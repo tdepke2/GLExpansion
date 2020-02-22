@@ -11,7 +11,7 @@ using namespace std;
 class Shader {
     public:
     Shader(const string& vertexShaderPath, const string& fragmentShaderPath);
-    unsigned int getProgramHandle() const;
+    unsigned int getHandle() const;
     void setBool(const string& name, bool value) const;
     void setInt(const string& name, int value) const;
     void setFloat(const string& name, float value) const;

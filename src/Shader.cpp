@@ -23,7 +23,7 @@ Shader::Shader(const string& vertexShaderPath, const string& fragmentShaderPath)
     glDeleteShader(fragmentShader);
 }
 
-unsigned int Shader::getProgramHandle() const {
+unsigned int Shader::getHandle() const {
     return _programHandle;
 }
 
