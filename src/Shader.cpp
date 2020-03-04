@@ -1,6 +1,7 @@
 #include "Shader.h"
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <sstream>
 
 Shader::Shader(const string& vertexShaderPath, const string& fragmentShaderPath) {
@@ -64,6 +65,7 @@ unsigned int Shader::_compileShader(const string& filename, GLenum shaderType) {
         char infoLog[512];
         glGetShaderInfoLog(shaderHandle, 512, nullptr, infoLog);
         cout << "Error: In shader \"" << filename << "\": " << infoLog << endl;
+        return 0;
     }
     
     return shaderHandle;

@@ -8,46 +8,26 @@
 #include <iostream>
 #include <stdexcept>
 
+atomic<Simulator::State> Simulator::state = {State::Uninitialized};
 mt19937 Simulator::mainRNG;
 Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 10.0f));
 glm::ivec2 Simulator::windowSize(800, 600);
-glm::vec2 Simulator::lastMousePos(0.0f, 0.0f);
+glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 
 int Simulator::start() {
-    cout << "Initializing setup..." << endl;
+    cout << "Initializing setup...\n";
     int exitCode = 0;
+    GLFWwindow* window = nullptr;
     try {
+        assert(state == State::Uninitialized);
+        state = State::Running;
         mainRNG.seed(static_cast<unsigned long>(chrono::high_resolution_clock::now().time_since_epoch().count()));
-        
-        glfwInit();    // Initialize GLFW and set version.
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        
-        GLFWwindow* window = glfwCreateWindow(windowSize.x, windowSize.y, "LearnOpenGL", NULL, NULL);    // Create the window.
-        if (window == nullptr) {
-            cout << "Error: Failed to create GLFW window." << endl;
-            glfwTerminate();
-            return -1;
-        }
-        glfwMakeContextCurrent(window);
-        
-        glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);    // Set function callbacks.
-        glfwSetCursorPosCallback(window, cursorPosCallback);
-        glfwSetScrollCallback(window, scrollCallback);
-        
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        
-        if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {    // Load all OpenGL function pointers with GLAD.
-            cout << "Error: Failed to initialize GLAD." << endl;
-            return -1;
-        }
-        
-        glEnable(GL_DEPTH_TEST);
-        
-        // End of OpenGL setup.
-        
         stbi_set_flip_vertically_on_load(true);
+        
+        window = setupOpenGL();
+        setupShaders();
+        setupTextures();
+        setupSimulation();
         
         unsigned int texture1 = loadTexture("textures/container.jpg");
         unsigned int texture2 = loadTexture("textures/awesomeface.png");
@@ -167,7 +147,8 @@ int Simulator::start() {
         
         double lastTime = glfwGetTime();
         float deltaTime = 0.0f;
-        while (!glfwWindowShouldClose(window)) {    // Render loop.
+        cout << "Setup complete.\n";
+        while (state != State::Exiting) {    // Render loop.
             double currentTime = glfwGetTime();
             deltaTime = static_cast<float>(currentTime - lastTime);
             lastTime = currentTime;
@@ -187,7 +168,7 @@ int Simulator::start() {
             glm::mat4 view = camera.getViewMatrix();
             glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
             
-            glm::mat4 projection = glm::perspective(glm::radians(camera.fov), static_cast<float>(windowSize.x) / windowSize.y, 0.1f, 100.0f);
+            glm::mat4 projection = glm::perspective(glm::radians(camera.fov), static_cast<float>(windowSize.x) / windowSize.y, NEAR_PLANE, FAR_PLANE);
             glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
             
             //glBindVertexArray(vao);
@@ -208,32 +189,39 @@ int Simulator::start() {
             glfwSwapBuffers(window);
             glfwPollEvents();
             glCheckError();
+            
+            if (glfwWindowShouldClose(window)) {
+                state = State::Exiting;
+            }
         }
         
         glDeleteVertexArrays(1, &vao);
         glDeleteBuffers(1, &vbo);
         
     } catch (exception& ex) {
-        cout << "\n****************************************************" << endl;
-        cout << "* A fatal error has occurred, terminating program. *" << endl;
-        cout << "****************************************************" << endl;
-        cout << "Error: " << ex.what() << endl;
-        cout << "(Press enter)" << endl;
+        state = State::Exiting;
+        cout << "\n****************************************************\n";
+        cout << "* A fatal error has occurred, terminating program. *\n";
+        cout << "****************************************************\n";
+        cout << "Error: " << ex.what() << "\n";
+        cout << "(Press enter)\n";
         cin.get();
         exitCode = -1;
     }
     
+    glfwDestroyWindow(window);
     glfwTerminate();
     return exitCode;
 }
 
-int Simulator::randomInteger(int min, int max) {
-    uniform_int_distribution<int> minMaxRange(min, max);
+float Simulator::randomFloat(float min, float max) {
+    uniform_real_distribution<float> minMaxRange(min, max);
     return minMaxRange(mainRNG);
 }
 
-int Simulator::randomInteger(int n) {
-    return randomInteger(0, n - 1);
+int Simulator::randomInt(int min, int max) {
+    uniform_int_distribution<int> minMaxRange(min, max);
+    return minMaxRange(mainRNG);
 }
 
 GLenum Simulator::glCheckError_(const char* file, int line) {
@@ -259,14 +247,93 @@ void Simulator::framebufferSizeCallback(GLFWwindow* window, int width, int heigh
     glViewport(0, 0, width, height);
 }
 
+void Simulator::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (action == GLFW_PRESS) {
+        if (key == GLFW_KEY_ESCAPE) {
+            if (state == State::Running) {
+                state = State::Paused;
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                glfwSetCursorPos(window, windowSize.x / 2.0f, windowSize.y / 2.0f);
+            } else if (state == State::Paused) {
+                state = State::Running;
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            }
+        }
+    }
+}
+
+void Simulator::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+    
+}
+
 void Simulator::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
-    camera.processMouseMove(static_cast<float>(xpos) - lastMousePos.x, lastMousePos.y - static_cast<float>(ypos));
+    if (state == State::Running) {
+        camera.processMouseMove(static_cast<float>(xpos) - lastMousePos.x, lastMousePos.y - static_cast<float>(ypos));
+    }
     lastMousePos.x = static_cast<float>(xpos);
     lastMousePos.y = static_cast<float>(ypos);
 }
 
 void Simulator::scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
     camera.processMouseScroll(static_cast<float>(xoffset), static_cast<float>(yoffset));
+}
+
+GLFWwindow* Simulator::setupOpenGL() {
+    glfwInit();    // Initialize GLFW and set version.
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    
+    GLFWwindow* window = glfwCreateWindow(windowSize.x, windowSize.y, "LearnOpenGL", nullptr, nullptr);    // Create the window.
+    if (window == nullptr) {
+        throw runtime_error("Error: Failed to create GLFW window.");
+    }
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1);    // Update our screen after at least 1 screen refresh.
+    
+    glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);    // Set function callbacks.
+    glfwSetKeyCallback(window, keyCallback);
+    glfwSetMouseButtonCallback(window, mouseButtonCallback);
+    glfwSetCursorPosCallback(window, cursorPosCallback);
+    glfwSetScrollCallback(window, scrollCallback);
+    
+    if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {    // Load all OpenGL function pointers with GLAD.
+        throw runtime_error("Error: Failed to initialize GLAD.");
+    }
+    
+    glEnable(GL_DEPTH_TEST);
+    //glDepthFunc(GL_LESS);
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    //glEnable(GL_CULL_FACE);
+    //glFrontFace(GL_CCW);
+    //glCullFace(GL_BACK);
+    //glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    
+    glfwSetCursorPos(window, windowSize.x / 2.0f, windowSize.y / 2.0f);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    
+    return window;
+}
+
+void Simulator::setupShaders() {
+    
+}
+
+void Simulator::setupTextures() {
+    
+}
+
+void Simulator::setupSimulation() {
+    
+}
+
+void Simulator::nextTick(GLFWwindow* window) {
+    
+}
+
+void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectionMtx, float deltaTime) {
+    
 }
 
 unsigned int Simulator::loadTexture(const string& filename) {
@@ -284,7 +351,7 @@ unsigned int Simulator::loadTexture(const string& filename) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, numChannels == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
     } else {
-        cout << "Error: Unable to load texture \"" << filename << "\"." << endl;
+        cout << "Error: Unable to load texture \"" << filename << "\".\n";
     }
     stbi_image_free(data);
     
@@ -292,9 +359,9 @@ unsigned int Simulator::loadTexture(const string& filename) {
 }
 
 void Simulator::processInput(GLFWwindow* window, float deltaTime) {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, true);
-    }
+    //if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        //glfwSetWindowShouldClose(window, true);
+    //}
     
     glm::vec3 moveDirection(0.0f, 0.0f, 0.0f);
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
