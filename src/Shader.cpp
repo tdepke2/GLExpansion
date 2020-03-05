@@ -28,16 +28,20 @@ unsigned int Shader::getHandle() const {
     return _programHandle;
 }
 
-void Shader::setBool(const string& name, bool value) const {
-    glUniform1i(glGetUniformLocation(_programHandle, name.c_str()), static_cast<int>(value));
+void Shader::setFloat(const string& name, float value) const {
+    glUniform1f(_getUniformLocation(name), value);
 }
 
 void Shader::setInt(const string& name, int value) const {
-    glUniform1i(glGetUniformLocation(_programHandle, name.c_str()), value);
+    glUniform1i(_getUniformLocation(name), value);
 }
 
-void Shader::setFloat(const string& name, float value) const {
-    glUniform1f(glGetUniformLocation(_programHandle, name.c_str()), value);
+void Shader::setUnsignedInt(const string& name, unsigned int value) const {
+    glUniform1ui(_getUniformLocation(name), value);
+}
+
+void Shader::setMatrix4Float(const string& name, const float* value) const {
+    glUniformMatrix4fv(_getUniformLocation(name), 1, false, value);
 }
 
 void Shader::use() {
@@ -69,4 +73,12 @@ unsigned int Shader::_compileShader(const string& filename, GLenum shaderType) {
     }
     
     return shaderHandle;
+}
+
+int Shader::_getUniformLocation(const string& name) const {
+    int location = glGetUniformLocation(_programHandle, name.c_str());
+    if (location == -1) {
+        cout << "Error: Failed to set uniform \"" << name << "\".\n";
+    }
+    return location;
 }
