@@ -3,14 +3,16 @@
 
 #include "Shader.h"
 #include "Simulator.h"
+#include "VertexArrayObject.h"
 #include <cassert>
 #include <chrono>
 #include <iostream>
 #include <stdexcept>
+#include <utility>
 
 atomic<Simulator::State> Simulator::state = {State::Uninitialized};
 mt19937 Simulator::mainRNG;
-Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 10.0f));
+Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 5.0f));
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 
@@ -29,7 +31,7 @@ int Simulator::start() {
         setupTextures();
         setupSimulation();
         
-        unsigned int texture1 = loadTexture("textures/container.jpg");
+        unsigned int texture1 = loadTexture("textures/grid512.bmp");//container.jpg");
         unsigned int texture2 = loadTexture("textures/awesomeface.png");
         
         Shader testShader("shaders/shader.v.glsl", "shaders/shader.f.glsl");
@@ -37,94 +39,8 @@ int Simulator::start() {
         testShader.setInt("tex1", 0);
         testShader.setInt("tex2", 1);
         
-        /*float vertices[] = {
-             0.5f,  0.5f, 0.0f,  1.0f, 0.0f, 0.0f,  1.0f, 1.0f,
-             0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,  1.0f, 0.0f,
-            -0.5f, -0.5f, 0.0f,  0.0f, 0.0f, 1.0f,  0.0f, 0.0f,
-            -0.5f,  0.5f, 0.0f,  1.0f, 1.0f, 0.0f,  0.0f, 1.0f
-        };
-        unsigned int indices[] = {
-            0, 1, 3,
-            1, 2, 3
-        };
-        unsigned int vao;
-        glGenVertexArrays(1, &vao);
-        glBindVertexArray(vao);
-        
-        unsigned int vbo;
-        glGenBuffers(1, &vbo);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-        
-        unsigned int ebo;
-        glGenBuffers(1, &ebo);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-        
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), reinterpret_cast<void*>(0));
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), reinterpret_cast<void*>(3 * sizeof(float)));
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), reinterpret_cast<void*>(6 * sizeof(float)));
-        glEnableVertexAttribArray(2);*/
-        
-        float vertices[] = {
-            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-             0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-             0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-             0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-             0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-             0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-             0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-            -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-
-            -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-             0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-             0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-             0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-             0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-             0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-             0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-             0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-             0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-             0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-             0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-             0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-             0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
-        };
-        
-        unsigned int vao;
-        glGenVertexArrays(1, &vao);
-        glBindVertexArray(vao);
-        
-        unsigned int vbo;
-        glGenBuffers(1, &vbo);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-        
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<void*>(0));
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<void*>(3 * sizeof(float)));
-        glEnableVertexAttribArray(2);
+        VertexArrayObject vao;
+        vao.generateCube();
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
@@ -167,19 +83,14 @@ int Simulator::start() {
             glm::mat4 projection = glm::perspective(glm::radians(camera.fov), static_cast<float>(windowSize.x) / windowSize.y, NEAR_PLANE, FAR_PLANE);
             testShader.setMatrix4Float("projection", glm::value_ptr(projection));
             
-            //glBindVertexArray(vao);
-            //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-            //glDrawArrays(GL_TRIANGLES, 0, 36);
-            
-            glBindVertexArray(vao);
-            for (unsigned int i = 0; i < 10; ++i) {
+            for (unsigned int i = 0; i < 1; ++i) {
                 glm::mat4 model = glm::mat4(1.0f);
                 model = glm::translate(model, cubePositions[i]);
-                float angle = 20.0f * i; 
-                model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+                //float angle = 20.0f * i;
+                //model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
                 testShader.setMatrix4Float("model", glm::value_ptr(model));
                 
-                glDrawArrays(GL_TRIANGLES, 0, 36);
+                vao.draw();
             }
             
             glfwSwapBuffers(window);
@@ -190,10 +101,6 @@ int Simulator::start() {
                 state = State::Exiting;
             }
         }
-        
-        glDeleteVertexArrays(1, &vao);
-        glDeleteBuffers(1, &vbo);
-        
     } catch (exception& ex) {
         state = State::Exiting;
         cout << "\n****************************************************\n";
@@ -301,7 +208,7 @@ GLFWwindow* Simulator::setupOpenGL() {
     //glDepthFunc(GL_LESS);
     //glEnable(GL_BLEND);
     //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    //glEnable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE);
     //glFrontFace(GL_CCW);
     //glCullFace(GL_BACK);
     //glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
