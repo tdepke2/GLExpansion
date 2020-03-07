@@ -34,13 +34,24 @@ int Simulator::start() {
         unsigned int texture1 = loadTexture("textures/grid512.bmp");//container.jpg");
         unsigned int texture2 = loadTexture("textures/awesomeface.png");
         
-        Shader testShader("shaders/shader.v.glsl", "shaders/shader.f.glsl");
-        testShader.use();
-        testShader.setInt("tex1", 0);
-        testShader.setInt("tex2", 1);
+        Shader lightShader("shaders/cubeShader.v.glsl", "shaders/lightShader.f.glsl");
+        glm::vec3 lightPosition(1.0f, 1.0f, 1.0f);
+        glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
+        lightShader.use();
+        lightShader.setVec3("lightColor", lightColor);
         
-        VertexArrayObject vao;
-        vao.generateSphere();
+        VertexArrayObject lightCube;
+        lightCube.generateCube(0.2f);
+        
+        Shader cubeShader("shaders/cubeShader.v.glsl", "shaders/cubeShader.f.glsl");
+        cubeShader.use();
+        cubeShader.setInt("tex1", 0);
+        cubeShader.setInt("tex2", 1);
+        cubeShader.setVec3("objectColor", glm::vec3(1.0f, 0.5f, 0.31f));
+        cubeShader.setVec3("lightColor", lightColor);
+        
+        VertexArrayObject cube1;
+        cube1.generateCube();
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
@@ -64,7 +75,6 @@ int Simulator::start() {
             double currentTime = glfwGetTime();
             deltaTime = static_cast<float>(currentTime - lastTime);
             lastTime = currentTime;
-            
             processInput(window, deltaTime);
             
             glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
@@ -75,22 +85,28 @@ int Simulator::start() {
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_2D, texture2);
             
-            testShader.use();
-            
             glm::mat4 view = camera.getViewMatrix();
-            testShader.setMatrix4Float("view", glm::value_ptr(view));
-            
             glm::mat4 projection = glm::perspective(glm::radians(camera.fov), static_cast<float>(windowSize.x) / windowSize.y, NEAR_PLANE, FAR_PLANE);
-            testShader.setMatrix4Float("projection", glm::value_ptr(projection));
+            
+            lightShader.use();
+            lightShader.setMat4("view", view);
+            lightShader.setMat4("projection", projection);
+            
+            lightShader.setMat4("model", glm::translate(glm::mat4(1.0f), lightPosition));
+            lightCube.draw();
+            
+            cubeShader.use();
+            cubeShader.setMat4("view", view);
+            cubeShader.setMat4("projection", projection);
             
             for (unsigned int i = 0; i < 1; ++i) {
                 glm::mat4 model = glm::mat4(1.0f);
                 model = glm::translate(model, cubePositions[i]);
                 //float angle = 20.0f * i;
                 //model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-                testShader.setMatrix4Float("model", glm::value_ptr(model));
+                cubeShader.setMat4("model", model);
                 
-                vao.draw();
+                cube1.draw();
             }
             
             glfwSwapBuffers(window);

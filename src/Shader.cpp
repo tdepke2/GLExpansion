@@ -32,6 +32,10 @@ void Shader::setFloat(const string& name, float value) const {
     glUniform1f(_getUniformLocation(name), value);
 }
 
+void Shader::setBool(const string& name, bool value) const {
+    glUniform1i(_getUniformLocation(name), static_cast<int>(value));
+}
+
 void Shader::setInt(const string& name, int value) const {
     glUniform1i(_getUniformLocation(name), value);
 }
@@ -40,8 +44,40 @@ void Shader::setUnsignedInt(const string& name, unsigned int value) const {
     glUniform1ui(_getUniformLocation(name), value);
 }
 
-void Shader::setMatrix4Float(const string& name, const float* value) const {
-    glUniformMatrix4fv(_getUniformLocation(name), 1, false, value);
+void Shader::setVec2(const string& name, const glm::vec2& value) const {
+    glUniform2fv(_getUniformLocation(name), 1, glm::value_ptr(value));
+}
+
+void Shader::setVec2(const string& name, float x, float y) const {
+    glUniform2f(_getUniformLocation(name), x, y);
+}
+
+void Shader::setVec3(const string& name, const glm::vec3& value) const {
+    glUniform3fv(_getUniformLocation(name), 1, glm::value_ptr(value));
+}
+
+void Shader::setVec3(const string& name, float x, float y, float z) const {
+    glUniform3f(_getUniformLocation(name), x, y, z);
+}
+
+void Shader::setVec4(const string& name, const glm::vec4& value) const {
+    glUniform4fv(_getUniformLocation(name), 1, glm::value_ptr(value));
+}
+
+void Shader::setVec4(const string& name, float x, float y, float z, float w) const {
+    glUniform4f(_getUniformLocation(name), x, y, z, w);
+}
+
+void Shader::setMat2(const string& name, const glm::mat2& value) const {
+    glUniformMatrix2fv(_getUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
+}
+
+void Shader::setMat3(const string& name, const glm::mat3& value) const {
+    glUniformMatrix3fv(_getUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
+}
+
+void Shader::setMat4(const string& name, const glm::mat4& value) const {
+    glUniformMatrix4fv(_getUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
 }
 
 void Shader::use() {
