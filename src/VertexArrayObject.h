@@ -16,18 +16,18 @@ struct VertexAttributes {
 
 class VertexArrayObject {
     public:
-    static constexpr unsigned int NUM_BUFFERS = 1;
     VertexArrayObject();
     ~VertexArrayObject();
     void generateVertices(vector<VertexAttributes>&& _vertices);
+    void generateVertices(vector<VertexAttributes>&& _vertices, vector<unsigned int>&& _indices);
     void generateCube(float sideLength = 1.0f);
-    void generateSphere();
+    void generateSphere(float radius = 1.0f, int numSectors = 32, int numStacks = 16);
     void draw();
     
     private:
-    unsigned int _vaoHandle;
-    unsigned int _vboHandles[NUM_BUFFERS];
+    unsigned int _vertexArrayHandle, _vertexBufferHandle, _elementBufferHandle;
     vector<VertexAttributes> _vertices;
+    vector<unsigned int> _indices;
 };
 
 #endif

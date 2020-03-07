@@ -40,7 +40,7 @@ int Simulator::start() {
         testShader.setInt("tex2", 1);
         
         VertexArrayObject vao;
-        vao.generateCube();
+        vao.generateSphere();
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
