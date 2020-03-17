@@ -1,8 +1,5 @@
 #version 330 core
 
-uniform sampler2D tex1;
-uniform sampler2D tex2;
-
 struct Material {
     vec3 ambient;
     vec3 diffuse;

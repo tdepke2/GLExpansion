@@ -31,8 +31,8 @@ void VertexArrayObject::generateVertices(vector<VertexAttributes>&& vertices) {
     glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_POSITION, 3, GL_FLOAT, false, sizeof(VertexAttributes), reinterpret_cast<void*>(0));
     glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_NORMAL);
     glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_NORMAL, 3, GL_FLOAT, false, sizeof(VertexAttributes), reinterpret_cast<void*>(sizeof(float) * 3));
-    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_TEX_COORD);
-    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_TEX_COORD, 2, GL_FLOAT, false, sizeof(VertexAttributes), reinterpret_cast<void*>(sizeof(float) * 6));
+    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_TEX_COORDS);
+    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_TEX_COORDS, 2, GL_FLOAT, false, sizeof(VertexAttributes), reinterpret_cast<void*>(sizeof(float) * 6));
 }
 
 void VertexArrayObject::generateVertices(vector<VertexAttributes>&& vertices, vector<unsigned int>&& indices) {

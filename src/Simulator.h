@@ -18,7 +18,7 @@ using namespace std;
 class Simulator {
     public:
     static constexpr float NEAR_PLANE = 0.1f, FAR_PLANE = 100.0f;
-    static constexpr int ATTRIBUTE_LOCATION_V_POSITION = 0, ATTRIBUTE_LOCATION_V_NORMAL = 1, ATTRIBUTE_LOCATION_V_TEX_COORD = 2;
+    static constexpr int ATTRIBUTE_LOCATION_V_POSITION = 0, ATTRIBUTE_LOCATION_V_NORMAL = 1, ATTRIBUTE_LOCATION_V_TEX_COORDS = 2;
     
     static int start();
     static float randomFloat(float min = 0.0f, float max = 1.0f);    // Generates a random float between min (inclusive) and max (exclusive).
