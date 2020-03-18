@@ -44,6 +44,18 @@ void Shader::setUnsignedInt(const string& name, unsigned int value) const {
     glUniform1ui(_getUniformLocation(name), value);
 }
 
+void Shader::setFloatArray(const string& name, unsigned int count, const float* valuePtr) const {
+    glUniform1fv(_getUniformLocation(name), count, valuePtr);
+}
+
+void Shader::setIntArray(const string& name, unsigned int count, const int* valuePtr) const {
+    glUniform1iv(_getUniformLocation(name), count, valuePtr);
+}
+
+void Shader::setUnsignedIntArray(const string& name, unsigned int count, const unsigned int* valuePtr) const {
+    glUniform1uiv(_getUniformLocation(name), count, valuePtr);
+}
+
 void Shader::setVec2(const string& name, const glm::vec2& value) const {
     glUniform2fv(_getUniformLocation(name), 1, glm::value_ptr(value));
 }

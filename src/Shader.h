@@ -19,6 +19,9 @@ class Shader {
     void setBool(const string& name, bool value) const;
     void setInt(const string& name, int value) const;
     void setUnsignedInt(const string& name, unsigned int value) const;
+    void setFloatArray(const string& name, unsigned int count, const float* valuePtr) const;
+    void setIntArray(const string& name, unsigned int count, const int* valuePtr) const;
+    void setUnsignedIntArray(const string& name, unsigned int count, const unsigned int* valuePtr) const;
     void setVec2(const string& name, const glm::vec2& value) const;
     void setVec2(const string& name, float x, float y) const;
     void setVec3(const string& name, const glm::vec3& value) const;

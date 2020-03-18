@@ -35,14 +35,14 @@ int Simulator::start() {
         unsigned int specularMap = loadTexture("textures/container2_specular.png");
         
         Shader lightShader("shaders/phongShader.v.glsl", "shaders/lightShader.f.glsl");
-        const int NUM_POINT_LIGHTS = 4;
-        glm::vec3 pointLightPositions[NUM_POINT_LIGHTS] = {
+        const int NUM_LIGHTS = 8;
+        glm::vec3 pointLightPositions[4] = {
             {0.7f, 0.2f, 2.0f},
             {2.3f, -3.3f, -4.0f},
             {-4.0f, 2.0f, -12.0f},
             {0.0f, 0.0f, -3.0f}
         };
-        glm::vec3 pointLightColors[NUM_POINT_LIGHTS] = {
+        glm::vec3 pointLightColors[4] = {
             {1.0f, 1.0f, 1.0f},
             {1.0f, 1.0f, 1.0f},
             {1.0f, 1.0f, 1.0f},
@@ -51,13 +51,13 @@ int Simulator::start() {
         VertexArrayObject lightCube;
         lightCube.generateCube(0.2f);
         
-        Shader cubeShader("shaders/phongShader.v.glsl", "shaders/phongShader.f.glsl");
+        Shader phongShader("shaders/phongShader.v.glsl", "shaders/phongShader.f.glsl");
         VertexArrayObject cube1;
         cube1.generateCube();
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
-        glm::vec3 cubePositions[] = {
+        vector<glm::vec3> cubePositions = {
             glm::vec3( 0.0f,  0.0f,  0.0f),
             glm::vec3( 2.0f,  5.0f, -15.0f),
             glm::vec3(-1.5f, -2.2f, -2.5f),
@@ -69,6 +69,9 @@ int Simulator::start() {
             glm::vec3( 1.5f,  0.2f, -1.5f),
             glm::vec3(-1.3f,  1.0f, -1.5f)
         };
+        for (int i = 0; i < 5000; ++i) {
+            //cubePositions.emplace_back(randomFloat(-50.0f, 50.0f), randomFloat(-50.0f, 50.0f), randomFloat(-50.0f, 50.0f));
+        }
         
         double lastTime = glfwGetTime();
         float deltaTime = 0.0f;
@@ -103,56 +106,62 @@ int Simulator::start() {
             lightShader.setMat4("viewMtx", viewMtx);
             lightShader.setMat4("projectionMtx", projectionMtx);
             
-            for (int i = 0; i < NUM_POINT_LIGHTS; ++i) {
+            for (int i = 0; i < 4; ++i) {
                 lightShader.setVec3("lightColor", pointLightColors[i]);
                 lightShader.setMat4("modelMtx", glm::translate(glm::mat4(1.0f), pointLightPositions[i]));
                 lightCube.draw();
             }
             
-            cubeShader.use();
-            cubeShader.setInt("material.diffuse", 0);
+            phongShader.use();
+            phongShader.setInt("material.diffuse", 0);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, diffuseMap);
-            cubeShader.setInt("material.specular", 1);
+            phongShader.setInt("material.specular", 1);
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_2D, specularMap);
-            cubeShader.setFloat("material.shininess", 32.0f);
+            phongShader.setFloat("material.shininess", 32.0f);
             
-            cubeShader.setVec3("directionalLight.directionViewSpace", viewMtx * glm::vec4(-0.2f, -1.0f, -0.3f, 0.0f));
+            unsigned int lightStates[NUM_LIGHTS] = {1, 1, 1, 1, 1, 1, 0, 0};
+            phongShader.setUnsignedIntArray("lightStates", NUM_LIGHTS, lightStates);
+            
+            phongShader.setUnsignedInt("lights[0].type", 0);
+            phongShader.setVec3("lights[0].directionViewSpace", viewMtx * glm::vec4(-0.2f, -1.0f, -0.3f, 0.0f));
             glm::vec3 directionalLightColor(1.0f, 1.0f, 1.0f);
-            cubeShader.setVec3("directionalLight.ambient", directionalLightColor * 0.05f);
-            cubeShader.setVec3("directionalLight.diffuse", directionalLightColor * 0.4f);
-            cubeShader.setVec3("directionalLight.specular", directionalLightColor * 0.5f);
+            phongShader.setVec3("lights[0].ambient", directionalLightColor * 0.05f);
+            phongShader.setVec3("lights[0].diffuse", directionalLightColor * 0.4f);
+            phongShader.setVec3("lights[0].specular", directionalLightColor * 0.5f);
             
-            for (int i = 0; i < NUM_POINT_LIGHTS; ++i) {
-                cubeShader.setVec3("pointLights[" + to_string(i) + "].positionViewSpace", viewMtx * glm::vec4(pointLightPositions[i], 1.0f));
-                cubeShader.setVec3("pointLights[" + to_string(i) + "].ambient", pointLightColors[i] * 0.05f);
-                cubeShader.setVec3("pointLights[" + to_string(i) + "].diffuse", pointLightColors[i] * 0.8f);
-                cubeShader.setVec3("pointLights[" + to_string(i) + "].specular", pointLightColors[i]);
-                cubeShader.setVec3("pointLights[" + to_string(i) + "].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
+            for (int i = 0; i < 4; ++i) {
+                phongShader.setUnsignedInt("lights[" + to_string(i + 1) + "].type", 1);
+                phongShader.setVec3("lights[" + to_string(i + 1) + "].positionViewSpace", viewMtx * glm::vec4(pointLightPositions[i], 1.0f));
+                phongShader.setVec3("lights[" + to_string(i + 1) + "].ambient", pointLightColors[i] * 0.05f);
+                phongShader.setVec3("lights[" + to_string(i + 1) + "].diffuse", pointLightColors[i] * 0.8f);
+                phongShader.setVec3("lights[" + to_string(i + 1) + "].specular", pointLightColors[i]);
+                phongShader.setVec3("lights[" + to_string(i + 1) + "].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
             }
             
-            cubeShader.setVec3("spotLight.positionViewSpace", viewMtx * glm::vec4(camera.position, 1.0f));
-            cubeShader.setVec3("spotLight.directionViewSpace", viewMtx * glm::vec4(camera.front, 0.0f));
+            phongShader.setUnsignedInt("lights[5].type", 2);
+            phongShader.setVec3("lights[5].positionViewSpace", viewMtx * glm::vec4(camera.position, 1.0f));
+            phongShader.setVec3("lights[5].directionViewSpace", viewMtx * glm::vec4(camera.front, 0.0f));
             glm::vec3 spotLightColor(1.0f, 1.0f, 1.0f);
-            cubeShader.setVec3("spotLight.ambient", spotLightColor * 0.0f);
-            cubeShader.setVec3("spotLight.diffuse", spotLightColor);
-            cubeShader.setVec3("spotLight.specular", spotLightColor);
-            cubeShader.setVec3("spotLight.attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
-            cubeShader.setVec2("spotLight.cutOff", glm::vec2(glm::cos(glm::radians(12.5f)), glm::cos(glm::radians(17.5f))));
+            phongShader.setVec3("lights[5].ambient", spotLightColor * 0.0f);
+            phongShader.setVec3("lights[5].diffuse", spotLightColor);
+            phongShader.setVec3("lights[5].specular", spotLightColor);
+            phongShader.setVec3("lights[5].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
+            phongShader.setVec2("lights[5].cutOff", glm::vec2(glm::cos(glm::radians(12.5f)), glm::cos(glm::radians(17.5f))));
             
-            cubeShader.setMat4("viewMtx", viewMtx);
-            cubeShader.setMat4("projectionMtx", projectionMtx);
+            phongShader.setMat4("viewMtx", viewMtx);
+            phongShader.setMat4("projectionMtx", projectionMtx);
             
-            for (unsigned int i = 0; i < 10; ++i) {
+            for (unsigned int i = 0; i < cubePositions.size(); ++i) {
                 glm::mat4 modelMtx = glm::translate(glm::mat4(1.0f), cubePositions[i]);
                 float angle = 20.0f * i;
                 modelMtx = glm::rotate(modelMtx, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-                cubeShader.setMat4("modelMtx", modelMtx);
+                phongShader.setMat4("modelMtx", modelMtx);
                 
                 cube1.draw();
             }
-            cubeShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, -0.5f, 3.0f)), glm::vec3(3.0f, 0.2f, 5.0f)));
+            phongShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, -0.5f, 3.0f)), glm::vec3(3.0f, 0.2f, 5.0f)));
             cube1.draw();
             
             glfwSwapBuffers(window);
