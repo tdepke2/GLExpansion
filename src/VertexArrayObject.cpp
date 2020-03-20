@@ -142,8 +142,8 @@ void VertexArrayObject::generateSphere(float radius, int numSectors, int numStac
 void VertexArrayObject::draw() {
     glBindVertexArray(_vertexArrayHandle);
     if (_indices.empty()) {
-        glDrawArrays(GL_TRIANGLES, 0, _vertices.size());
+        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(_vertices.size()));
     } else {
-        glDrawElements(GL_TRIANGLES, _indices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(_indices.size()), GL_UNSIGNED_INT, 0);
     }
 }

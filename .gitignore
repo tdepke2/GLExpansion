@@ -6,3 +6,4 @@ textures/
 *.vcxproj*
 *.o
 *.exe
+assimp-vc141-mtd.dll

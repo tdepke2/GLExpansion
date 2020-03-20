@@ -10,6 +10,10 @@
 #include <stdexcept>
 #include <utility>
 
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
 atomic<Simulator::State> Simulator::state = {State::Uninitialized};
 mt19937 Simulator::mainRNG;
 Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -71,6 +75,12 @@ int Simulator::start() {
         };
         for (int i = 0; i < 5000; ++i) {
             //cubePositions.emplace_back(randomFloat(-50.0f, 50.0f), randomFloat(-50.0f, 50.0f), randomFloat(-50.0f, 50.0f));
+        }
+        
+        Assimp::Importer importer;
+        const aiScene* scene = importer.ReadFile("test.obj", aiProcess_Triangulate | aiProcess_FlipUVs);
+        if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+            cout << "ERROR::ASSIMP::" << importer.GetErrorString() << endl;
         }
         
         double lastTime = glfwGetTime();
