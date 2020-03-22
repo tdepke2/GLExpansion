@@ -8,8 +8,8 @@ const uint SPOT_LIGHT = 2u;
 uniform bool lightStates[NUM_LIGHTS];
 
 struct Material {
-    sampler2D diffuse;
-    sampler2D specular;
+    sampler2D texDiffuse0;
+    sampler2D texSpecular0;
     float shininess;
 };
 uniform Material material;
@@ -72,8 +72,8 @@ vec3 calculateLight(Light light, vec3 normalDir, vec3 viewDir, vec3 diffuseColor
 void main() {
     vec3 normalDir = normalize(fNormal);
     vec3 viewDir = normalize(-fPosition);
-    vec3 diffuseColor = vec3(texture(material.diffuse, fTexCoords));
-    vec3 specularColor = vec3(texture(material.specular, fTexCoords));
+    vec3 diffuseColor = vec3(texture(material.texDiffuse0, fTexCoords));
+    vec3 specularColor = vec3(texture(material.texSpecular0, fTexCoords));
     
     vec3 color = vec3(0.0, 0.0, 0.0);
     for (uint i = 0u; i < NUM_LIGHTS; ++i) {

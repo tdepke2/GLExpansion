@@ -1,24 +1,22 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include "Mesh.h"
+#include "Model.h"
 #include "Shader.h"
 #include "Simulator.h"
-#include "VertexArrayObject.h"
 #include <cassert>
 #include <chrono>
 #include <iostream>
 #include <stdexcept>
 #include <utility>
 
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
-
 atomic<Simulator::State> Simulator::state = {State::Uninitialized};
 mt19937 Simulator::mainRNG;
 Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 3.0f));
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
+unordered_map<string, unsigned int> Simulator::loadedTextures;
 
 int Simulator::start() {
     cout << "Initializing setup...\n";
@@ -52,12 +50,14 @@ int Simulator::start() {
             {1.0f, 1.0f, 1.0f},
             {1.0f, 1.0f, 1.0f}
         };
-        VertexArrayObject lightCube;
+        Mesh lightCube;
         lightCube.generateCube(0.2f);
         
         Shader phongShader("shaders/phongShader.v.glsl", "shaders/phongShader.f.glsl");
-        VertexArrayObject cube1;
+        Mesh cube1;
         cube1.generateCube();
+        
+        Model nanosuit("models/nanosuit/nanosuit.obj");
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
@@ -77,12 +77,6 @@ int Simulator::start() {
             //cubePositions.emplace_back(randomFloat(-50.0f, 50.0f), randomFloat(-50.0f, 50.0f), randomFloat(-50.0f, 50.0f));
         }
         
-        Assimp::Importer importer;
-        const aiScene* scene = importer.ReadFile("test.obj", aiProcess_Triangulate | aiProcess_FlipUVs);
-        if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-            cout << "ERROR::ASSIMP::" << importer.GetErrorString() << endl;
-        }
-        
         double lastTime = glfwGetTime();
         float deltaTime = 0.0f;
         double lastFrameTime = lastTime;
@@ -98,6 +92,9 @@ int Simulator::start() {
                 cout << 1000.0 / frameCounter << " ms/frame\n";
                 frameCounter = 0;
                 lastFrameTime += 1.0;
+                if (currentTime - lastFrameTime >= 1.0) {
+                    lastFrameTime = currentTime;
+                }
             }
             
             processInput(window, deltaTime);
@@ -123,10 +120,10 @@ int Simulator::start() {
             }
             
             phongShader.use();
-            phongShader.setInt("material.diffuse", 0);
+            phongShader.setInt("material.texDiffuse0", 0);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, diffuseMap);
-            phongShader.setInt("material.specular", 1);
+            phongShader.setInt("material.texSpecular0", 1);
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_2D, specularMap);
             phongShader.setFloat("material.shininess", 32.0f);
@@ -174,6 +171,9 @@ int Simulator::start() {
             phongShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, -0.5f, 3.0f)), glm::vec3(3.0f, 0.2f, 5.0f)));
             cube1.draw();
             
+            phongShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)), glm::vec3(1.0f, 1.0f, 1.0f)));
+            nanosuit.draw(phongShader);
+            
             glfwSwapBuffers(window);
             glfwPollEvents();
             glCheckError();
@@ -220,9 +220,38 @@ GLenum Simulator::glCheckError_(const char* file, int line) {
             case GL_INVALID_FRAMEBUFFER_OPERATION: error = "INVALID_FRAMEBUFFER_OPERATION"; break;
             default:                               error = "UNKNOWN ERROR (" + to_string(errorCode) + ")"; break;
         }
-        cout << error << " | " << file << " (" << line << ")";
+        cout << error << " | " << file << " (" << line << ")\n";
     }
     return errorCode;
+}
+
+unsigned int Simulator::loadTexture(const string& filename) {
+    auto findResult = loadedTextures.find(filename);
+    if (findResult != loadedTextures.end()) {
+        return findResult->second;
+    }
+    
+    cout << "Loading texture \"" << filename << "\".\n";
+    unsigned int texHandle;
+    glGenTextures(1, &texHandle);
+    glBindTexture(GL_TEXTURE_2D, texHandle);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    
+    int width, height, numChannels;
+    unsigned char* imageData = stbi_load(filename.c_str(), &width, &height, &numChannels, 0);
+    if (imageData) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, numChannels == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, imageData);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    } else {
+        cout << "Error: Unable to load texture \"" << filename << "\".\n";
+    }
+    stbi_image_free(imageData);
+    
+    loadedTextures[filename] = texHandle;
+    return texHandle;
 }
 
 void Simulator::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
@@ -318,28 +347,6 @@ void Simulator::nextTick(GLFWwindow* window) {
 
 void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectionMtx, float deltaTime) {
     
-}
-
-unsigned int Simulator::loadTexture(const string& filename) {
-    unsigned int texHandle;
-    glGenTextures(1, &texHandle);
-    glBindTexture(GL_TEXTURE_2D, texHandle);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    
-    int width, height, numChannels;
-    unsigned char* data = stbi_load(filename.c_str(), &width, &height, &numChannels, 0);
-    if (data) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, numChannels == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    } else {
-        cout << "Error: Unable to load texture \"" << filename << "\".\n";
-    }
-    stbi_image_free(data);
-    
-    return texHandle;
 }
 
 void Simulator::processInput(GLFWwindow* window, float deltaTime) {

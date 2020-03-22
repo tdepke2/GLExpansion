@@ -12,6 +12,7 @@
 #include <atomic>
 #include <random>
 #include <string>
+#include <unordered_map>
 
 using namespace std;
 
@@ -24,6 +25,7 @@ class Simulator {
     static float randomFloat(float min = 0.0f, float max = 1.0f);    // Generates a random float between min (inclusive) and max (exclusive).
     static int randomInt(int min, int max);    // Generates a random integer between min and max inclusive.
     static GLenum glCheckError_(const char* file, int line);    // Error checking, https://learnopengl.com/In-Practice/Debugging
+    static unsigned int loadTexture(const string& filename);
     
     private:
     enum class State {
@@ -35,6 +37,7 @@ class Simulator {
     static Camera camera;
     static glm::ivec2 windowSize;
     static glm::vec2 lastMousePos;
+    static unordered_map<string, unsigned int> loadedTextures;
     
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -49,7 +52,6 @@ class Simulator {
     static void nextTick(GLFWwindow* window);
     static void renderScene(const glm::mat4& viewMtx, const glm::mat4& projectionMtx, float deltaTime);
     
-    static unsigned int loadTexture(const string& filename);
     static void processInput(GLFWwindow* window, float deltaTime);
 };
 
