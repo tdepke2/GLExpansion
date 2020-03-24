@@ -26,6 +26,7 @@ class Simulator {
     static int randomInt(int min, int max);    // Generates a random integer between min and max inclusive.
     static GLenum glCheckError_(const char* file, int line);    // Error checking, https://learnopengl.com/In-Practice/Debugging
     static unsigned int loadTexture(const string& filename);
+    static unsigned int generateTexture(int r, int g, int b);
     
     private:
     enum class State {

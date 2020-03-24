@@ -33,10 +33,14 @@ int Simulator::start() {
         setupTextures();
         setupSimulation();
         
+        unsigned int blackTexture = generateTexture(0, 0, 0);
         unsigned int diffuseMap = loadTexture("textures/container2.png");
         unsigned int specularMap = loadTexture("textures/container2_specular.png");
         
         Shader lightShader("shaders/phongShader.v.glsl", "shaders/lightShader.f.glsl");
+        Shader phongShader("shaders/phongShader.v.glsl", "shaders/phongShader.f.glsl");
+        Shader testShader("shaders/phongShader.v.glsl", "shaders/blendShader.f.glsl");
+        
         const int NUM_LIGHTS = 8;
         glm::vec3 pointLightPositions[4] = {
             {0.7f, 0.2f, 2.0f},
@@ -53,11 +57,31 @@ int Simulator::start() {
         Mesh lightCube;
         lightCube.generateCube(0.2f);
         
-        Shader phongShader("shaders/phongShader.v.glsl", "shaders/phongShader.f.glsl");
         Mesh cube1;
         cube1.generateCube();
+        //stbi_set_flip_vertically_on_load(false);
+        Model modelTest("models/nanosuit/nanosuit.obj");
+        //stbi_set_flip_vertically_on_load(true);
         
-        Model nanosuit("models/nanosuit/nanosuit.obj");
+        vector<Mesh::Vertex> grassVertices = {
+            { 0.5,  1.0,  0.5,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f},
+            {-0.5,  1.0,  0.5,  0.0f,  0.0f,  1.0f, 0.0f, 1.0f},
+            {-0.5,  0.0,  0.5,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f},
+            { 0.5,  0.0,  0.5,  0.0f,  0.0f,  1.0f, 1.0f, 0.0f}
+        };
+        vector<unsigned int> grassIndices = {
+            0, 1, 2, 2, 3, 0
+        };
+        unsigned int grassDiffuse = loadTexture("textures/blending_transparent_window.png");
+        Mesh grass(move(grassVertices), move(grassIndices));
+        
+        vector<glm::vec3> grassPositions = {
+            {-1.5f,  0.0f, -0.5f},
+            { 1.5f,  0.0f,  0.5f},
+            { 0.0f,  0.0f,  0.7f},
+            {-0.3f,  0.0f, -2.3f},
+            { 0.5f,  0.0f, -0.6f}
+        };
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
@@ -87,7 +111,7 @@ int Simulator::start() {
             deltaTime = static_cast<float>(currentTime - lastTime);
             lastTime = currentTime;
             
-            ++frameCounter;
+            /*++frameCounter;
             if (currentTime - lastFrameTime >= 1.0) {
                 cout << 1000.0 / frameCounter << " ms/frame\n";
                 frameCounter = 0;
@@ -95,7 +119,7 @@ int Simulator::start() {
                 if (currentTime - lastFrameTime >= 1.0) {
                     lastFrameTime = currentTime;
                 }
-            }
+            }*/
             
             processInput(window, deltaTime);
             
@@ -120,12 +144,10 @@ int Simulator::start() {
             }
             
             phongShader.use();
+            phongShader.setMat4("viewMtx", viewMtx);
+            phongShader.setMat4("projectionMtx", projectionMtx);
             phongShader.setInt("material.texDiffuse0", 0);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, diffuseMap);
             phongShader.setInt("material.texSpecular0", 1);
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, specularMap);
             phongShader.setFloat("material.shininess", 32.0f);
             
             unsigned int lightStates[NUM_LIGHTS] = {1, 1, 1, 1, 1, 1, 0, 0};
@@ -157,22 +179,40 @@ int Simulator::start() {
             phongShader.setVec3("lights[5].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
             phongShader.setVec2("lights[5].cutOff", glm::vec2(glm::cos(glm::radians(12.5f)), glm::cos(glm::radians(17.5f))));
             
-            phongShader.setMat4("viewMtx", viewMtx);
-            phongShader.setMat4("projectionMtx", projectionMtx);
+            phongShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)), glm::vec3(0.1f, 0.1f, 0.1f)));
+            modelTest.draw(phongShader);
             
+            testShader.use();
+            glEnable(GL_BLEND);
+            testShader.setMat4("viewMtx", viewMtx);
+            testShader.setMat4("projectionMtx", projectionMtx);
+            testShader.setInt("material.texDiffuse0", 0);
+            
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, diffuseMap);
+            //glActiveTexture(GL_TEXTURE1);
+            //glBindTexture(GL_TEXTURE_2D, specularMap);
             for (unsigned int i = 0; i < cubePositions.size(); ++i) {
                 glm::mat4 modelMtx = glm::translate(glm::mat4(1.0f), cubePositions[i]);
                 float angle = 20.0f * i;
                 modelMtx = glm::rotate(modelMtx, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-                phongShader.setMat4("modelMtx", modelMtx);
-                
+                testShader.setMat4("modelMtx", modelMtx);
                 cube1.draw();
             }
-            phongShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, -0.5f, 3.0f)), glm::vec3(3.0f, 0.2f, 5.0f)));
+            testShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, -0.5f, 3.0f)), glm::vec3(3.0f, 0.2f, 5.0f)));
             cube1.draw();
             
-            phongShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)), glm::vec3(1.0f, 1.0f, 1.0f)));
-            nanosuit.draw(phongShader);
+            glDepthMask(false);
+            glDisable(GL_CULL_FACE);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, grassDiffuse);
+            for (unsigned int i = 0; i < grassPositions.size(); ++i) {
+                testShader.setMat4("modelMtx", glm::translate(glm::mat4(1.0f), grassPositions[i]));
+                grass.draw();
+            }
+            glDepthMask(true);
+            glEnable(GL_CULL_FACE);
+            glDisable(GL_BLEND);
             
             glfwSwapBuffers(window);
             glfwPollEvents();
@@ -232,25 +272,54 @@ unsigned int Simulator::loadTexture(const string& filename) {
     }
     
     cout << "Loading texture \"" << filename << "\".\n";
-    unsigned int texHandle;
-    glGenTextures(1, &texHandle);
-    glBindTexture(GL_TEXTURE_2D, texHandle);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    
     int width, height, numChannels;
     unsigned char* imageData = stbi_load(filename.c_str(), &width, &height, &numChannels, 0);
+    GLenum format = numChannels == 3 ? GL_RGB : GL_RGBA;
+    unsigned int texHandle;
     if (imageData) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, numChannels == 3 ? GL_RGB : GL_RGBA, GL_UNSIGNED_BYTE, imageData);
+        glGenTextures(1, &texHandle);
+        glBindTexture(GL_TEXTURE_2D, texHandle);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, imageData);
+        
         glGenerateMipmap(GL_TEXTURE_2D);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     } else {
         cout << "Error: Unable to load texture \"" << filename << "\".\n";
     }
     stbi_image_free(imageData);
     
     loadedTextures[filename] = texHandle;
+    return texHandle;
+}
+
+unsigned int Simulator::generateTexture(int r, int g, int b) {
+    string textureName = "color " + to_string(r) + " " + to_string(g) + " " + to_string(b);
+    auto findResult = loadedTextures.find(textureName);
+    if (findResult != loadedTextures.end()) {
+        return findResult->second;
+    }
+    
+    cout << "Generating texture \"" << textureName << "\".\n";
+    unsigned int texHandle;
+    glGenTextures(1, &texHandle);
+    glBindTexture(GL_TEXTURE_2D, texHandle);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    GLubyte* imageData = new GLubyte[8 * 8 * 3];
+    for (int i = 0; i < 8 * 8 * 3; i += 3) {
+        imageData[i] = static_cast<GLubyte>(r);
+        imageData[i + 1] = static_cast<GLubyte>(g);
+        imageData[i + 2] = static_cast<GLubyte>(b);
+    }
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 8, 8, 0, GL_RGB, GL_UNSIGNED_BYTE, imageData);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    
+    loadedTextures[textureName] = texHandle;
     return texHandle;
 }
 
@@ -315,12 +384,12 @@ GLFWwindow* Simulator::setupOpenGL() {
     }
     
     glEnable(GL_DEPTH_TEST);
-    //glDepthFunc(GL_LESS);
-    //glEnable(GL_BLEND);
-    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthFunc(GL_LESS);
+    glDisable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_CULL_FACE);
-    //glFrontFace(GL_CCW);
-    //glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+    glCullFace(GL_BACK);
     //glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     
     glfwSetCursorPos(window, windowSize.x / 2.0f, windowSize.y / 2.0f);

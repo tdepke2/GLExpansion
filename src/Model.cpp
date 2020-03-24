@@ -102,11 +102,14 @@ Mesh Model::_processMesh(aiMesh* mesh, const aiScene* scene) {
 
 void Model::_loadMaterialTextures(aiMaterial* material, aiTextureType type, const string& uniformName, vector<Mesh::Texture>& textures) {
     if (VERBOSE_OUTPUT) {
-        cout << "      Material " << uniformName << " has " << material->GetTextureCount(type) << " textures.\n";
+        cout << "      Material " << uniformName << " has " << material->GetTextureCount(type) << " textures:\n";
     }
     for (unsigned int i = 0; i < material->GetTextureCount(type); ++i) {
         aiString str;
         material->GetTexture(type, i, &str);
+        if (VERBOSE_OUTPUT) {
+            cout << "      \"" << str.C_Str() << "\"\n";
+        }
         textures.emplace_back(Simulator::loadTexture(directoryPath + "/" + string(str.C_Str())), uniformName + to_string(i));
     }
 }

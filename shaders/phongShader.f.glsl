@@ -70,15 +70,18 @@ vec3 calculateLight(Light light, vec3 normalDir, vec3 viewDir, vec3 diffuseColor
 }
 
 void main() {
+    vec4 diffuseColor = texture(material.texDiffuse0, fTexCoords);
+    if (diffuseColor.a < 0.5) {
+        //discard;
+    }
+    vec4 specularColor = texture(material.texSpecular0, fTexCoords);
     vec3 normalDir = normalize(fNormal);
     vec3 viewDir = normalize(-fPosition);
-    vec3 diffuseColor = vec3(texture(material.texDiffuse0, fTexCoords));
-    vec3 specularColor = vec3(texture(material.texSpecular0, fTexCoords));
     
     vec3 color = vec3(0.0, 0.0, 0.0);
     for (uint i = 0u; i < NUM_LIGHTS; ++i) {
         if (lightStates[i]) {
-            color += calculateLight(lights[i], normalDir, viewDir, diffuseColor, specularColor);
+            color += calculateLight(lights[i], normalDir, viewDir, vec3(diffuseColor), vec3(specularColor));
         }
     }
     
