@@ -233,6 +233,7 @@ int Simulator::start() {
         exitCode = -1;
     }
     
+    glCheckError();
     glfwDestroyWindow(window);
     glfwTerminate();
     return exitCode;

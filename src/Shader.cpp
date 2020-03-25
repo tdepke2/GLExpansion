@@ -92,7 +92,7 @@ void Shader::setMat4(const string& name, const glm::mat4& value) const {
     glUniformMatrix4fv(_getUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
 }
 
-void Shader::use() {
+void Shader::use() const {
     glUseProgram(_programHandle);
 }
 
