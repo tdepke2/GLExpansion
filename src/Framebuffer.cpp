@@ -12,8 +12,10 @@ Framebuffer::Framebuffer(const glm::ivec2& bufferSize) {
     glGenTextures(1, &_texColorBuffer);    // Create color buffer (using a 2D texture).
     glBindTexture(GL_TEXTURE_2D, _texColorBuffer);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, bufferSize.x, bufferSize.y, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _texColorBuffer, 0);
     
@@ -39,4 +41,9 @@ const glm::ivec2& Framebuffer::getBufferSize() const {
 
 void Framebuffer::bind() const {
     glBindFramebuffer(GL_FRAMEBUFFER, _framebufferHandle);
+}
+
+void Framebuffer::bindTexColorBuffer() const {
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, _texColorBuffer);
 }

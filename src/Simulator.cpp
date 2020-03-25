@@ -1,6 +1,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include "Framebuffer.h"
 #include "Mesh.h"
 #include "Model.h"
 #include "Shader.h"
@@ -39,6 +40,7 @@ int Simulator::start() {
         
         Shader lightShader("shaders/phongShader.v.glsl", "shaders/lightShader.f.glsl");
         Shader phongShader("shaders/phongShader.v.glsl", "shaders/phongShader.f.glsl");
+        Shader framebufferShader("shaders/framebufferShader.v.glsl", "shaders/framebufferShader.f.glsl");
         Shader testShader("shaders/phongShader.v.glsl", "shaders/blendShader.f.glsl");
         
         const int NUM_LIGHTS = 8;
@@ -64,10 +66,10 @@ int Simulator::start() {
         //stbi_set_flip_vertically_on_load(true);
         
         vector<Mesh::Vertex> grassVertices = {
-            { 0.5,  1.0,  0.5,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f},
-            {-0.5,  1.0,  0.5,  0.0f,  0.0f,  1.0f, 0.0f, 1.0f},
-            {-0.5,  0.0,  0.5,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f},
-            { 0.5,  0.0,  0.5,  0.0f,  0.0f,  1.0f, 1.0f, 0.0f}
+            { 0.5f,  1.0f,  0.5f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f},
+            {-0.5f,  1.0f,  0.5f,  0.0f,  0.0f,  1.0f, 0.0f, 1.0f},
+            {-0.5f,  0.0f,  0.5f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f},
+            { 0.5f,  0.0f,  0.5f,  0.0f,  0.0f,  1.0f, 1.0f, 0.0f}
         };
         vector<unsigned int> grassIndices = {
             0, 1, 2, 2, 3, 0
@@ -82,6 +84,19 @@ int Simulator::start() {
             {-0.3f,  0.0f, -2.3f},
             { 0.5f,  0.0f, -0.6f}
         };
+        
+        vector<Mesh::Vertex> windowQuadVertices = {
+            { 1.0f,  1.0f,  0.0f,  0.0f,  0.0f,  0.0f, 1.0f, 1.0f},
+            {-1.0f,  1.0f,  0.0f,  0.0f,  0.0f,  0.0f, 0.0f, 1.0f},
+            {-1.0f, -1.0f,  0.0f,  0.0f,  0.0f,  0.0f, 0.0f, 0.0f},
+            { 1.0f, -1.0f,  0.0f,  0.0f,  0.0f,  0.0f, 1.0f, 0.0f}
+        };
+        vector<unsigned int> windowQuadIndices = {
+            0, 1, 2, 2, 3, 0
+        };
+        Mesh windowQuad(move(windowQuadVertices), move(windowQuadIndices));
+        
+        Framebuffer fbo(glm::ivec2(1920, 1080));
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
@@ -123,6 +138,8 @@ int Simulator::start() {
             
             processInput(window, deltaTime);
             
+            fbo.bind();
+            glViewport(0, 0, fbo.getBufferSize().x, fbo.getBufferSize().y);
             glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             
@@ -213,6 +230,17 @@ int Simulator::start() {
             glDepthMask(true);
             glEnable(GL_CULL_FACE);
             glDisable(GL_BLEND);
+            
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, windowSize.x, windowSize.y);
+            glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glDisable(GL_DEPTH_TEST);
+            framebufferShader.use();
+            framebufferShader.setInt("tex", 0);
+            fbo.bindTexColorBuffer();
+            windowQuad.draw();
+            glEnable(GL_DEPTH_TEST);
             
             glfwSwapBuffers(window);
             glfwPollEvents();
@@ -327,7 +355,6 @@ unsigned int Simulator::generateTexture(int r, int g, int b) {
 void Simulator::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
     windowSize.x = width;
     windowSize.y = height;
-    glViewport(0, 0, width, height);
 }
 
 void Simulator::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {

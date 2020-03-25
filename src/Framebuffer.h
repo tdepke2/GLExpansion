@@ -13,6 +13,7 @@ class Framebuffer {
     ~Framebuffer();
     const glm::ivec2& getBufferSize() const;
     void bind() const;
+    void bindTexColorBuffer() const;
     
     private:
     unsigned int _framebufferHandle, _texColorBuffer, _rboDepthStencilBuffer;
