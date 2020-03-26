@@ -20,8 +20,14 @@ Shader::Shader(const string& vertexShaderPath, const string& fragmentShaderPath)
         cout << "Error: Failed to link shader: " << infoLog << endl;
     }
     
-    glDeleteShader(vertexShader);    // Clean up the individual shader parts as they are no longer needed.
+    glDetachShader(_programHandle, vertexShader);    // Clean up the individual shader parts as they are no longer needed.
+    glDetachShader(_programHandle, fragmentShader);
+    glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
+}
+
+Shader::~Shader() {
+    glDeleteProgram(_programHandle);
 }
 
 unsigned int Shader::getHandle() const {

@@ -12,6 +12,7 @@ class Framebuffer {
     Framebuffer(const glm::ivec2& bufferSize);
     ~Framebuffer();
     const glm::ivec2& getBufferSize() const;
+    void setBufferSize(const glm::ivec2& bufferSize);
     void bind() const;
     void bindTexColorBuffer() const;
     

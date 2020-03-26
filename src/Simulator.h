@@ -9,7 +9,9 @@
 #define glCheckError() glCheckError_(__FILE__, __LINE__)
 
 #include "Camera.h"
+#include "Framebuffer.h"
 #include <atomic>
+#include <memory>
 #include <random>
 #include <string>
 #include <unordered_map>
@@ -39,6 +41,7 @@ class Simulator {
     static glm::ivec2 windowSize;
     static glm::vec2 lastMousePos;
     static unordered_map<string, unsigned int> loadedTextures;
+    static unique_ptr<Framebuffer> fbo;
     
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);

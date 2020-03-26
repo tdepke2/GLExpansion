@@ -31,9 +31,9 @@ Mesh::Mesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices, vector<Tex
 }
 
 Mesh::~Mesh() {
+    glDeleteVertexArrays(1, &_vertexArrayHandle);
     glDeleteBuffers(1, &_vertexBufferHandle);
     glDeleteBuffers(1, &_elementBufferHandle);
-    glDeleteVertexArrays(1, &_vertexArrayHandle);
 }
 
 Mesh::Mesh(Mesh&& mesh) : _vertexArrayHandle(mesh._vertexArrayHandle), _vertexBufferHandle(mesh._vertexBufferHandle), _elementBufferHandle(mesh._elementBufferHandle) {

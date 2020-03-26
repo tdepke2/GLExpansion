@@ -13,6 +13,7 @@ using namespace std;
 class Shader {
     public:
     Shader(const string& vertexShaderPath, const string& fragmentShaderPath);
+    ~Shader();
     unsigned int getHandle() const;
     void setFloat(const string& name, float value) const;
     void setBool(const string& name, bool value) const;

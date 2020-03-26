@@ -1,7 +1,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#include "Framebuffer.h"
 #include "Mesh.h"
 #include "Model.h"
 #include "Shader.h"
@@ -18,6 +17,7 @@ Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 3.0f));
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 unordered_map<string, unsigned int> Simulator::loadedTextures;
+unique_ptr<Framebuffer> Simulator::fbo;
 
 int Simulator::start() {
     cout << "Initializing setup...\n";
@@ -96,7 +96,7 @@ int Simulator::start() {
         };
         Mesh windowQuad(move(windowQuadVertices), move(windowQuadIndices));
         
-        Framebuffer fbo(glm::ivec2(1920, 1080));
+        fbo = make_unique<Framebuffer>(windowSize);
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
@@ -138,8 +138,8 @@ int Simulator::start() {
             
             processInput(window, deltaTime);
             
-            fbo.bind();
-            glViewport(0, 0, fbo.getBufferSize().x, fbo.getBufferSize().y);
+            fbo->bind();
+            glViewport(0, 0, fbo->getBufferSize().x, fbo->getBufferSize().y);
             glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             
@@ -238,7 +238,7 @@ int Simulator::start() {
             glDisable(GL_DEPTH_TEST);
             framebufferShader.use();
             framebufferShader.setInt("tex", 0);
-            fbo.bindTexColorBuffer();
+            fbo->bindTexColorBuffer();
             windowQuad.draw();
             glEnable(GL_DEPTH_TEST);
             
@@ -260,6 +260,8 @@ int Simulator::start() {
         cin.get();
         exitCode = -1;
     }
+    
+    fbo.reset();
     
     glCheckError();
     glfwDestroyWindow(window);
@@ -355,6 +357,7 @@ unsigned int Simulator::generateTexture(int r, int g, int b) {
 void Simulator::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
     windowSize.x = width;
     windowSize.y = height;
+    fbo->setBufferSize(windowSize);
 }
 
 void Simulator::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
