@@ -14,9 +14,9 @@ const vec2 OFFSETS[9] = vec2[](
 );
 
 const float KERNEL[9] = float[](
-    1.0, 1.0, 1.0,
-    1.0, -8.0, 1.0,
-    1.0, 1.0, 1.0
+    1.0,  1.0,  1.0,
+    1.0, -8.0,  1.0,
+    1.0,  1.0,  1.0
 );
 
 uniform sampler2D tex;
@@ -26,11 +26,11 @@ in vec2 fTexCoords;
 out vec4 fragColor;
 
 void main() {
-    //fragColor = texture(tex, fTexCoords);
+    fragColor = texture(tex, fTexCoords);
     
-    vec3 sum = vec3(0.0);
-    for (int i = 0; i < 9; ++i) {
-        sum += vec3(texture(tex, fTexCoords.st + OFFSETS[i])) * KERNEL[i];
-    }
-    fragColor = vec4(sum, 1.0);
+    //vec3 sum = vec3(0.0);
+    //for (int i = 0; i < 9; ++i) {
+        //sum += vec3(texture(tex, fTexCoords.st + OFFSETS[i])) * KERNEL[i];
+    //}
+    //fragColor = vec4(sum, 1.0);
 }

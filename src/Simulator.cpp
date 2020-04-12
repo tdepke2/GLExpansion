@@ -38,6 +38,7 @@ int Simulator::start() {
         unsigned int diffuseMap = loadTexture("textures/container2.png");
         unsigned int specularMap = loadTexture("textures/container2_specular.png");
         
+        Shader skyboxShader("shaders/skyboxShader.v.glsl", "shaders/skyboxShader.f.glsl");
         Shader lightShader("shaders/phongShader.v.glsl", "shaders/lightShader.f.glsl");
         Shader phongShader("shaders/phongShader.v.glsl", "shaders/phongShader.f.glsl");
         Shader framebufferShader("shaders/framebufferShader.v.glsl", "shaders/framebufferShader.f.glsl");
@@ -95,6 +96,57 @@ int Simulator::start() {
             0, 1, 2, 2, 3, 0
         };
         Mesh windowQuad(move(windowQuadVertices), move(windowQuadIndices));
+        
+        unsigned int skyboxTexture = loadCubemap("textures/skybox/.jpg");
+        vector<Mesh::Vertex> skyboxVertices = {
+            {-1.0f,  1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            {-1.0f, -1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f, -1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f, -1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f,  1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            {-1.0f,  1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+
+            {-1.0f, -1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            {-1.0f, -1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            {-1.0f,  1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            {-1.0f,  1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            {-1.0f,  1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            {-1.0f, -1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+
+            { 1.0f, -1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f, -1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f,  1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f,  1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f,  1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f, -1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+
+            {-1.0f, -1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            {-1.0f,  1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f,  1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f,  1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f, -1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            {-1.0f, -1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+
+            {-1.0f,  1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f,  1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f,  1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f,  1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            {-1.0f,  1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            {-1.0f,  1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+
+            {-1.0f, -1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            {-1.0f, -1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f, -1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f, -1.0f, -1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            {-1.0f, -1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0},
+            { 1.0f, -1.0f,  1.0f, 0.0, 0.0, 0.0, 0.0, 0.0}
+        };
+        vector<unsigned int> skyboxIndices;
+        for (unsigned int i = 0; i < skyboxVertices.size(); ++i) {
+            skyboxIndices.push_back(i);
+        }
+        Mesh skybox(move(skyboxVertices), move(skyboxIndices));
+        //skybox.generateCube();
         
         fbo = make_unique<Framebuffer>(windowSize);
         
@@ -198,6 +250,18 @@ int Simulator::start() {
             
             phongShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)), glm::vec3(0.1f, 0.1f, 0.1f)));
             modelTest.draw(phongShader);
+            
+            skyboxShader.use();    // Issue with skybox currently where it is inverted. #######################################################################################
+            glDepthFunc(GL_LEQUAL);
+            glDisable(GL_CULL_FACE);
+            skyboxShader.setMat4("viewMtx", glm::mat4(glm::mat3(viewMtx)));
+            skyboxShader.setMat4("projectionMtx", projectionMtx);
+            skyboxShader.setInt("skybox", 0);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
+            skybox.draw();
+            glDepthFunc(GL_LESS);
+            glEnable(GL_CULL_FACE);
             
             testShader.use();
             glEnable(GL_BLEND);
@@ -303,13 +367,14 @@ unsigned int Simulator::loadTexture(const string& filename) {
     }
     
     cout << "Loading texture \"" << filename << "\".\n";
+    unsigned int texHandle;
+    glGenTextures(1, &texHandle);
+    glBindTexture(GL_TEXTURE_2D, texHandle);
     int width, height, numChannels;
     unsigned char* imageData = stbi_load(filename.c_str(), &width, &height, &numChannels, 0);
     GLenum format = numChannels == 3 ? GL_RGB : GL_RGBA;
-    unsigned int texHandle;
+    
     if (imageData) {
-        glGenTextures(1, &texHandle);
-        glBindTexture(GL_TEXTURE_2D, texHandle);
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, imageData);
         
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -318,9 +383,55 @@ unsigned int Simulator::loadTexture(const string& filename) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     } else {
-        cout << "Error: Unable to load texture \"" << filename << "\".\n";
+        cout << "Error: Unable to load texture.\n";
     }
     stbi_image_free(imageData);
+    
+    loadedTextures[filename] = texHandle;
+    return texHandle;
+}
+
+unsigned int Simulator::loadCubemap(const string& filename) {
+    auto findResult = loadedTextures.find(filename);
+    if (findResult != loadedTextures.end()) {
+        return findResult->second;
+    }
+    
+    stbi_set_flip_vertically_on_load(false);
+    string prefix = filename.substr(0, filename.find('.'));
+    string postfix = filename.substr(filename.find('.'));
+    cout << "Loading cubemap.\n";
+    unsigned int texHandle;
+    glGenTextures(1, &texHandle);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, texHandle);
+    
+    int width, height, numChannels;
+    for (unsigned int i = 0; i < 6; ++i) {
+        string faceFilename = prefix + (i % 2 == 0 ? "pos" : "neg");
+        if (i < 2) {
+            faceFilename += "x" + postfix;
+        } else if (i < 4) {
+            faceFilename += "y" + postfix;
+        } else {
+            faceFilename += "z" + postfix;
+        }
+        cout << "  Face " << i << ": \"" << faceFilename << "\".\n";
+        
+        unsigned char* imageData = stbi_load(faceFilename.c_str(), &width, &height, &numChannels, 0);
+        GLenum format = numChannels == 3 ? GL_RGB : GL_RGBA;
+        if (imageData) {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, imageData);
+        } else {
+            cout << "Error: Unable to load texture.\n";
+        }
+        stbi_image_free(imageData);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    stbi_set_flip_vertically_on_load(true);
     
     loadedTextures[filename] = texHandle;
     return texHandle;
