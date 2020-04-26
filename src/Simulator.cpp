@@ -42,7 +42,8 @@ int Simulator::start() {
         Shader lightShader("shaders/phongShader.v.glsl", "shaders/lightShader.f.glsl");
         Shader phongShader("shaders/phongShader.v.glsl", "shaders/phongShader.f.glsl");
         Shader framebufferShader("shaders/framebufferShader.v.glsl", "shaders/framebufferShader.f.glsl");
-        Shader testShader("shaders/phongShader.v.glsl", "shaders/blendShader.f.glsl");
+        //Shader testShader("shaders/phongShader.v.glsl", "shaders/blendShader.f.glsl");
+        Shader testShader("shaders/reflectionShader.v.glsl", "shaders/reflectionShader.f.glsl");
         
         const int NUM_LIGHTS = 8;
         glm::vec3 pointLightPositions[4] = {
@@ -267,10 +268,12 @@ int Simulator::start() {
             glEnable(GL_BLEND);
             testShader.setMat4("viewMtx", viewMtx);
             testShader.setMat4("projectionMtx", projectionMtx);
-            testShader.setInt("material.texDiffuse0", 0);
+            //testShader.setInt("material.texDiffuse0", 0);
+            testShader.setInt("skybox", 0);
+            testShader.setVec3("cameraPos", camera.position);
             
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, diffuseMap);
+            //glBindTexture(GL_TEXTURE_2D, diffuseMap);
             //glActiveTexture(GL_TEXTURE1);
             //glBindTexture(GL_TEXTURE_2D, specularMap);
             for (unsigned int i = 0; i < cubePositions.size(); ++i) {
