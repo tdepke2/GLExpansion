@@ -9,6 +9,8 @@ out vec3 fTexCoords;
 
 void main() {
     fTexCoords = vPosition;
+    fTexCoords.x = -fTexCoords.x;
     
-    gl_Position = (projectionMtx * viewMtx * vec4(vPosition, 1.0)).xyww;
+    vec4 position = projectionMtx * viewMtx * vec4(vPosition, 1.0);
+    gl_Position = position.xyww;
 }

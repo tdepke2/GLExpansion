@@ -251,7 +251,7 @@ int Simulator::start() {
             phongShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)), glm::vec3(0.1f, 0.1f, 0.1f)));
             modelTest.draw(phongShader);
             
-            skyboxShader.use();    // Issue with skybox currently where it is inverted. #######################################################################################
+            skyboxShader.use();
             glDepthFunc(GL_LEQUAL);
             glDisable(GL_CULL_FACE);
             skyboxShader.setMat4("viewMtx", glm::mat4(glm::mat3(viewMtx)));
@@ -397,7 +397,7 @@ unsigned int Simulator::loadCubemap(const string& filename) {
         return findResult->second;
     }
     
-    stbi_set_flip_vertically_on_load(false);
+    stbi_set_flip_vertically_on_load(false);    // Need to flip the textures to match the specifications of a cubemap.
     string prefix = filename.substr(0, filename.find('.'));
     string postfix = filename.substr(filename.find('.'));
     cout << "Loading cubemap.\n";
