@@ -31,6 +31,7 @@ class Shader {
     void setMat2(const string& name, const glm::mat2& value) const;
     void setMat3(const string& name, const glm::mat3& value) const;
     void setMat4(const string& name, const glm::mat4& value) const;
+    void setUniformBlockBinding(const string& name, unsigned int value) const;
     void use() const;
     
     private:

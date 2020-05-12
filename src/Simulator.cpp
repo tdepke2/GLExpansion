@@ -39,11 +39,22 @@ int Simulator::start() {
         unsigned int specularMap = loadTexture("textures/container2_specular.png");
         
         Shader skyboxShader("shaders/skyboxShader.v.glsl", "shaders/skyboxShader.f.glsl");
+        skyboxShader.setUniformBlockBinding("ViewProjectionMtx", 0);
         Shader lightShader("shaders/phongShader.v.glsl", "shaders/lightShader.f.glsl");
+        lightShader.setUniformBlockBinding("ViewProjectionMtx", 0);
         Shader phongShader("shaders/phongShader.v.glsl", "shaders/phongShader.f.glsl");
+        phongShader.setUniformBlockBinding("ViewProjectionMtx", 0);
         Shader framebufferShader("shaders/framebufferShader.v.glsl", "shaders/framebufferShader.f.glsl");
-        //Shader testShader("shaders/phongShader.v.glsl", "shaders/blendShader.f.glsl");
-        Shader testShader("shaders/reflectionShader.v.glsl", "shaders/reflectionShader.f.glsl");
+        Shader testShader("shaders/phongShader.v.glsl", "shaders/blendShader.f.glsl");
+        testShader.setUniformBlockBinding("ViewProjectionMtx", 0);
+        //Shader testShader("shaders/reflectionShader.v.glsl", "shaders/reflectionShader.f.glsl");
+        
+        unsigned int uniformBufferVPMtx;    // Create a uniform buffer for ViewProjectionMtx.
+        glGenBuffers(1, &uniformBufferVPMtx);
+        glBindBuffer(GL_UNIFORM_BUFFER, uniformBufferVPMtx);
+        glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+        glBindBufferRange(GL_UNIFORM_BUFFER, 0, uniformBufferVPMtx, 0, 2 * sizeof(glm::mat4));    // Link to binding point 0.
         
         const int NUM_LIGHTS = 8;
         glm::vec3 pointLightPositions[4] = {
@@ -198,14 +209,16 @@ int Simulator::start() {
             
             glm::mat4 viewMtx = camera.getViewMatrix();
             glm::mat4 projectionMtx = glm::perspective(glm::radians(camera.fov), static_cast<float>(windowSize.x) / windowSize.y, NEAR_PLANE, FAR_PLANE);
+            glBindBuffer(GL_UNIFORM_BUFFER, uniformBufferVPMtx);
+            glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(viewMtx));
+            glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projectionMtx));
+            glBindBuffer(GL_UNIFORM_BUFFER, 0);
             
             //lightColor.r = sin(glfwGetTime() * 2.0f);
             //lightColor.g = sin(glfwGetTime() * 0.7f);
             //lightColor.b = sin(glfwGetTime() * 1.3f);
             
             lightShader.use();
-            lightShader.setMat4("viewMtx", viewMtx);
-            lightShader.setMat4("projectionMtx", projectionMtx);
             
             for (int i = 0; i < 4; ++i) {
                 lightShader.setVec3("lightColor", pointLightColors[i]);
@@ -214,8 +227,6 @@ int Simulator::start() {
             }
             
             phongShader.use();
-            phongShader.setMat4("viewMtx", viewMtx);
-            phongShader.setMat4("projectionMtx", projectionMtx);
             phongShader.setInt("material.texDiffuse0", 0);
             phongShader.setInt("material.texSpecular0", 1);
             phongShader.setFloat("material.shininess", 32.0f);
@@ -255,8 +266,6 @@ int Simulator::start() {
             skyboxShader.use();
             glDepthFunc(GL_LEQUAL);
             glDisable(GL_CULL_FACE);
-            skyboxShader.setMat4("viewMtx", glm::mat4(glm::mat3(viewMtx)));
-            skyboxShader.setMat4("projectionMtx", projectionMtx);
             skyboxShader.setInt("skybox", 0);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
@@ -266,16 +275,14 @@ int Simulator::start() {
             
             testShader.use();
             glEnable(GL_BLEND);
-            testShader.setMat4("viewMtx", viewMtx);
-            testShader.setMat4("projectionMtx", projectionMtx);
-            //testShader.setInt("material.texDiffuse0", 0);
-            testShader.setInt("skybox", 0);
-            testShader.setVec3("cameraPos", camera.position);
+            testShader.setInt("material.texDiffuse0", 0);
+            //testShader.setInt("skybox", 0);
+            //testShader.setVec3("cameraPos", camera.position);
             
             glActiveTexture(GL_TEXTURE0);
-            //glBindTexture(GL_TEXTURE_2D, diffuseMap);
-            //glActiveTexture(GL_TEXTURE1);
-            //glBindTexture(GL_TEXTURE_2D, specularMap);
+            glBindTexture(GL_TEXTURE_2D, diffuseMap);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, specularMap);
             for (unsigned int i = 0; i < cubePositions.size(); ++i) {
                 glm::mat4 modelMtx = glm::translate(glm::mat4(1.0f), cubePositions[i]);
                 float angle = 20.0f * i;
@@ -373,9 +380,20 @@ unsigned int Simulator::loadTexture(const string& filename) {
     unsigned int texHandle;
     glGenTextures(1, &texHandle);
     glBindTexture(GL_TEXTURE_2D, texHandle);
-    int width, height, numChannels;
+    int width, height, numChannels = 1;
     unsigned char* imageData = stbi_load(filename.c_str(), &width, &height, &numChannels, 0);
-    GLenum format = numChannels == 3 ? GL_RGB : GL_RGBA;
+    GLenum format;
+    if (numChannels == 1) {
+        format = GL_RED;
+    } else if (numChannels == 3) {
+        format = GL_RGB;
+    } else if (numChannels == 4) {
+        format = GL_RGBA;
+    } else {
+        cout << "Error: Unsupported channel number.\n";
+        stbi_image_free(imageData);
+        imageData = nullptr;
+    }
     
     if (imageData) {
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, imageData);
@@ -408,7 +426,7 @@ unsigned int Simulator::loadCubemap(const string& filename) {
     glGenTextures(1, &texHandle);
     glBindTexture(GL_TEXTURE_CUBE_MAP, texHandle);
     
-    int width, height, numChannels;
+    int width, height, numChannels = 1;
     for (unsigned int i = 0; i < 6; ++i) {
         string faceFilename = prefix + (i % 2 == 0 ? "pos" : "neg");
         if (i < 2) {
@@ -421,7 +439,18 @@ unsigned int Simulator::loadCubemap(const string& filename) {
         cout << "  Face " << i << ": \"" << faceFilename << "\".\n";
         
         unsigned char* imageData = stbi_load(faceFilename.c_str(), &width, &height, &numChannels, 0);
-        GLenum format = numChannels == 3 ? GL_RGB : GL_RGBA;
+        GLenum format;
+        if (numChannels == 1) {
+            format = GL_RED;
+        } else if (numChannels == 3) {
+            format = GL_RGB;
+        } else if (numChannels == 4) {
+            format = GL_RGBA;
+        } else {
+            cout << "Error: Unsupported channel number.\n";
+            stbi_image_free(imageData);
+            imageData = nullptr;
+        }
         if (imageData) {
             glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, imageData);
         } else {

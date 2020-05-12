@@ -98,6 +98,14 @@ void Shader::setMat4(const string& name, const glm::mat4& value) const {
     glUniformMatrix4fv(_getUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
 }
 
+void Shader::setUniformBlockBinding(const string& name, unsigned int value) const {
+    unsigned int index = glGetUniformBlockIndex(_programHandle, name.c_str());
+    if (index == GL_INVALID_INDEX) {
+        cout << "Error: Failed to set uniform block binding \"" << name << "\".\n";
+    }
+    glUniformBlockBinding(_programHandle, index, value);
+}
+
 void Shader::use() const {
     glUseProgram(_programHandle);
 }
