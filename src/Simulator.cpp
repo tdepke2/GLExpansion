@@ -45,6 +45,8 @@ int Simulator::start() {
         Shader phongShader("shaders/phongShader.v.glsl", "shaders/phongShader.f.glsl");
         phongShader.setUniformBlockBinding("ViewProjectionMtx", 0);
         Shader framebufferShader("shaders/framebufferShader.v.glsl", "shaders/framebufferShader.f.glsl");
+        Shader normalShader("shaders/debugNormals.v.glsl", "shaders/debugNormals.g.glsl", "shaders/debugNormals.f.glsl");
+        normalShader.setUniformBlockBinding("ViewProjectionMtx", 0);
         Shader testShader("shaders/phongShader.v.glsl", "shaders/blendShader.f.glsl");
         testShader.setUniformBlockBinding("ViewProjectionMtx", 0);
         //Shader testShader("shaders/reflectionShader.v.glsl", "shaders/reflectionShader.f.glsl");
@@ -75,7 +77,7 @@ int Simulator::start() {
         Mesh cube1;
         cube1.generateCube();
         //stbi_set_flip_vertically_on_load(false);
-        Model modelTest("models/nanosuit/nanosuit.obj");
+        Model modelTest("models/backpack/backpack.obj");
         //stbi_set_flip_vertically_on_load(true);
         
         vector<Mesh::Vertex> grassVertices = {
@@ -260,8 +262,12 @@ int Simulator::start() {
             phongShader.setVec3("lights[5].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
             phongShader.setVec2("lights[5].cutOff", glm::vec2(glm::cos(glm::radians(12.5f)), glm::cos(glm::radians(17.5f))));
             
-            phongShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)), glm::vec3(0.1f, 0.1f, 0.1f)));
+            phongShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)), glm::vec3(1.1f, 1.1f, 1.1f)));
             modelTest.draw(phongShader);
+            
+            normalShader.use();
+            normalShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)), glm::vec3(1.1f, 1.1f, 1.1f)));
+            modelTest.draw();
             
             skyboxShader.use();
             glDepthFunc(GL_LEQUAL);

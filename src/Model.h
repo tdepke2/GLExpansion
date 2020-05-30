@@ -12,7 +12,7 @@ using namespace std;
 
 class Model {
     public:
-    static constexpr bool VERBOSE_OUTPUT = true;
+    static constexpr bool VERBOSE_OUTPUT = false;
     vector<Mesh> meshes;
     string directoryPath;
     

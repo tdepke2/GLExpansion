@@ -26,6 +26,32 @@ Shader::Shader(const string& vertexShaderPath, const string& fragmentShaderPath)
     glDeleteShader(fragmentShader);
 }
 
+Shader::Shader(const string& vertexShaderPath, const string& geometryShaderPath, const string& fragmentShaderPath) {
+    unsigned int vertexShader = _compileShader(vertexShaderPath, GL_VERTEX_SHADER);
+    unsigned int geometryShader = _compileShader(geometryShaderPath, GL_GEOMETRY_SHADER);
+    unsigned int fragmentShader = _compileShader(fragmentShaderPath, GL_FRAGMENT_SHADER);
+    
+    _programHandle = glCreateProgram();    // Create the program and link the shaders.
+    glAttachShader(_programHandle, vertexShader);
+    glAttachShader(_programHandle, geometryShader);
+    glAttachShader(_programHandle, fragmentShader);
+    glLinkProgram(_programHandle);
+    int success;
+    glGetProgramiv(_programHandle, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(_programHandle, 512, nullptr, infoLog);
+        cout << "Error: Failed to link shader: " << infoLog << endl;
+    }
+    
+    glDetachShader(_programHandle, vertexShader);    // Clean up the individual shader parts as they are no longer needed.
+    glDetachShader(_programHandle, geometryShader);
+    glDetachShader(_programHandle, fragmentShader);
+    glDeleteShader(vertexShader);
+    glDeleteShader(geometryShader);
+    glDeleteShader(fragmentShader);
+}
+
 Shader::~Shader() {
     glDeleteProgram(_programHandle);
 }
