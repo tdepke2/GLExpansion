@@ -45,11 +45,10 @@ int Simulator::start() {
         Shader phongShader("shaders/phongShader.v.glsl", "shaders/phongShader.f.glsl");
         phongShader.setUniformBlockBinding("ViewProjectionMtx", 0);
         Shader framebufferShader("shaders/framebufferShader.v.glsl", "shaders/framebufferShader.f.glsl");
-        Shader normalShader("shaders/debugNormals.v.glsl", "shaders/debugNormals.g.glsl", "shaders/debugNormals.f.glsl");
-        normalShader.setUniformBlockBinding("ViewProjectionMtx", 0);
         Shader testShader("shaders/phongShader.v.glsl", "shaders/blendShader.f.glsl");
         testShader.setUniformBlockBinding("ViewProjectionMtx", 0);
-        //Shader testShader("shaders/reflectionShader.v.glsl", "shaders/reflectionShader.f.glsl");
+        Shader instanceShader("shaders/instancedDrawing.v.glsl", "shaders/instancedDrawing.f.glsl");
+        instanceShader.setUniformBlockBinding("ViewProjectionMtx", 0);
         
         unsigned int uniformBufferVPMtx;    // Create a uniform buffer for ViewProjectionMtx.
         glGenBuffers(1, &uniformBufferVPMtx);
@@ -79,6 +78,27 @@ int Simulator::start() {
         //stbi_set_flip_vertically_on_load(false);
         Model modelTest("models/backpack/backpack.obj");
         //stbi_set_flip_vertically_on_load(true);
+        
+        Model planetModel("models/planet/planet.obj");
+        Model rockModel("models/rock/rock.obj");
+        
+        constexpr int NUM_ROCKS = 10000;
+        glm::mat4* rockTransforms = new glm::mat4[NUM_ROCKS];
+        constexpr float RADIUS = 50.0f, OFFSET = 2.5f;
+        for (int i = 0; i < NUM_ROCKS; ++i) {
+            glm::mat4 modelMtx(1.0f);
+            float angle = static_cast<float>(i) / NUM_ROCKS * 360.0f;
+            float x = sin(angle) * RADIUS + (randomInt(0, static_cast<int>(2 * OFFSET * 100 - 1)) / 100.0f - OFFSET);
+            float y = (randomInt(0, static_cast<int>(2 * OFFSET * 100 - 1)) / 100.0f - OFFSET) * 0.4f;
+            float z = cos(angle) * RADIUS + randomInt(0, static_cast<int>(2 * OFFSET * 100 - 1)) / 100.0f - OFFSET;
+            modelMtx = glm::translate(modelMtx, glm::vec3(x, y, z));
+            modelMtx = glm::scale(modelMtx, glm::vec3(randomInt(0, 19) / 100.0f + 0.05f));
+            modelMtx = glm::rotate(modelMtx, randomFloat(0.0f, 360.0f), glm::vec3(0.4f, 0.6f, 0.8f));
+            
+            rockTransforms[i] = modelMtx;
+        }
+        
+        //unsigned int 
         
         vector<Mesh::Vertex> grassVertices = {
             { 0.5f,  1.0f,  0.5f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f},
@@ -265,9 +285,15 @@ int Simulator::start() {
             phongShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)), glm::vec3(1.1f, 1.1f, 1.1f)));
             modelTest.draw(phongShader);
             
-            normalShader.use();
-            normalShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)), glm::vec3(1.1f, 1.1f, 1.1f)));
-            modelTest.draw();
+            instanceShader.use();
+            instanceShader.setInt("material.texDiffuse0", 0);
+            instanceShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(4.0f, 4.0f, 4.0f)));
+            planetModel.draw(instanceShader);
+            
+            for (int i = 0; i < NUM_ROCKS; ++i) {
+                instanceShader.setMat4("modelMtx", rockTransforms[i]);
+                rockModel.draw(instanceShader);
+            }
             
             skyboxShader.use();
             glDepthFunc(GL_LEQUAL);
@@ -519,6 +545,12 @@ void Simulator::keyCallback(GLFWwindow* window, int key, int scancode, int actio
             } else if (state == State::Paused) {
                 state = State::Running;
                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            }
+        } else if (key == GLFW_KEY_UP) {
+            camera.moveSpeed *= 2.0f;
+        } else if (key == GLFW_KEY_DOWN) {
+            if (camera.moveSpeed > 0.1f) {
+                camera.moveSpeed /= 2.0f;
             }
         }
     }
