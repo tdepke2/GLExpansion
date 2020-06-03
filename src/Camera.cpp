@@ -18,8 +18,9 @@ glm::mat4 Camera::getViewMatrix() {
 
 void Camera::processKeyboard(const glm::vec3& direction, float deltaTime) {
     float velocity = moveSpeed * deltaTime;
-    position += direction.z * -front * velocity;
     position += direction.x * right * velocity;
+    position += direction.y * up * velocity;
+    position += direction.z * -front * velocity;
 }
 
 void Camera::processMouseMove(float xoffset, float yoffset, bool constrainPitch) {

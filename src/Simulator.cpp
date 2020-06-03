@@ -649,6 +649,12 @@ void Simulator::processInput(GLFWwindow* window, float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
         moveDirection.x += 1.0f;
     }
+    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
+        moveDirection.y -= 1.0f;
+    }
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+        moveDirection.y += 1.0f;
+    }
     if (moveDirection != glm::vec3(0.0f, 0.0f, 0.0f)) {
         camera.processKeyboard(glm::normalize(moveDirection), deltaTime);
     }
