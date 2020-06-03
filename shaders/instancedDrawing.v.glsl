@@ -1,6 +1,5 @@
 #version 330 core
 
-uniform mat4 modelMtx;
 layout (std140) uniform ViewProjectionMtx {
     uniform mat4 viewMtx;
     uniform mat4 projectionMtx;
@@ -16,5 +15,5 @@ out vec2 fTexCoords;
 void main() {
     fTexCoords = vTexCoords;
     
-    gl_Position = projectionMtx * viewMtx * modelMtx * vec4(vPosition, 1.0);
+    gl_Position = projectionMtx * viewMtx * instanceMtx * vec4(vPosition, 1.0);
 }

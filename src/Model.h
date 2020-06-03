@@ -19,8 +19,11 @@ class Model {
     Model();
     Model(const string& filename);
     void loadFile(const string& filename);
+    void applyInstanceBuffer(unsigned int startIndex) const;
     void draw() const;
     void draw(const Shader& shader) const;
+    void drawInstanced(unsigned int count) const;
+    void drawInstanced(const Shader& shader, unsigned int count) const;
     
     private:
     void _processNode(aiNode* node, const aiScene* scene);

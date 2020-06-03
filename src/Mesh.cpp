@@ -182,6 +182,22 @@ void Mesh::generateSphere(float radius, int numSectors, int numStacks) {
     generateMesh(move(vertices), move(indices));
 }
 
+void Mesh::applyInstanceBuffer(unsigned int startIndex) const {
+    glBindVertexArray(_vertexArrayHandle);
+    glEnableVertexAttribArray(startIndex);
+    glVertexAttribPointer(startIndex, 4, GL_FLOAT, false, 4 * sizeof(glm::vec4), reinterpret_cast<void*>(0));
+    glVertexAttribDivisor(startIndex, 1);
+    glEnableVertexAttribArray(startIndex + 1);
+    glVertexAttribPointer(startIndex + 1, 4, GL_FLOAT, false, 4 * sizeof(glm::vec4), reinterpret_cast<void*>(1 * sizeof(glm::vec4)));
+    glVertexAttribDivisor(startIndex + 1, 1);
+    glEnableVertexAttribArray(startIndex + 2);
+    glVertexAttribPointer(startIndex + 2, 4, GL_FLOAT, false, 4 * sizeof(glm::vec4), reinterpret_cast<void*>(2 * sizeof(glm::vec4)));
+    glVertexAttribDivisor(startIndex + 2, 1);
+    glEnableVertexAttribArray(startIndex + 3);
+    glVertexAttribPointer(startIndex + 3, 4, GL_FLOAT, false, 4 * sizeof(glm::vec4), reinterpret_cast<void*>(3 * sizeof(glm::vec4)));
+    glVertexAttribDivisor(startIndex + 3, 1);
+}
+
 void Mesh::draw() const {
     glBindVertexArray(_vertexArrayHandle);
     glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, 0);
@@ -194,4 +210,18 @@ void Mesh::draw(const Shader& shader) const {
         glBindTexture(GL_TEXTURE_2D, textures[i].id);
     }
     draw();
+}
+
+void Mesh::drawInstanced(unsigned int count) const {
+    glBindVertexArray(_vertexArrayHandle);
+    glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, 0, count);
+}
+
+void Mesh::drawInstanced(const Shader& shader, unsigned int count) const {
+    for (unsigned int i = 0; i < textures.size(); ++i) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        shader.setInt(textures[i].uniformName, i);    // hmm yeah idk ###################################
+        glBindTexture(GL_TEXTURE_2D, textures[i].id);
+    }
+    drawInstanced(count);
 }

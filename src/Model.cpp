@@ -39,6 +39,12 @@ void Model::loadFile(const string& filename) {
     _processNode(scene->mRootNode, scene);
 }
 
+void Model::applyInstanceBuffer(unsigned int startIndex) const {
+    for (size_t i = 0; i < meshes.size(); ++i) {
+        meshes[i].applyInstanceBuffer(startIndex);
+    }
+}
+
 void Model::draw() const {
     for (size_t i = 0; i < meshes.size(); ++i) {
         meshes[i].draw();
@@ -48,6 +54,18 @@ void Model::draw() const {
 void Model::draw(const Shader& shader) const {
     for (size_t i = 0; i < meshes.size(); ++i) {
         meshes[i].draw(shader);
+    }
+}
+
+void Model::drawInstanced(unsigned int count) const {
+    for (size_t i = 0; i < meshes.size(); ++i) {
+        meshes[i].drawInstanced(count);
+    }
+}
+
+void Model::drawInstanced(const Shader& shader, unsigned int count) const {
+    for (size_t i = 0; i < meshes.size(); ++i) {
+        meshes[i].drawInstanced(shader, count);
     }
 }
 

@@ -82,7 +82,7 @@ int Simulator::start() {
         Model planetModel("models/planet/planet.obj");
         Model rockModel("models/rock/rock.obj");
         
-        constexpr int NUM_ROCKS = 10000;
+        constexpr int NUM_ROCKS = 100000;
         glm::mat4* rockTransforms = new glm::mat4[NUM_ROCKS];
         constexpr float RADIUS = 50.0f, OFFSET = 2.5f;
         for (int i = 0; i < NUM_ROCKS; ++i) {
@@ -98,7 +98,11 @@ int Simulator::start() {
             rockTransforms[i] = modelMtx;
         }
         
-        //unsigned int 
+        unsigned int instanceBuffer;
+        glGenBuffers(1, &instanceBuffer);
+        glBindBuffer(GL_ARRAY_BUFFER, instanceBuffer);
+        glBufferData(GL_ARRAY_BUFFER, NUM_ROCKS * sizeof(glm::mat4), &rockTransforms[0], GL_STATIC_DRAW);
+        rockModel.applyInstanceBuffer(3);
         
         vector<Mesh::Vertex> grassVertices = {
             { 0.5f,  1.0f,  0.5f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f},
@@ -285,15 +289,12 @@ int Simulator::start() {
             phongShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)), glm::vec3(1.1f, 1.1f, 1.1f)));
             modelTest.draw(phongShader);
             
+            phongShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(4.0f, 4.0f, 4.0f)));
+            planetModel.draw(phongShader);
+            
             instanceShader.use();
             instanceShader.setInt("material.texDiffuse0", 0);
-            instanceShader.setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(4.0f, 4.0f, 4.0f)));
-            planetModel.draw(instanceShader);
-            
-            for (int i = 0; i < NUM_ROCKS; ++i) {
-                instanceShader.setMat4("modelMtx", rockTransforms[i]);
-                rockModel.draw(instanceShader);
-            }
+            rockModel.drawInstanced(instanceShader, NUM_ROCKS);
             
             skyboxShader.use();
             glDepthFunc(GL_LEQUAL);
