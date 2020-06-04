@@ -1,15 +1,19 @@
 #ifndef _SIMULATOR_H
 #define _SIMULATOR_H
 
+class Framebuffer;
+class Shader;
+
 #include <glad/glad.h>    // OpenGL includes.
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#define glCheckError() glCheckError_(__FILE__, __LINE__)
+#define glCheckError() Simulator::glCheckError_(__FILE__, __LINE__)
 
 #include "Camera.h"
-#include "Framebuffer.h"
+#include "Mesh.h"
+#include "Model.h"
 #include <atomic>
 #include <memory>
 #include <random>
@@ -42,7 +46,12 @@ class Simulator {
     static glm::ivec2 windowSize;
     static glm::vec2 lastMousePos;
     static unordered_map<string, unsigned int> loadedTextures;
-    static unique_ptr<Framebuffer> fbo;
+    static unique_ptr<Shader> skyboxShader, lightShader, phongShader, framebufferShader, testShader;
+    static unique_ptr<Framebuffer> renderFramebuffer;
+    static unsigned int blackTexture, cubeDiffuseMap, cubeSpecularMap, skyboxCubemap;
+    static unsigned int uniformBufferVPMtx;
+    static Mesh lightCube, cube1, windowQuad, skybox;
+    static Model modelTest, planetModel, rockModel;
     
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -51,8 +60,8 @@ class Simulator {
     static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
     
     static GLFWwindow* setupOpenGL();
-    static void setupShaders();
     static void setupTextures();
+    static void setupShaders();
     static void setupSimulation();
     static void nextTick(GLFWwindow* window);
     static void renderScene(const glm::mat4& viewMtx, const glm::mat4& projectionMtx, float deltaTime);
