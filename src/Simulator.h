@@ -48,10 +48,11 @@ class Simulator {
     static unordered_map<string, unsigned int> loadedTextures;
     static unique_ptr<Shader> skyboxShader, lightShader, phongShader, framebufferShader, testShader;
     static unique_ptr<Framebuffer> renderFramebuffer;
-    static unsigned int blackTexture, cubeDiffuseMap, cubeSpecularMap, skyboxCubemap;
+    static unsigned int blackTexture, whiteTexture, cubeDiffuseMap, cubeSpecularMap, woodTexture, skyboxCubemap;
     static unsigned int uniformBufferVPMtx;
     static Mesh lightCube, cube1, windowQuad, skybox;
     static Model modelTest, planetModel, rockModel;
+    static bool flashlightOn, sunlightOn, lampsOn;
     
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
