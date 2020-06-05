@@ -491,7 +491,7 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
     phongShader->use();
     phongShader->setInt("material.texDiffuse0", 0);
     phongShader->setInt("material.texSpecular0", 1);
-    phongShader->setFloat("material.shininess", 32.0f);
+    phongShader->setFloat("material.shininess", 64.0f);
     
     phongShader->setUnsignedIntArray("lightStates", NUM_LIGHTS, lightStates);
     

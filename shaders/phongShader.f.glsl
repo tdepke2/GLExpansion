@@ -43,8 +43,8 @@ vec3 calculateLight(Light light, vec3 normalDir, vec3 viewDir, vec3 diffuseColor
         float distance = length(light.positionViewSpace - fPosition);
         lightScalar = 1.0 / (light.attenuationVals.x + light.attenuationVals.y * distance + light.attenuationVals.z * distance * distance);
     }
-    vec3 reflectDir = reflect(-lightDir, normalDir);
-    //vec3 halfwayDir = normalize(lightDir + viewDir);
+    //vec3 reflectDir = reflect(-lightDir, normalDir);
+    vec3 halfwayDir = normalize(lightDir + viewDir);
     
     vec3 ambient = light.ambient * diffuseColor * lightScalar;
     
@@ -60,20 +60,20 @@ vec3 calculateLight(Light light, vec3 normalDir, vec3 viewDir, vec3 diffuseColor
     float diffuseScalar = max(dot(normalDir, lightDir), 0.0);
     vec3 diffuse = light.diffuse * diffuseScalar * diffuseColor * lightScalar;
     
-    float specularScalar = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);    // Blinn model.
-    vec3 specular = light.specular * specularScalar * specularColor * lightScalar;
-    
-    //float specularScalar = pow(max(dot(normalDir, halfwayDir), 0.0), material.shininess);    // Blinn-Phong model.
+    //float specularScalar = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);    // Blinn model.
     //vec3 specular = light.specular * specularScalar * specularColor * lightScalar;
+    
+    float specularScalar = (diffuseScalar == 0.0 ? 0.0 : pow(max(dot(normalDir, halfwayDir), 0.0), material.shininess));    // Blinn-Phong model.
+    vec3 specular = light.specular * specularScalar * specularColor * lightScalar;
     
     return ambient + diffuse + specular;
 }
 
 void main() {
     vec4 diffuseColor = texture(material.texDiffuse0, fTexCoords);
-    if (diffuseColor.a < 0.5) {
+    //if (diffuseColor.a < 0.5) {
         //discard;
-    }
+    //}
     vec4 specularColor = texture(material.texSpecular0, fTexCoords);
     vec3 normalDir = normalize(fNormal);
     vec3 viewDir = normalize(-fPosition);
