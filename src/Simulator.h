@@ -31,8 +31,8 @@ class Simulator {
     static float randomFloat(float min = 0.0f, float max = 1.0f);    // Generates a random float between min (inclusive) and max (exclusive).
     static int randomInt(int min, int max);    // Generates a random integer between min and max inclusive.
     static GLenum glCheckError_(const char* file, int line);    // Error checking, https://learnopengl.com/In-Practice/Debugging
-    static unsigned int loadTexture(const string& filename);
-    static unsigned int loadCubemap(const string& filename);
+    static unsigned int loadTexture(const string& filename, bool gammaCorrection);
+    static unsigned int loadCubemap(const string& filename, bool gammaCorrection);
     static unsigned int generateTexture(int r, int g, int b);
     
     private:

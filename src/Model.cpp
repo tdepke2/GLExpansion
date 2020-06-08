@@ -128,6 +128,6 @@ void Model::_loadMaterialTextures(aiMaterial* material, aiTextureType type, cons
         if (VERBOSE_OUTPUT) {
             cout << "      \"" << str.C_Str() << "\"\n";
         }
-        textures.emplace_back(Simulator::loadTexture(directoryPath + "/" + string(str.C_Str())), uniformName + to_string(i));
+        textures.emplace_back(Simulator::loadTexture(directoryPath + "/" + string(str.C_Str()), type == aiTextureType_DIFFUSE), uniformName + to_string(i));
     }
 }

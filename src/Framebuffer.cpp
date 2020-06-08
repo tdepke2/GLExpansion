@@ -11,7 +11,7 @@ Framebuffer::Framebuffer(const glm::ivec2& bufferSize) {
     
     glGenTextures(1, &_texColorBuffer);    // Create color buffer (using a 2D texture).
     glBindTexture(GL_TEXTURE_2D, _texColorBuffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, bufferSize.x, bufferSize.y, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB12, bufferSize.x, bufferSize.y, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -44,7 +44,7 @@ const glm::ivec2& Framebuffer::getBufferSize() const {
 void Framebuffer::setBufferSize(const glm::ivec2& bufferSize) {
     _bufferSize = bufferSize;
     glBindTexture(GL_TEXTURE_2D, _texColorBuffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, bufferSize.x, bufferSize.y, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB12, bufferSize.x, bufferSize.y, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindRenderbuffer(GL_RENDERBUFFER, _rboDepthStencilBuffer);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, bufferSize.x, bufferSize.y);

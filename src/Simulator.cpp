@@ -84,6 +84,7 @@ int Simulator::start() {
             glEnable(GL_CULL_FACE);
             
             glBindFramebuffer(GL_FRAMEBUFFER, 0);    // Draw framebuffer.
+            glEnable(GL_FRAMEBUFFER_SRGB);    // Apply gamma correction to final render.
             glViewport(0, 0, windowSize.x, windowSize.y);
             glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
@@ -93,6 +94,7 @@ int Simulator::start() {
             renderFramebuffer->bindTexColorBuffer();
             windowQuad.draw();
             glEnable(GL_DEPTH_TEST);
+            glDisable(GL_FRAMEBUFFER_SRGB);
             
             glfwSwapBuffers(window);
             glfwPollEvents();
@@ -154,24 +156,32 @@ GLenum Simulator::glCheckError_(const char* file, int line) {
     return errorCode;
 }
 
-unsigned int Simulator::loadTexture(const string& filename) {
+unsigned int Simulator::loadTexture(const string& filename, bool gammaCorrection) {
     auto findResult = loadedTextures.find(filename);
     if (findResult != loadedTextures.end()) {
         return findResult->second;
     }
     
-    cout << "Loading texture \"" << filename << "\".\n";
+    cout << "Loading texture \"" << filename << "\"";
+    if (gammaCorrection) {
+        cout << " (with gamma correction).\n";
+    } else {
+        cout << ".\n";
+    }
     unsigned int texHandle;
     glGenTextures(1, &texHandle);
     glBindTexture(GL_TEXTURE_2D, texHandle);
     int width, height, numChannels = 1;
     unsigned char* imageData = stbi_load(filename.c_str(), &width, &height, &numChannels, 0);
-    GLenum format;
+    GLenum internalFormat, format;
     if (numChannels == 1) {
+        internalFormat = GL_RED;
         format = GL_RED;
     } else if (numChannels == 3) {
+        internalFormat = (gammaCorrection ? GL_SRGB : GL_RGB);
         format = GL_RGB;
     } else if (numChannels == 4) {
+        internalFormat = (gammaCorrection ? GL_SRGB_ALPHA : GL_RGBA);
         format = GL_RGBA;
     } else {
         cout << "Error: Unsupported channel number.\n";
@@ -180,7 +190,7 @@ unsigned int Simulator::loadTexture(const string& filename) {
     }
     
     if (imageData) {
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, imageData);
+        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, imageData);
         
         glGenerateMipmap(GL_TEXTURE_2D);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -196,7 +206,7 @@ unsigned int Simulator::loadTexture(const string& filename) {
     return texHandle;
 }
 
-unsigned int Simulator::loadCubemap(const string& filename) {
+unsigned int Simulator::loadCubemap(const string& filename, bool gammaCorrection) {
     auto findResult = loadedTextures.find(filename);
     if (findResult != loadedTextures.end()) {
         return findResult->second;
@@ -223,12 +233,15 @@ unsigned int Simulator::loadCubemap(const string& filename) {
         cout << "  Face " << i << ": \"" << faceFilename << "\".\n";
         
         unsigned char* imageData = stbi_load(faceFilename.c_str(), &width, &height, &numChannels, 0);
-        GLenum format;
+        GLenum internalFormat, format;
         if (numChannels == 1) {
+            internalFormat = GL_RED;
             format = GL_RED;
         } else if (numChannels == 3) {
+            internalFormat = (gammaCorrection ? GL_SRGB : GL_RGB);
             format = GL_RGB;
         } else if (numChannels == 4) {
+            internalFormat = (gammaCorrection ? GL_SRGB_ALPHA : GL_RGBA);
             format = GL_RGBA;
         } else {
             cout << "Error: Unsupported channel number.\n";
@@ -236,7 +249,7 @@ unsigned int Simulator::loadCubemap(const string& filename) {
             imageData = nullptr;
         }
         if (imageData) {
-            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, imageData);
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, imageData);
         } else {
             cout << "Error: Unable to load texture.\n";
         }
@@ -371,9 +384,9 @@ GLFWwindow* Simulator::setupOpenGL() {
 void Simulator::setupTextures() {
     blackTexture = generateTexture(0, 0, 0);
     whiteTexture = generateTexture(255, 255, 255);
-    cubeDiffuseMap = loadTexture("textures/container2.png");
-    cubeSpecularMap = loadTexture("textures/container2_specular.png");
-    woodTexture = loadTexture("textures/wood.png");
+    cubeDiffuseMap = loadTexture("textures/container2.png", true);
+    cubeSpecularMap = loadTexture("textures/container2_specular.png", false);
+    woodTexture = loadTexture("textures/wood.png", true);
 }
 
 void Simulator::setupShaders() {
@@ -412,7 +425,7 @@ void Simulator::setupSimulation() {
     };
     windowQuad.generateMesh(move(windowQuadVertices), move(windowQuadIndices));
     
-    skyboxCubemap = loadCubemap("textures/skybox/.jpg");
+    skyboxCubemap = loadCubemap("textures/skybox/.jpg", true);
     skybox.generateCube(2.0f);
     
     lightCube.generateCube(0.2f);

@@ -1,5 +1,7 @@
 #version 330 core
 
+const float GAMMA = 2.2;
+
 const float OFFSET = 1.0 / 300.0;
 const vec2 OFFSETS[9] = vec2[](
     vec2( OFFSET,  OFFSET),
@@ -33,4 +35,6 @@ void main() {
         //sum += vec3(texture(tex, fTexCoords.st + OFFSETS[i])) * KERNEL[i];
     //}
     //fragColor = vec4(sum, 1.0);
+    
+    //fragColor.rgb = pow(fragColor.rgb, vec3(1.0 / GAMMA));    // Custom gamma setting.
 }

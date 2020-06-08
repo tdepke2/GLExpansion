@@ -74,7 +74,7 @@ void main() {
     //if (diffuseColor.a < 0.5) {
         //discard;
     //}
-    vec4 specularColor = texture(material.texSpecular0, fTexCoords);
+    vec4 specularColor = texture(material.texSpecular0, fTexCoords).rrra;
     vec3 normalDir = normalize(fNormal);
     vec3 viewDir = normalize(-fPosition);
     
