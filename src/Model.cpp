@@ -1,25 +1,22 @@
 #include "Model.h"
 #include "Simulator.h"
 #include <cassert>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <utility>
 
 Model::Model() {}
 
-Model::Model(const string& filename) {
-    loadFile(filename);
+Model::Model(const string& filename, const glm::mat4& transformMtx) {
+    loadFile(filename, transformMtx);
 }
 
-void Model::loadFile(const string& filename) {
+void Model::loadFile(const string& filename, const glm::mat4& transformMtx) {
     assert(meshes.empty());
     if (VERBOSE_OUTPUT) {
         cout << "Loading model \"" << filename << "\".\n";
     }
     Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs);
+    const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_FlipUVs);
     
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         cout << "Failed to load model file \"" << filename << "\": " << importer.GetErrorString() << "\n";
@@ -36,7 +33,7 @@ void Model::loadFile(const string& filename) {
         cout << "  Number of textures:   " << scene->mNumTextures << "\n";
     }
     meshes.reserve(scene->mNumMeshes);
-    _processNode(scene->mRootNode, scene);
+    _processNode(scene->mRootNode, scene, transformMtx);
 }
 
 void Model::applyInstanceBuffer(unsigned int startIndex) const {
@@ -69,28 +66,40 @@ void Model::drawInstanced(const Shader& shader, unsigned int count) const {
     }
 }
 
-void Model::_processNode(aiNode* node, const aiScene* scene) {
+void Model::_processNode(aiNode* node, const aiScene* scene, const glm::mat4& transformMtx) {
+    glm::mat4 thisTransformMtx = glm::transpose(glm::make_mat4(&node->mTransformation.a1));
     if (VERBOSE_OUTPUT) {
         cout << "  Node " << node->mName.C_Str() << " has " << node->mNumMeshes << " meshes and " << node->mNumChildren << " children.\n";
-    }
-    for (unsigned int i = 0; i < node->mNumMeshes; ++i) {    // Process all meshes in this node.
-        meshes.push_back(_processMesh(scene->mMeshes[node->mMeshes[i]], scene));
+        cout << "  Transform: " << glm::to_string(thisTransformMtx) << "\n";
     }
     
+    for (unsigned int i = 0; i < node->mNumMeshes; ++i) {    // Process all meshes in this node.
+        meshes.push_back(_processMesh(scene->mMeshes[node->mMeshes[i]], scene, thisTransformMtx * transformMtx));
+    }
     for (unsigned int i = 0; i < node->mNumChildren; ++i) {    // Process all child nodes.
-        _processNode(node->mChildren[i], scene);
+        _processNode(node->mChildren[i], scene, thisTransformMtx * transformMtx);
     }
 }
 
-Mesh Model::_processMesh(aiMesh* mesh, const aiScene* scene) {
+Mesh Model::_processMesh(aiMesh* mesh, const aiScene* scene, const glm::mat4& transformMtx) {
     if (VERBOSE_OUTPUT) {
         cout << "    Mesh " << mesh->mName.C_Str() << " has " << mesh->mNumBones << " bones, " << mesh->mNumFaces << " faces, and " << mesh->mNumVertices << " vertices.\n";
     }
     vector<Mesh::Vertex> vertices;
     vertices.reserve(mesh->mNumVertices);
+    glm::mat3 normalMtx;
+    bool applyTransform = false;
+    if (transformMtx != glm::mat4(1.0f)) {
+        normalMtx = glm::mat3(glm::transpose(glm::inverse(transformMtx)));
+        applyTransform = true;
+    }
     for (unsigned int i = 0; i < mesh->mNumVertices; ++i) {
-        glm::vec3 vPosition(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
+        glm::vec4 vPosition(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z, 1.0f);
         glm::vec3 vNormal(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
+        if (applyTransform) {
+            vPosition = transformMtx * vPosition;
+            vNormal = normalMtx * vNormal;
+        }
         glm::vec2 vTexCoords;
         if (mesh->mTextureCoords[0]) {
             vTexCoords.x = mesh->mTextureCoords[0][i].x;

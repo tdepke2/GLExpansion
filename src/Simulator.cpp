@@ -534,7 +534,10 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         phongShader->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
     }
     
-    phongShader->setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f)), glm::vec3(0.9f, 0.9f, 0.9f)));
+    glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f));
+    //transform = glm::rotate(transform, -glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+    transform = glm::scale(transform, glm::vec3(0.5f, 0.5f, 0.5f));
+    phongShader->setMat4("modelMtx", transform);
     modelTest.draw(*phongShader);
     
     glActiveTexture(GL_TEXTURE0);

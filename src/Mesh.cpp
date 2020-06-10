@@ -8,7 +8,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <utility>
-#define PI acos(-1.0f)
 
 Mesh::Mesh() {
     _vertexArrayHandle = 0;
@@ -140,10 +139,10 @@ void Mesh::generateSphere(float radius, int numSectors, int numStacks) {
     
     vector<Vertex> vertices;    // http://www.songho.ca/opengl/gl_sphere.html#sphere
     vertices.reserve((numSectors + 1) * (numStacks + 1));
-    float sectorStep = 2.0f * PI / numSectors;
-    float stackStep = PI / numStacks;
+    float sectorStep = 2.0f * glm::pi<float>() / numSectors;
+    float stackStep = glm::pi<float>() / numStacks;
     for (int i = 0; i <= numStacks; ++i) {
-        float stackAngle = PI / 2.0f - i * stackStep;    // Go from PI/2 to -PI/2.
+        float stackAngle = glm::pi<float>() / 2.0f - i * stackStep;    // Go from pi/2 to -pi/2.
         float rCosTheta = radius * cos(stackAngle);
         float z = radius * sin(stackAngle);
         
