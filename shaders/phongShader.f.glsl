@@ -13,6 +13,7 @@ struct Material {
     float shininess;
 };
 uniform Material material;
+uniform sampler2D shadowMap;
 
 struct Light {
     uint type;
@@ -29,8 +30,27 @@ uniform Light lights[NUM_LIGHTS];
 in vec3 fPosition;
 in vec3 fNormal;
 in vec2 fTexCoords;
+in vec4 fPositionLightSpace;
 
 out vec4 fragColor;
+
+float calculateShadow(vec4 positionLightSpace, vec3 normalDir, vec3 lightDir) {
+    vec3 normalizedDeviceCoords = (positionLightSpace.xyz / positionLightSpace.w) * 0.5 + 0.5;
+    float shadowBias = max(0.05 * (1.0 - dot(normalDir, lightDir)), 0.005);
+    float brightness = 0.0;
+    if (normalizedDeviceCoords.z > 1.0) {
+        brightness = 1.0;
+    } else {
+        vec2 texelSize = 1.0 / textureSize(shadowMap, 0);    // Apply percentage-closer filtering for softer shadows.
+        for (int y = -1; y <= 1; ++y) {
+            for (int x = -1; x <= 1; ++x) {
+                brightness += normalizedDeviceCoords.z > texture(shadowMap, normalizedDeviceCoords.xy + vec2(x, y) * texelSize).r ? 0.0 : 1.0;
+            }
+        }
+        brightness /= 9.0;
+    }
+    return brightness;
+}
 
 vec3 calculateLight(Light light, vec3 normalDir, vec3 viewDir, vec3 diffuseColor, vec3 specularColor) {
     vec3 lightDir;
@@ -55,6 +75,8 @@ vec3 calculateLight(Light light, vec3 normalDir, vec3 viewDir, vec3 diffuseColor
             return ambient;
         }
         lightScalar *= intensity;
+    } else if (light.type == DIRECTIONAL_LIGHT) {
+        lightScalar *= calculateShadow(fPositionLightSpace, normalDir, lightDir);
     }
     
     float diffuseScalar = max(dot(normalDir, lightDir), 0.0);

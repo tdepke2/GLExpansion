@@ -16,13 +16,14 @@ Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 3.0f));
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 unordered_map<string, unsigned int> Simulator::loadedTextures;
-unique_ptr<Shader> Simulator::skyboxShader, Simulator::lightShader, Simulator::phongShader, Simulator::framebufferShader, Simulator::testShader;
-unique_ptr<Framebuffer> Simulator::renderFramebuffer;
+unique_ptr<Shader> Simulator::skyboxShader, Simulator::lightShader, Simulator::phongShader, Simulator::shadowMapShader, Simulator::framebufferShader, Simulator::testShader;
+unique_ptr<Framebuffer> Simulator::renderFramebuffer, Simulator::shadowFramebuffer;
 unsigned int Simulator::blackTexture, Simulator::whiteTexture, Simulator::cubeDiffuseMap, Simulator::cubeSpecularMap, Simulator::woodTexture, Simulator::skyboxCubemap;
 unsigned int Simulator::uniformBufferVPMtx;
 Mesh Simulator::lightCube, Simulator::cube1, Simulator::windowQuad, Simulator::skybox;
 Model Simulator::modelTest, Simulator::planetModel, Simulator::rockModel;
 bool Simulator::flashlightOn = false, Simulator::sunlightOn = true, Simulator::lampsOn = false;
+float Simulator::sunT = 0.0f, Simulator::sunSpeed = 0.01f;
 
 int Simulator::start() {
     cout << "Initializing setup...\n";
@@ -63,6 +64,17 @@ int Simulator::start() {
             }
             
             processInput(window, deltaTime);
+            sunT += sunSpeed;
+            
+            shadowFramebuffer->bind();    // Render from light source POV for shadows.
+            glViewport(0, 0, shadowFramebuffer->getBufferSize().x, shadowFramebuffer->getBufferSize().y);
+            glClear(GL_DEPTH_BUFFER_BIT);
+            glm::vec3 sunPosition = glm::vec3(glm::rotate(glm::mat4(1.0f), sunT, glm::vec3(1.0f, 1.0f, 1.0f)) * glm::vec4(0.0f, 0.0f, 40.0f, 1.0f));
+            glm::mat4 lightViewMtx = glm::lookAt(sunPosition + camera.position, camera.position, glm::vec3(0.0f, 1.0f, 0.0f));
+            glm::mat4 lightProjectionMtx = glm::ortho(-40.0f, 40.0f, -40.0f, 40.0f, 0.1f, 80.0f);
+            glDisable(GL_CULL_FACE);
+            renderScene(glm::mat4(1.0f), glm::mat4(1.0f), true, lightProjectionMtx * lightViewMtx);
+            glEnable(GL_CULL_FACE);
             
             renderFramebuffer->bind();    // Prepare framebuffer for drawing.
             glViewport(0, 0, renderFramebuffer->getBufferSize().x, renderFramebuffer->getBufferSize().y);
@@ -71,7 +83,7 @@ int Simulator::start() {
             glm::mat4 viewMtx = camera.getViewMatrix();
             glm::mat4 projectionMtx = glm::perspective(glm::radians(camera.fov), static_cast<float>(windowSize.x) / windowSize.y, NEAR_PLANE, FAR_PLANE);
             
-            renderScene(viewMtx, projectionMtx, deltaTime);
+            renderScene(viewMtx, projectionMtx, false, lightProjectionMtx * lightViewMtx);
             
             skyboxShader->use();    // Draw the skybox.
             glDepthFunc(GL_LEQUAL);
@@ -91,7 +103,7 @@ int Simulator::start() {
             glDisable(GL_DEPTH_TEST);
             framebufferShader->use();
             framebufferShader->setInt("tex", 0);
-            renderFramebuffer->bindTexColorBuffer();
+            renderFramebuffer->bindTexture(0);
             windowQuad.draw();
             glEnable(GL_DEPTH_TEST);
             glDisable(GL_FRAMEBUFFER_SRGB);
@@ -119,9 +131,11 @@ int Simulator::start() {
     skyboxShader.reset();
     lightShader.reset();
     phongShader.reset();
+    shadowMapShader.reset();
     framebufferShader.reset();
     testShader.reset();
     renderFramebuffer.reset();
+    shadowFramebuffer.reset();
     
     glCheckError();
     glfwDestroyWindow(window);
@@ -323,6 +337,12 @@ void Simulator::keyCallback(GLFWwindow* window, int key, int scancode, int actio
             sunlightOn = !sunlightOn;
         } else if (key == GLFW_KEY_H) {
             lampsOn = !lampsOn;
+        } else if (key == GLFW_KEY_RIGHT) {
+            sunSpeed *= 2.0f;
+        } else if (key == GLFW_KEY_LEFT) {
+            if (sunSpeed > 0.00001f) {
+                sunSpeed /= 2.0f;
+            }
         }
     }
 }
@@ -405,6 +425,8 @@ void Simulator::setupShaders() {
     phongShader = make_unique<Shader>("shaders/phongShader.v.glsl", "shaders/phongShader.f.glsl");
     phongShader->setUniformBlockBinding("ViewProjectionMtx", 0);
     
+    shadowMapShader = make_unique<Shader>("shaders/shadowMapShader.v.glsl", "shaders/shadowMapShader.f.glsl");
+    
     framebufferShader = make_unique<Shader>("shaders/framebufferShader.v.glsl", "shaders/framebufferShader.f.glsl");
     
     testShader = make_unique<Shader>("shaders/phongShader.v.glsl", "shaders/blendShader.f.glsl");
@@ -413,6 +435,14 @@ void Simulator::setupShaders() {
 
 void Simulator::setupSimulation() {
     renderFramebuffer = make_unique<Framebuffer>(windowSize);
+    renderFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGB12, GL_RGB, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    renderFramebuffer->attachRenderbuffer(GL_DEPTH_STENCIL_ATTACHMENT, GL_DEPTH24_STENCIL8);
+    renderFramebuffer->validate();
+    
+    shadowFramebuffer = make_unique<Framebuffer>(glm::ivec2(2048, 2048));
+    shadowFramebuffer->disableColorBuffer();
+    shadowFramebuffer->attachTexture(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_NEAREST, GL_CLAMP_TO_BORDER, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    shadowFramebuffer->validate();
     
     vector<Mesh::Vertex> windowQuadVertices = {
         { 1.0f,  1.0f,  0.0f,  0.0f,  0.0f,  0.0f, 1.0f, 1.0f},
@@ -430,9 +460,9 @@ void Simulator::setupSimulation() {
     
     lightCube.generateCube(0.2f);
     cube1.generateCube();
-    //stbi_set_flip_vertically_on_load(false);
-    modelTest.loadFile("models/backpack/backpack.obj");
-    //stbi_set_flip_vertically_on_load(true);
+    stbi_set_flip_vertically_on_load(false);
+    modelTest.loadFile("models/boot_camp/boot_camp.obj");
+    stbi_set_flip_vertically_on_load(true);
     
     // Instancing example.
     /*planetModel.loadFile("models/planet/planet.obj");
@@ -466,79 +496,97 @@ void Simulator::nextTick(GLFWwindow* window) {
     
 }
 
-void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectionMtx, float deltaTime) {
-    glBindBuffer(GL_UNIFORM_BUFFER, uniformBufferVPMtx);    // Update uniform buffer.
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(viewMtx));
-    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projectionMtx));
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    
-    constexpr int NUM_LIGHTS = 8;
-    glm::vec3 pointLightPositions[4] = {
-        {0.7f, 0.2f, 2.0f},
-        {2.3f, -3.3f, -4.0f},
-        {-4.0f, 2.0f, -12.0f},
-        {0.0f, 0.0f, -3.0f}
-    };
-    glm::vec3 pointLightColors[4] = {
-        {1.0f, 1.0f, 1.0f},
-        {1.0f, 1.0f, 1.0f},
-        {1.0f, 1.0f, 1.0f},
-        {1.0f, 1.0f, 1.0f}
-    };
-    unsigned int lightStates[NUM_LIGHTS] = {0, 0, 0, 0, 0, 0, 0, 0};
-    lightStates[0] = (sunlightOn ? 1u : 0u);
-    lightStates[1] = (flashlightOn ? 1u : 0u);
-    for (int i = 0; i < 4; ++i) {
-        lightStates[i + 2] = (lampsOn ? 1u : 0u);
-    }
-    
-    lightShader->use();
-    for (int i = 0; i < 4; ++i) {
-        if (lightStates[i + 2] == 1) {
-            lightShader->setVec3("lightColor", pointLightColors[i]);
-            lightShader->setMat4("modelMtx", glm::translate(glm::mat4(1.0f), pointLightPositions[i]));
-            lightCube.draw();
+void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender, const glm::mat4& lightSpaceMtx) {
+    Shader* shader;
+    if (shadowRender) {
+        shader = shadowMapShader.get();
+        shader->use();
+        shader->setMat4("lightSpaceMtx", lightSpaceMtx);
+    } else {
+        glBindBuffer(GL_UNIFORM_BUFFER, uniformBufferVPMtx);    // Update uniform buffer.
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(viewMtx));
+        glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projectionMtx));
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+        
+        constexpr int NUM_LIGHTS = 8;
+        glm::vec3 pointLightPositions[4] = {
+            {0.7f, 0.2f, 2.0f},
+            {2.3f, -3.3f, -4.0f},
+            {-4.0f, 2.0f, -12.0f},
+            {0.0f, 0.0f, -3.0f}
+        };
+        glm::vec3 pointLightColors[4] = {
+            {1.0f, 1.0f, 1.0f},
+            {1.0f, 1.0f, 1.0f},
+            {1.0f, 1.0f, 1.0f},
+            {1.0f, 1.0f, 1.0f}
+        };
+        unsigned int lightStates[NUM_LIGHTS] = {0, 0, 0, 0, 0, 0, 0, 0};
+        lightStates[0] = (sunlightOn ? 1u : 0u);
+        lightStates[1] = (flashlightOn ? 1u : 0u);
+        for (int i = 0; i < 4; ++i) {
+            lightStates[i + 2] = (lampsOn ? 1u : 0u);
+        }
+        
+        shader = lightShader.get();
+        shader->use();
+        for (int i = 0; i < 4; ++i) {
+            if (lightStates[i + 2] == 1) {
+                shader->setVec3("lightColor", pointLightColors[i]);
+                shader->setMat4("modelMtx", glm::translate(glm::mat4(1.0f), pointLightPositions[i]));
+                lightCube.draw();
+            }
+        }
+        
+        shader->setVec3("lightColor", glm::vec3(1.0f, 1.0f, 0.0f));
+        glm::vec3 sunPosition = glm::vec3(glm::rotate(glm::mat4(1.0f), sunT, glm::vec3(1.0f, 1.0f, 1.0f)) * glm::vec4(0.0f, 0.0f, 40.0f, 1.0f));
+        shader->setMat4("modelMtx", glm::translate(glm::mat4(1.0f), sunPosition + camera.position));
+        lightCube.draw();
+        
+        shader = phongShader.get();
+        shader->use();
+        shader->setMat4("lightSpaceMtx", lightSpaceMtx);
+        shader->setInt("material.texDiffuse0", 0);
+        shader->setInt("material.texSpecular0", 1);
+        shader->setFloat("material.shininess", 64.0f);
+        shader->setInt("shadowMap", 2);
+        glActiveTexture(GL_TEXTURE2);
+        shadowFramebuffer->bindTexture(0);
+        
+        shader->setUnsignedIntArray("lightStates", NUM_LIGHTS, lightStates);
+        
+        shader->setUnsignedInt("lights[0].type", 0);
+        shader->setVec3("lights[0].directionViewSpace", viewMtx * glm::vec4(-sunPosition, 0.0f));
+        glm::vec3 directionalLightColor(1.0f, 1.0f, 1.0f);
+        shader->setVec3("lights[0].ambient", directionalLightColor * 0.05f);
+        shader->setVec3("lights[0].diffuse", directionalLightColor * 0.4f);
+        shader->setVec3("lights[0].specular", directionalLightColor * 0.5f);
+        
+        shader->setUnsignedInt("lights[1].type", 2);
+        shader->setVec3("lights[1].positionViewSpace", viewMtx * glm::vec4(camera.position, 1.0f));
+        shader->setVec3("lights[1].directionViewSpace", viewMtx * glm::vec4(camera.front, 0.0f));
+        glm::vec3 spotLightColor(1.0f, 1.0f, 1.0f);
+        shader->setVec3("lights[1].ambient", spotLightColor * 0.0f);
+        shader->setVec3("lights[1].diffuse", spotLightColor);
+        shader->setVec3("lights[1].specular", spotLightColor);
+        shader->setVec3("lights[1].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
+        shader->setVec2("lights[1].cutOff", glm::vec2(glm::cos(glm::radians(12.5f)), glm::cos(glm::radians(17.5f))));
+        
+        for (int i = 0; i < 4; ++i) {
+            shader->setUnsignedInt("lights[" + to_string(i + 2) + "].type", 1);
+            shader->setVec3("lights[" + to_string(i + 2) + "].positionViewSpace", viewMtx * glm::vec4(pointLightPositions[i], 1.0f));
+            shader->setVec3("lights[" + to_string(i + 2) + "].ambient", pointLightColors[i] * 0.05f);
+            shader->setVec3("lights[" + to_string(i + 2) + "].diffuse", pointLightColors[i] * 0.8f);
+            shader->setVec3("lights[" + to_string(i + 2) + "].specular", pointLightColors[i]);
+            shader->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
         }
     }
     
-    phongShader->use();
-    phongShader->setInt("material.texDiffuse0", 0);
-    phongShader->setInt("material.texSpecular0", 1);
-    phongShader->setFloat("material.shininess", 64.0f);
-    
-    phongShader->setUnsignedIntArray("lightStates", NUM_LIGHTS, lightStates);
-    
-    phongShader->setUnsignedInt("lights[0].type", 0);
-    phongShader->setVec3("lights[0].directionViewSpace", viewMtx * glm::vec4(-0.2f, -1.0f, -0.3f, 0.0f));
-    glm::vec3 directionalLightColor(1.0f, 1.0f, 1.0f);
-    phongShader->setVec3("lights[0].ambient", directionalLightColor * 0.05f);
-    phongShader->setVec3("lights[0].diffuse", directionalLightColor * 0.4f);
-    phongShader->setVec3("lights[0].specular", directionalLightColor * 0.5f);
-    
-    phongShader->setUnsignedInt("lights[1].type", 2);
-    phongShader->setVec3("lights[1].positionViewSpace", viewMtx * glm::vec4(camera.position, 1.0f));
-    phongShader->setVec3("lights[1].directionViewSpace", viewMtx * glm::vec4(camera.front, 0.0f));
-    glm::vec3 spotLightColor(1.0f, 1.0f, 1.0f);
-    phongShader->setVec3("lights[1].ambient", spotLightColor * 0.0f);
-    phongShader->setVec3("lights[1].diffuse", spotLightColor);
-    phongShader->setVec3("lights[1].specular", spotLightColor);
-    phongShader->setVec3("lights[1].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
-    phongShader->setVec2("lights[1].cutOff", glm::vec2(glm::cos(glm::radians(12.5f)), glm::cos(glm::radians(17.5f))));
-    
-    for (int i = 0; i < 4; ++i) {
-        phongShader->setUnsignedInt("lights[" + to_string(i + 2) + "].type", 1);
-        phongShader->setVec3("lights[" + to_string(i + 2) + "].positionViewSpace", viewMtx * glm::vec4(pointLightPositions[i], 1.0f));
-        phongShader->setVec3("lights[" + to_string(i + 2) + "].ambient", pointLightColors[i] * 0.05f);
-        phongShader->setVec3("lights[" + to_string(i + 2) + "].diffuse", pointLightColors[i] * 0.8f);
-        phongShader->setVec3("lights[" + to_string(i + 2) + "].specular", pointLightColors[i]);
-        phongShader->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
-    }
-    
     glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f));
-    //transform = glm::rotate(transform, -glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
-    transform = glm::scale(transform, glm::vec3(0.5f, 0.5f, 0.5f));
-    phongShader->setMat4("modelMtx", transform);
-    modelTest.draw(*phongShader);
+    transform = glm::rotate(transform, -glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+    transform = glm::scale(transform, glm::vec3(0.01f, 0.01f, 0.01f));
+    shader->setMat4("modelMtx", transform);
+    modelTest.draw(*shader);
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, cubeDiffuseMap);
@@ -560,15 +608,18 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         glm::mat4 modelMtx = glm::translate(glm::mat4(1.0f), cubePositions[i]);
         float angle = 20.0f * i;
         modelMtx = glm::rotate(modelMtx, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-        phongShader->setMat4("modelMtx", modelMtx);
+        shader->setMat4("modelMtx", modelMtx);
         cube1.draw();
     }
+    
+    shader->setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), camera.position), glm::vec3(0.4f, 0.4f, 0.4f)));
+    cube1.draw();
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, woodTexture);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, whiteTexture);
-    phongShader->setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(15.0f, 0.2f, 15.0f)));
+    shader->setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(150.0f, 0.2f, 150.0f)));
     cube1.draw();
 }
 

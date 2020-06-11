@@ -46,13 +46,14 @@ class Simulator {
     static glm::ivec2 windowSize;
     static glm::vec2 lastMousePos;
     static unordered_map<string, unsigned int> loadedTextures;
-    static unique_ptr<Shader> skyboxShader, lightShader, phongShader, framebufferShader, testShader;
-    static unique_ptr<Framebuffer> renderFramebuffer;
+    static unique_ptr<Shader> skyboxShader, lightShader, phongShader, shadowMapShader, framebufferShader, testShader;
+    static unique_ptr<Framebuffer> renderFramebuffer, shadowFramebuffer;
     static unsigned int blackTexture, whiteTexture, cubeDiffuseMap, cubeSpecularMap, woodTexture, skyboxCubemap;
     static unsigned int uniformBufferVPMtx;
     static Mesh lightCube, cube1, windowQuad, skybox;
     static Model modelTest, planetModel, rockModel;
     static bool flashlightOn, sunlightOn, lampsOn;
+    static float sunT, sunSpeed;
     
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -65,7 +66,7 @@ class Simulator {
     static void setupShaders();
     static void setupSimulation();
     static void nextTick(GLFWwindow* window);
-    static void renderScene(const glm::mat4& viewMtx, const glm::mat4& projectionMtx, float deltaTime);
+    static void renderScene(const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender, const glm::mat4& lightSpaceMtx);
     
     static void processInput(GLFWwindow* window, float deltaTime);
 };

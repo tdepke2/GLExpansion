@@ -1,40 +1,20 @@
 #include "Framebuffer.h"
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
 #include <stdexcept>
 #include <string>
 
 Framebuffer::Framebuffer(const glm::ivec2& bufferSize) {
     _bufferSize = bufferSize;
     glGenFramebuffers(1, &_framebufferHandle);
-    glBindFramebuffer(GL_FRAMEBUFFER, _framebufferHandle);
-    
-    glGenTextures(1, &_texColorBuffer);    // Create color buffer (using a 2D texture).
-    glBindTexture(GL_TEXTURE_2D, _texColorBuffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB12, bufferSize.x, bufferSize.y, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _texColorBuffer, 0);
-    
-    glGenRenderbuffers(1, &_rboDepthStencilBuffer);    // Create depth and stencil buffer (using a renderbuffer because we don't need to sample values from it like with the color buffer).
-    glBindRenderbuffer(GL_RENDERBUFFER, _rboDepthStencilBuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, bufferSize.x, bufferSize.y);
-    glBindRenderbuffer(GL_RENDERBUFFER, 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, _rboDepthStencilBuffer);
-    
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        throw runtime_error("Framebuffer is not complete. Error code " + to_string(glCheckFramebufferStatus(GL_FRAMEBUFFER)) + ".\n");
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 Framebuffer::~Framebuffer() {
     glDeleteFramebuffers(1, &_framebufferHandle);
-    glDeleteTextures(1, &_texColorBuffer);
-    glDeleteRenderbuffers(1, &_rboDepthStencilBuffer);
+    for (const TextureData& texture : _textures) {
+        glDeleteTextures(1, &texture.handle);
+    }
+    for (const RenderbufferData& renderbuffer : _renderbuffers) {
+        glDeleteRenderbuffers(1, &renderbuffer.handle);
+    }
 }
 
 const glm::ivec2& Framebuffer::getBufferSize() const {
@@ -43,19 +23,75 @@ const glm::ivec2& Framebuffer::getBufferSize() const {
 
 void Framebuffer::setBufferSize(const glm::ivec2& bufferSize) {
     _bufferSize = bufferSize;
-    glBindTexture(GL_TEXTURE_2D, _texColorBuffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB12, bufferSize.x, bufferSize.y, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    for (const TextureData& texture : _textures) {
+        glBindTexture(GL_TEXTURE_2D, texture.handle);
+        glTexImage2D(GL_TEXTURE_2D, 0, texture.internalFormat, bufferSize.x, bufferSize.y, 0, texture.format, GL_UNSIGNED_BYTE, nullptr);
+    }
     glBindTexture(GL_TEXTURE_2D, 0);
-    glBindRenderbuffer(GL_RENDERBUFFER, _rboDepthStencilBuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, bufferSize.x, bufferSize.y);
+    
+    for (const RenderbufferData& renderbuffer : _renderbuffers) {
+        glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer.handle);
+        glRenderbufferStorage(GL_RENDERBUFFER, renderbuffer.internalFormat, bufferSize.x, bufferSize.y);
+    }
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
+}
+
+void Framebuffer::attachTexture(GLenum attachment, GLint internalFormat, GLenum format, GLint filter, GLint wrap, const glm::vec4& borderColor) {
+    glBindFramebuffer(GL_FRAMEBUFFER, _framebufferHandle);
+    
+    _textures.emplace_back(0, internalFormat, format);
+    glGenTextures(1, &_textures.back().handle);    // Create color buffer (using a 2D texture).
+    glBindTexture(GL_TEXTURE_2D, _textures.back().handle);
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, _bufferSize.x, _bufferSize.y, 0, format, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
+    if (wrap == GL_CLAMP_TO_BORDER) {
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, value_ptr(borderColor));
+    }
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, _textures.back().handle, 0);
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Framebuffer::attachRenderbuffer(GLenum attachment, GLenum internalFormat) {
+    glBindFramebuffer(GL_FRAMEBUFFER, _framebufferHandle);
+    
+    _renderbuffers.emplace_back(0, internalFormat);
+    glGenRenderbuffers(1, &_renderbuffers.back().handle);    // Create depth and stencil buffer (using a renderbuffer because we don't need to sample values from it like with the color buffer).
+    glBindRenderbuffer(GL_RENDERBUFFER, _renderbuffers.back().handle);
+    glRenderbufferStorage(GL_RENDERBUFFER, internalFormat, _bufferSize.x, _bufferSize.y);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, attachment, GL_RENDERBUFFER, _renderbuffers.back().handle);
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Framebuffer::disableColorBuffer() const {
+    glBindFramebuffer(GL_FRAMEBUFFER, _framebufferHandle);
+    
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Framebuffer::validate() const {
+    glBindFramebuffer(GL_FRAMEBUFFER, _framebufferHandle);
+    
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        throw runtime_error("Framebuffer is not complete. Error code " + to_string(glCheckFramebufferStatus(GL_FRAMEBUFFER)) + ".\n");
+    }
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Framebuffer::bind() const {
     glBindFramebuffer(GL_FRAMEBUFFER, _framebufferHandle);
 }
 
-void Framebuffer::bindTexColorBuffer() const {
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, _texColorBuffer);
+void Framebuffer::bindTexture(unsigned int index) const {
+    glBindTexture(GL_TEXTURE_2D, _textures[index].handle);
 }

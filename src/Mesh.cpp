@@ -203,11 +203,14 @@ void Mesh::draw() const {
 }
 
 void Mesh::draw(const Shader& shader) const {
-    for (unsigned int i = 0; i < textures.size(); ++i) {
-        glActiveTexture(GL_TEXTURE0 + i);
-        shader.setInt(textures[i].uniformName, i);    // hmm yeah idk ###################################
-        glBindTexture(GL_TEXTURE_2D, textures[i].id);
-    }
+    //for (unsigned int i = 0; i < textures.size(); ++i) {
+        //glActiveTexture(GL_TEXTURE0 + i);    // ############################################################# Maybe there is no need to pass a shader?
+        //glBindTexture(GL_TEXTURE_2D, textures[i].id);
+    //}
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, textures[0].id);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, textures[0].id);
     draw();
 }
 
@@ -219,7 +222,6 @@ void Mesh::drawInstanced(unsigned int count) const {
 void Mesh::drawInstanced(const Shader& shader, unsigned int count) const {
     for (unsigned int i = 0; i < textures.size(); ++i) {
         glActiveTexture(GL_TEXTURE0 + i);
-        shader.setInt(textures[i].uniformName, i);    // hmm yeah idk ###################################
         glBindTexture(GL_TEXTURE_2D, textures[i].id);
     }
     drawInstanced(count);
