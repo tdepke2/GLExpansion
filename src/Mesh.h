@@ -2,6 +2,11 @@
 #define _MESH_H
 
 #include "Shader.h"
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <string>
 #include <vector>
 
@@ -10,20 +15,23 @@ using namespace std;
 class Mesh {
     public:
     struct Vertex {
-        float vx, vy, vz;
-        float nx, ny, nz;
-        float s, t;
+        float x, y, z;       // Position.
+        float nx, ny, nz;    // Normal.
+        float s, t;          // Texture coords.
+        float tx, ty, tz;    // Tangent.
+        float bx, by, bz;    // Bitangent.
         
         Vertex() {}
-        Vertex(float vx, float vy, float vz, float nx, float ny, float nz, float s, float t) : vx(vx), vy(vy), vz(vz), nx(nx), ny(ny), nz(nz), s(s), t(t) {}
+        Vertex(const glm::vec3& p, const glm::vec3& n, const glm::vec2& c) : x(p.x), y(p.y), z(p.z), nx(n.x), ny(n.y), nz(n.z), s(c.s), t(c.t), tx(0.0f), ty(0.0f), tz(0.0f), bx(0.0f), by(0.0f), bz(0.0f) {}
+        Vertex(const glm::vec3& p, const glm::vec3& n, const glm::vec2& c, const glm::vec3& t, const glm::vec3& b) : x(p.x), y(p.y), z(p.z), nx(n.x), ny(n.y), nz(n.z), s(c.s), t(c.t), tx(t.x), ty(t.y), tz(t.z), bx(b.x), by(b.y), bz(b.z) {}
     };
     
     struct Texture {
-        unsigned int id;
-        string uniformName;
+        unsigned int handle;
+        unsigned int index;
         
         Texture() {}
-        Texture(unsigned int id, const string& uniformName) : id(id), uniformName(uniformName) {}
+        Texture(unsigned int handle, unsigned int index) : handle(handle), index(index) {}
     };
     
     vector<Vertex> vertices;

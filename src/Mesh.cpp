@@ -2,11 +2,6 @@
 #include "Simulator.h"
 #include <cassert>
 #include <cmath>
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 #include <utility>
 
 Mesh::Mesh() {
@@ -79,6 +74,10 @@ void Mesh::generateMesh(vector<Vertex>&& vertices, vector<unsigned int>&& indice
     glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_NORMAL, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(sizeof(float) * 3));
     glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_TEX_COORDS);
     glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_TEX_COORDS, 2, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(sizeof(float) * 6));
+    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_TANGENT);
+    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_TANGENT, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(sizeof(float) * 8));
+    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_BITANGENT);
+    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_BITANGENT, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(sizeof(float) * 11));
 }
 
 void Mesh::generateMesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures) {
@@ -90,35 +89,35 @@ void Mesh::generateCube(float sideLength) {
     vector<Vertex> vertices;
     vertices.reserve(24);
     float halfSideLength = sideLength / 2.0f;
-    vertices.emplace_back( halfSideLength,  halfSideLength, -halfSideLength,  1.0f,  0.0f,  0.0f, 1.0f, 1.0f);    // Right face.
-    vertices.emplace_back( halfSideLength,  halfSideLength,  halfSideLength,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f);
-    vertices.emplace_back( halfSideLength, -halfSideLength,  halfSideLength,  1.0f,  0.0f,  0.0f, 0.0f, 0.0f);
-    vertices.emplace_back( halfSideLength, -halfSideLength, -halfSideLength,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f);
+    vertices.emplace_back(glm::vec3( halfSideLength,  halfSideLength, -halfSideLength), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2( 1.0f,  1.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3( 0.0f,  0.0f,  0.0f));    // Right face.
+    vertices.emplace_back(glm::vec3( halfSideLength,  halfSideLength,  halfSideLength), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2( 0.0f,  1.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
+    vertices.emplace_back(glm::vec3( halfSideLength, -halfSideLength,  halfSideLength), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2( 0.0f,  0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
+    vertices.emplace_back(glm::vec3( halfSideLength, -halfSideLength, -halfSideLength), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec2( 1.0f,  0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
     
-    vertices.emplace_back(-halfSideLength,  halfSideLength,  halfSideLength, -1.0f,  0.0f,  0.0f, 1.0f, 1.0f);    // Left face.
-    vertices.emplace_back(-halfSideLength,  halfSideLength, -halfSideLength, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f);
-    vertices.emplace_back(-halfSideLength, -halfSideLength, -halfSideLength, -1.0f,  0.0f,  0.0f, 0.0f, 0.0f);
-    vertices.emplace_back(-halfSideLength, -halfSideLength,  halfSideLength, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f);
+    vertices.emplace_back(glm::vec3(-halfSideLength,  halfSideLength,  halfSideLength), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2( 1.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  0.0f));    // Left face.
+    vertices.emplace_back(glm::vec3(-halfSideLength,  halfSideLength, -halfSideLength), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2( 0.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
+    vertices.emplace_back(glm::vec3(-halfSideLength, -halfSideLength, -halfSideLength), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2( 0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
+    vertices.emplace_back(glm::vec3(-halfSideLength, -halfSideLength,  halfSideLength), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec2( 1.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
     
-    vertices.emplace_back( halfSideLength,  halfSideLength, -halfSideLength,  0.0f,  1.0f,  0.0f, 1.0f, 1.0f);    // Top face.
-    vertices.emplace_back(-halfSideLength,  halfSideLength, -halfSideLength,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f);
-    vertices.emplace_back(-halfSideLength,  halfSideLength,  halfSideLength,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f);
-    vertices.emplace_back( halfSideLength,  halfSideLength,  halfSideLength,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f);
+    vertices.emplace_back(glm::vec3( halfSideLength,  halfSideLength, -halfSideLength), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2( 1.0f,  1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));    // Top face.
+    vertices.emplace_back(glm::vec3(-halfSideLength,  halfSideLength, -halfSideLength), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2( 0.0f,  1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
+    vertices.emplace_back(glm::vec3(-halfSideLength,  halfSideLength,  halfSideLength), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2( 0.0f,  0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
+    vertices.emplace_back(glm::vec3( halfSideLength,  halfSideLength,  halfSideLength), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec2( 1.0f,  0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
     
-    vertices.emplace_back( halfSideLength, -halfSideLength,  halfSideLength,  0.0f, -1.0f,  0.0f, 1.0f, 1.0f);    // Bottom face.
-    vertices.emplace_back(-halfSideLength, -halfSideLength,  halfSideLength,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f);
-    vertices.emplace_back(-halfSideLength, -halfSideLength, -halfSideLength,  0.0f, -1.0f,  0.0f, 0.0f, 0.0f);
-    vertices.emplace_back( halfSideLength, -halfSideLength, -halfSideLength,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f);
+    vertices.emplace_back(glm::vec3( halfSideLength, -halfSideLength,  halfSideLength), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2( 1.0f,  1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));    // Bottom face.
+    vertices.emplace_back(glm::vec3(-halfSideLength, -halfSideLength,  halfSideLength), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2( 0.0f,  1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
+    vertices.emplace_back(glm::vec3(-halfSideLength, -halfSideLength, -halfSideLength), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2( 0.0f,  0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
+    vertices.emplace_back(glm::vec3( halfSideLength, -halfSideLength, -halfSideLength), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec2( 1.0f,  0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
     
-    vertices.emplace_back( halfSideLength,  halfSideLength,  halfSideLength,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f);    // Front face.
-    vertices.emplace_back(-halfSideLength,  halfSideLength,  halfSideLength,  0.0f,  0.0f,  1.0f, 0.0f, 1.0f);
-    vertices.emplace_back(-halfSideLength, -halfSideLength,  halfSideLength,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f);
-    vertices.emplace_back( halfSideLength, -halfSideLength,  halfSideLength,  0.0f,  0.0f,  1.0f, 1.0f, 0.0f);
+    vertices.emplace_back(glm::vec3( halfSideLength,  halfSideLength,  halfSideLength), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2( 1.0f,  1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));    // Front face.
+    vertices.emplace_back(glm::vec3(-halfSideLength,  halfSideLength,  halfSideLength), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2( 0.0f,  1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
+    vertices.emplace_back(glm::vec3(-halfSideLength, -halfSideLength,  halfSideLength), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2( 0.0f,  0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
+    vertices.emplace_back(glm::vec3( halfSideLength, -halfSideLength,  halfSideLength), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec2( 1.0f,  0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
     
-    vertices.emplace_back(-halfSideLength,  halfSideLength, -halfSideLength,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f);    // Back face.
-    vertices.emplace_back( halfSideLength,  halfSideLength, -halfSideLength,  0.0f,  0.0f, -1.0f, 0.0f, 1.0f);
-    vertices.emplace_back( halfSideLength, -halfSideLength, -halfSideLength,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f);
-    vertices.emplace_back(-halfSideLength, -halfSideLength, -halfSideLength,  0.0f,  0.0f, -1.0f, 1.0f, 0.0f);
+    vertices.emplace_back(glm::vec3(-halfSideLength,  halfSideLength, -halfSideLength), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2( 1.0f,  1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));    // Back face.
+    vertices.emplace_back(glm::vec3( halfSideLength,  halfSideLength, -halfSideLength), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2( 0.0f,  1.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
+    vertices.emplace_back(glm::vec3( halfSideLength, -halfSideLength, -halfSideLength), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2( 0.0f,  0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
+    vertices.emplace_back(glm::vec3(-halfSideLength, -halfSideLength, -halfSideLength), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec2( 1.0f,  0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  0.0f));
     
     vector<unsigned int> indices;
     indices.reserve(36);
@@ -144,14 +143,15 @@ void Mesh::generateSphere(float radius, int numSectors, int numStacks) {
     for (int i = 0; i <= numStacks; ++i) {
         float stackAngle = glm::pi<float>() / 2.0f - i * stackStep;    // Go from pi/2 to -pi/2.
         float rCosTheta = radius * cos(stackAngle);
-        float z = radius * sin(stackAngle);
+        glm::vec3 position;
+        position.z = radius * sin(stackAngle);
         
         for (int j = 0; j <= numSectors; ++j) {
             float sectorAngle = j * sectorStep;    // Go from 0 to 2PI.
             
-            float x = rCosTheta * cos(sectorAngle);
-            float y = rCosTheta * sin(sectorAngle);
-            vertices.emplace_back(x, y, z, x / radius, y / radius, z / radius, static_cast<float>(j) / numSectors, 1.0f - static_cast<float>(i) / numStacks);
+            position.x = rCosTheta * cos(sectorAngle);
+            position.y = rCosTheta * sin(sectorAngle);
+            vertices.emplace_back(position, position / radius, glm::vec2(static_cast<float>(j) / numSectors, 1.0f - static_cast<float>(i) / numStacks), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f));
         }
     }
     
@@ -203,14 +203,10 @@ void Mesh::draw() const {
 }
 
 void Mesh::draw(const Shader& shader) const {
-    //for (unsigned int i = 0; i < textures.size(); ++i) {
-        //glActiveTexture(GL_TEXTURE0 + i);    // ############################################################# Maybe there is no need to pass a shader?
-        //glBindTexture(GL_TEXTURE_2D, textures[i].id);
-    //}
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textures[0].id);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, textures[0].id);
+    for (unsigned int i = 0; i < textures.size(); ++i) {
+        glActiveTexture(GL_TEXTURE0 + textures[i].index);    // ############################################################# Maybe there is no need to pass a shader?
+        glBindTexture(GL_TEXTURE_2D, textures[i].handle);
+    }
     draw();
 }
 
@@ -221,8 +217,8 @@ void Mesh::drawInstanced(unsigned int count) const {
 
 void Mesh::drawInstanced(const Shader& shader, unsigned int count) const {
     for (unsigned int i = 0; i < textures.size(); ++i) {
-        glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_2D, textures[i].id);
+        glActiveTexture(GL_TEXTURE0 + textures[i].index);
+        glBindTexture(GL_TEXTURE_2D, textures[i].handle);
     }
     drawInstanced(count);
 }

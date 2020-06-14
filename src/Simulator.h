@@ -25,14 +25,14 @@ using namespace std;
 class Simulator {
     public:
     static constexpr float NEAR_PLANE = 0.1f, FAR_PLANE = 100.0f;
-    static constexpr int ATTRIBUTE_LOCATION_V_POSITION = 0, ATTRIBUTE_LOCATION_V_NORMAL = 1, ATTRIBUTE_LOCATION_V_TEX_COORDS = 2;
+    static constexpr int ATTRIBUTE_LOCATION_V_POSITION = 0, ATTRIBUTE_LOCATION_V_NORMAL = 1, ATTRIBUTE_LOCATION_V_TEX_COORDS = 2, ATTRIBUTE_LOCATION_V_TANGENT = 3, ATTRIBUTE_LOCATION_V_BITANGENT = 4;
     
     static int start();
     static float randomFloat(float min = 0.0f, float max = 1.0f);    // Generates a random float between min (inclusive) and max (exclusive).
     static int randomInt(int min, int max);    // Generates a random integer between min and max inclusive.
     static GLenum glCheckError_(const char* file, int line);    // Error checking, https://learnopengl.com/In-Practice/Debugging
-    static unsigned int loadTexture(const string& filename, bool gammaCorrection);
-    static unsigned int loadCubemap(const string& filename, bool gammaCorrection);
+    static unsigned int loadTexture(const string& filename, bool gammaCorrection, bool flip = true);
+    static unsigned int loadCubemap(const string& filename, bool gammaCorrection, bool flip = false);
     static unsigned int generateTexture(int r, int g, int b);
     
     private:
@@ -46,11 +46,11 @@ class Simulator {
     static glm::ivec2 windowSize;
     static glm::vec2 lastMousePos;
     static unordered_map<string, unsigned int> loadedTextures;
-    static unique_ptr<Shader> skyboxShader, lightShader, phongShader, shadowMapShader, framebufferShader, testShader;
+    static unique_ptr<Shader> skyboxShader, lightShader, phongShader, shadowMapShader, phongParallaxShader, framebufferShader;
     static unique_ptr<Framebuffer> renderFramebuffer, shadowFramebuffer;
-    static unsigned int blackTexture, whiteTexture, cubeDiffuseMap, cubeSpecularMap, woodTexture, skyboxCubemap;
+    static unsigned int blackTexture, whiteTexture, cubeDiffuseMap, cubeSpecularMap, woodTexture, skyboxCubemap, brickDiffuseMap, brickNormalMap;
     static unsigned int uniformBufferVPMtx;
-    static Mesh lightCube, cube1, windowQuad, skybox;
+    static Mesh lightCube, cube1, sphere1, windowQuad, skybox;
     static Model modelTest, planetModel, rockModel;
     static bool flashlightOn, sunlightOn, lampsOn;
     static float sunT, sunSpeed;

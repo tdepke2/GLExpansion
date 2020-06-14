@@ -16,7 +16,7 @@ void Model::loadFile(const string& filename, const glm::mat4& transformMtx) {
         cout << "Loading model \"" << filename << "\".\n";
     }
     Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_FlipUVs);
+    const aiScene* scene = importer.ReadFile(filename, aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate | aiProcess_GenNormals);
     
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         cout << "Failed to load model file \"" << filename << "\": " << importer.GetErrorString() << "\n";
@@ -96,10 +96,6 @@ Mesh Model::_processMesh(aiMesh* mesh, const aiScene* scene, const glm::mat4& tr
     for (unsigned int i = 0; i < mesh->mNumVertices; ++i) {
         glm::vec4 vPosition(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z, 1.0f);
         glm::vec3 vNormal(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
-        if (applyTransform) {
-            vPosition = transformMtx * vPosition;
-            vNormal = normalMtx * vNormal;
-        }
         glm::vec2 vTexCoords;
         if (mesh->mTextureCoords[0]) {
             vTexCoords.x = mesh->mTextureCoords[0][i].x;
@@ -108,8 +104,16 @@ Mesh Model::_processMesh(aiMesh* mesh, const aiScene* scene, const glm::mat4& tr
             vTexCoords.x = 0.0f;
             vTexCoords.y = 0.0f;
         }
+        glm::vec3 vTangent(mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z);
+        glm::vec3 vBitangent(mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z);
         
-        vertices.emplace_back(vPosition.x, vPosition.y, vPosition.z, vNormal.x, vNormal.y, vNormal.z, vTexCoords.x, vTexCoords.y);
+        if (applyTransform) {    // Uhh idk how to transform tangent/bitangent, need to check this ####################################################################################################################
+            //vPosition = transformMtx * vPosition;
+            //vNormal = normalMtx * vNormal;
+        }
+        
+        vertices.emplace_back(vPosition, vNormal, vTexCoords, vTangent, vBitangent);
+        //cout << "      vP = [" << vPosition.x << ", " << vPosition.y << ", " << vPosition.z << "], vN = [" << vNormal.x << ", " << vNormal.y << ", " << vNormal.z << "], vTC = [" << vTexCoords.s << ", " << vTexCoords.t << "], vT = [" << vTangent.x << ", " << vTangent.y << ", " << vTangent.z << "], vB = [" << vBitangent.x << ", " << vBitangent.y << ", " << vBitangent.z << "]\n";
     }
     
     vector<unsigned int> indices;
@@ -121,22 +125,24 @@ Mesh Model::_processMesh(aiMesh* mesh, const aiScene* scene, const glm::mat4& tr
     }
     
     vector<Mesh::Texture> textures;
-    _loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_DIFFUSE, "material.texDiffuse", textures);
-    _loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_SPECULAR, "material.texSpecular", textures);
+    _loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_DIFFUSE, "material.texDiffuse", 0, textures);
+    _loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_SPECULAR, "material.texSpecular", 1, textures);
+    _loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_HEIGHT, "material.texNormal", 2, textures);
     
     return Mesh(move(vertices), move(indices), move(textures));
 }
 
-void Model::_loadMaterialTextures(aiMaterial* material, aiTextureType type, const string& uniformName, vector<Mesh::Texture>& textures) {
+void Model::_loadMaterialTextures(aiMaterial* material, aiTextureType type, const string& uniformName, unsigned int index, vector<Mesh::Texture>& textures) {
     if (VERBOSE_OUTPUT) {
         cout << "      Material " << uniformName << " has " << material->GetTextureCount(type) << " textures:\n";
     }
-    for (unsigned int i = 0; i < material->GetTextureCount(type); ++i) {
+    //for (unsigned int i = 0; i < material->GetTextureCount(type); ++i) {    // Right now, only the first texture is used :/ #####################################################################################################
+    if (material->GetTextureCount(type) > 0) {
         aiString str;
-        material->GetTexture(type, i, &str);
+        material->GetTexture(type, 0, &str);
         if (VERBOSE_OUTPUT) {
             cout << "      \"" << str.C_Str() << "\"\n";
         }
-        textures.emplace_back(Simulator::loadTexture(directoryPath + "/" + string(str.C_Str()), type == aiTextureType_DIFFUSE), uniformName + to_string(i));
+        textures.emplace_back(Simulator::loadTexture(directoryPath + "/" + string(str.C_Str()), type == aiTextureType_DIFFUSE), index);
     }
 }

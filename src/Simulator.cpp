@@ -16,11 +16,11 @@ Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 3.0f));
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 unordered_map<string, unsigned int> Simulator::loadedTextures;
-unique_ptr<Shader> Simulator::skyboxShader, Simulator::lightShader, Simulator::phongShader, Simulator::shadowMapShader, Simulator::framebufferShader, Simulator::testShader;
+unique_ptr<Shader> Simulator::skyboxShader, Simulator::lightShader, Simulator::phongShader, Simulator::shadowMapShader, Simulator::phongParallaxShader, Simulator::framebufferShader;
 unique_ptr<Framebuffer> Simulator::renderFramebuffer, Simulator::shadowFramebuffer;
-unsigned int Simulator::blackTexture, Simulator::whiteTexture, Simulator::cubeDiffuseMap, Simulator::cubeSpecularMap, Simulator::woodTexture, Simulator::skyboxCubemap;
+unsigned int Simulator::blackTexture, Simulator::whiteTexture, Simulator::cubeDiffuseMap, Simulator::cubeSpecularMap, Simulator::woodTexture, Simulator::skyboxCubemap, Simulator::brickDiffuseMap, Simulator::brickNormalMap;
 unsigned int Simulator::uniformBufferVPMtx;
-Mesh Simulator::lightCube, Simulator::cube1, Simulator::windowQuad, Simulator::skybox;
+Mesh Simulator::lightCube, Simulator::cube1, Simulator::sphere1, Simulator::windowQuad, Simulator::skybox;
 Model Simulator::modelTest, Simulator::planetModel, Simulator::rockModel;
 bool Simulator::flashlightOn = false, Simulator::sunlightOn = true, Simulator::lampsOn = false;
 float Simulator::sunT = 0.0f, Simulator::sunSpeed = 0.01f;
@@ -33,7 +33,6 @@ int Simulator::start() {
         assert(state == State::Uninitialized);
         state = State::Running;
         mainRNG.seed(static_cast<unsigned long>(chrono::high_resolution_clock::now().time_since_epoch().count()));
-        stbi_set_flip_vertically_on_load(true);
         
         window = setupOpenGL();
         setupTextures();
@@ -132,8 +131,8 @@ int Simulator::start() {
     lightShader.reset();
     phongShader.reset();
     shadowMapShader.reset();
+    phongParallaxShader.reset();
     framebufferShader.reset();
-    testShader.reset();
     renderFramebuffer.reset();
     shadowFramebuffer.reset();
     
@@ -170,12 +169,13 @@ GLenum Simulator::glCheckError_(const char* file, int line) {
     return errorCode;
 }
 
-unsigned int Simulator::loadTexture(const string& filename, bool gammaCorrection) {
+unsigned int Simulator::loadTexture(const string& filename, bool gammaCorrection, bool flip) {
     auto findResult = loadedTextures.find(filename);
     if (findResult != loadedTextures.end()) {
         return findResult->second;
     }
     
+    stbi_set_flip_vertically_on_load(flip);    // Need to add this to the filename string during lookup ###########################################################################################################################
     cout << "Loading texture \"" << filename << "\"";
     if (gammaCorrection) {
         cout << " (with gamma correction).\n";
@@ -220,13 +220,14 @@ unsigned int Simulator::loadTexture(const string& filename, bool gammaCorrection
     return texHandle;
 }
 
-unsigned int Simulator::loadCubemap(const string& filename, bool gammaCorrection) {
+unsigned int Simulator::loadCubemap(const string& filename, bool gammaCorrection, bool flip) {
     auto findResult = loadedTextures.find(filename);
     if (findResult != loadedTextures.end()) {
         return findResult->second;
     }
     
-    stbi_set_flip_vertically_on_load(false);    // Need to flip the textures to match the specifications of a cubemap.
+    stbi_set_flip_vertically_on_load(flip);    // For skybox cubemap, textures are not flipped to match the specifications of a cubemap.
+                                               // Need to add this to the filename string during lookup ###########################################################################################################################
     string prefix = filename.substr(0, filename.find('.'));
     string postfix = filename.substr(filename.find('.'));
     cout << "Loading cubemap.\n";
@@ -274,7 +275,6 @@ unsigned int Simulator::loadCubemap(const string& filename, bool gammaCorrection
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    stbi_set_flip_vertically_on_load(true);
     
     loadedTextures[filename] = texHandle;
     return texHandle;
@@ -407,6 +407,9 @@ void Simulator::setupTextures() {
     cubeDiffuseMap = loadTexture("textures/container2.png", true);
     cubeSpecularMap = loadTexture("textures/container2_specular.png", false);
     woodTexture = loadTexture("textures/wood.png", true);
+    skyboxCubemap = loadCubemap("textures/skybox/.jpg", true);
+    brickDiffuseMap = loadTexture("textures/grid512.bmp", true);
+    brickNormalMap = loadTexture("textures/bricks2_normal.jpg", false);
 }
 
 void Simulator::setupShaders() {
@@ -427,10 +430,10 @@ void Simulator::setupShaders() {
     
     shadowMapShader = make_unique<Shader>("shaders/shadowMapShader.v.glsl", "shaders/shadowMapShader.f.glsl");
     
-    framebufferShader = make_unique<Shader>("shaders/framebufferShader.v.glsl", "shaders/framebufferShader.f.glsl");
+    phongParallaxShader = make_unique<Shader>("shaders/phongParallax.v.glsl", "shaders/phongParallax.f.glsl");
+    phongParallaxShader->setUniformBlockBinding("ViewProjectionMtx", 0);
     
-    testShader = make_unique<Shader>("shaders/phongShader.v.glsl", "shaders/blendShader.f.glsl");
-    testShader->setUniformBlockBinding("ViewProjectionMtx", 0);
+    framebufferShader = make_unique<Shader>("shaders/framebufferShader.v.glsl", "shaders/framebufferShader.f.glsl");
 }
 
 void Simulator::setupSimulation() {
@@ -445,24 +448,22 @@ void Simulator::setupSimulation() {
     shadowFramebuffer->validate();
     
     vector<Mesh::Vertex> windowQuadVertices = {
-        { 1.0f,  1.0f,  0.0f,  0.0f,  0.0f,  0.0f, 1.0f, 1.0f},
-        {-1.0f,  1.0f,  0.0f,  0.0f,  0.0f,  0.0f, 0.0f, 1.0f},
-        {-1.0f, -1.0f,  0.0f,  0.0f,  0.0f,  0.0f, 0.0f, 0.0f},
-        { 1.0f, -1.0f,  0.0f,  0.0f,  0.0f,  0.0f, 1.0f, 0.0f}
+        {{ 1.0f,  1.0f,  0.0f}, { 0.0f,  0.0f,  0.0f}, { 1.0f, 1.0f}},
+        {{-1.0f,  1.0f,  0.0f}, { 0.0f,  0.0f,  0.0f}, { 0.0f, 1.0f}},
+        {{-1.0f, -1.0f,  0.0f}, { 0.0f,  0.0f,  0.0f}, { 0.0f, 0.0f}},
+        {{ 1.0f, -1.0f,  0.0f}, { 0.0f,  0.0f,  0.0f}, { 1.0f, 0.0f}}
     };
     vector<unsigned int> windowQuadIndices = {
         0, 1, 2, 2, 3, 0
     };
     windowQuad.generateMesh(move(windowQuadVertices), move(windowQuadIndices));
     
-    skyboxCubemap = loadCubemap("textures/skybox/.jpg", true);
     skybox.generateCube(2.0f);
     
     lightCube.generateCube(0.2f);
     cube1.generateCube();
-    stbi_set_flip_vertically_on_load(false);
-    modelTest.loadFile("models/boot_camp/boot_camp.obj");
-    stbi_set_flip_vertically_on_load(true);
+    sphere1.generateSphere();
+    modelTest.loadFile("models/cube/cube.obj");
     
     // Instancing example.
     /*planetModel.loadFile("models/planet/planet.obj");
@@ -497,6 +498,27 @@ void Simulator::nextTick(GLFWwindow* window) {
 }
 
 void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender, const glm::mat4& lightSpaceMtx) {
+    constexpr int NUM_LIGHTS = 8;
+    glm::vec3 pointLightPositions[4] = {
+        {0.7f, 0.2f, 2.0f},
+        {2.3f, -3.3f, -4.0f},
+        {-4.0f, 2.0f, -12.0f},
+        {0.0f, 0.0f, -3.0f}
+    };
+    glm::vec3 pointLightColors[4] = {
+        {1.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, 1.0f}
+    };
+    unsigned int lightStates[NUM_LIGHTS] = {0, 0, 0, 0, 0, 0, 0, 0};
+    lightStates[0] = (sunlightOn ? 1u : 0u);
+    lightStates[1] = (flashlightOn ? 1u : 0u);
+    for (int i = 0; i < 4; ++i) {
+        lightStates[i + 2] = (lampsOn ? 1u : 0u);
+    }
+    glm::vec3 sunPosition = glm::vec3(glm::rotate(glm::mat4(1.0f), sunT, glm::vec3(1.0f, 1.0f, 1.0f)) * glm::vec4(0.0f, 0.0f, 40.0f, 1.0f));
+    
     Shader* shader;
     if (shadowRender) {
         shader = shadowMapShader.get();
@@ -507,26 +529,6 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(viewMtx));
         glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projectionMtx));
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
-        
-        constexpr int NUM_LIGHTS = 8;
-        glm::vec3 pointLightPositions[4] = {
-            {0.7f, 0.2f, 2.0f},
-            {2.3f, -3.3f, -4.0f},
-            {-4.0f, 2.0f, -12.0f},
-            {0.0f, 0.0f, -3.0f}
-        };
-        glm::vec3 pointLightColors[4] = {
-            {1.0f, 1.0f, 1.0f},
-            {1.0f, 1.0f, 1.0f},
-            {1.0f, 1.0f, 1.0f},
-            {1.0f, 1.0f, 1.0f}
-        };
-        unsigned int lightStates[NUM_LIGHTS] = {0, 0, 0, 0, 0, 0, 0, 0};
-        lightStates[0] = (sunlightOn ? 1u : 0u);
-        lightStates[1] = (flashlightOn ? 1u : 0u);
-        for (int i = 0; i < 4; ++i) {
-            lightStates[i + 2] = (lampsOn ? 1u : 0u);
-        }
         
         shader = lightShader.get();
         shader->use();
@@ -539,7 +541,6 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         }
         
         shader->setVec3("lightColor", glm::vec3(1.0f, 1.0f, 0.0f));
-        glm::vec3 sunPosition = glm::vec3(glm::rotate(glm::mat4(1.0f), sunT, glm::vec3(1.0f, 1.0f, 1.0f)) * glm::vec4(0.0f, 0.0f, 40.0f, 1.0f));
         shader->setMat4("modelMtx", glm::translate(glm::mat4(1.0f), sunPosition + camera.position));
         lightCube.draw();
         
@@ -582,12 +583,6 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         }
     }
     
-    glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f));
-    transform = glm::rotate(transform, -glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
-    transform = glm::scale(transform, glm::vec3(0.01f, 0.01f, 0.01f));
-    shader->setMat4("modelMtx", transform);
-    modelTest.draw(*shader);
-    
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, cubeDiffuseMap);
     glActiveTexture(GL_TEXTURE1);
@@ -619,8 +614,62 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
     glBindTexture(GL_TEXTURE_2D, woodTexture);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, whiteTexture);
-    shader->setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(150.0f, 0.2f, 150.0f)));
+    shader->setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(15.0f, 0.2f, 15.0f)));
     cube1.draw();
+    
+    if (!shadowRender) {
+        shader = phongParallaxShader.get();
+        shader->use();
+        shader->setInt("material.texDiffuse0", 0);
+        shader->setInt("material.texSpecular0", 1);
+        shader->setInt("material.texNormal0", 2);
+        shader->setFloat("material.shininess", 64.0f);
+        
+        shader->setVec3("viewPosition", camera.position);
+        shader->setUnsignedIntArray("lightStates", NUM_LIGHTS, lightStates);
+        
+        shader->setUnsignedInt("lights[0].type", 0);
+        shader->setVec3("lights[0].direction", glm::vec4(-sunPosition, 0.0f));
+        glm::vec3 directionalLightColor(1.0f, 1.0f, 1.0f);
+        shader->setVec3("lights[0].ambient", directionalLightColor * 0.05f);
+        shader->setVec3("lights[0].diffuse", directionalLightColor * 0.4f);
+        shader->setVec3("lights[0].specular", directionalLightColor * 0.5f);
+        
+        shader->setUnsignedInt("lights[1].type", 2);
+        shader->setVec3("lights[1].position", camera.position);
+        shader->setVec3("lights[1].direction", camera.front);
+        glm::vec3 spotLightColor(1.0f, 1.0f, 1.0f);
+        shader->setVec3("lights[1].ambient", spotLightColor * 0.0f);
+        shader->setVec3("lights[1].diffuse", spotLightColor);
+        shader->setVec3("lights[1].specular", spotLightColor);
+        shader->setVec3("lights[1].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
+        shader->setVec2("lights[1].cutOff", glm::vec2(glm::cos(glm::radians(12.5f)), glm::cos(glm::radians(17.5f))));
+        
+        for (int i = 0; i < 4; ++i) {
+            shader->setUnsignedInt("lights[" + to_string(i + 2) + "].type", 1);
+            shader->setVec3("lights[" + to_string(i + 2) + "].position", pointLightPositions[i]);
+            shader->setVec3("lights[" + to_string(i + 2) + "].ambient", pointLightColors[i] * 0.05f);
+            shader->setVec3("lights[" + to_string(i + 2) + "].diffuse", pointLightColors[i] * 0.8f);
+            shader->setVec3("lights[" + to_string(i + 2) + "].specular", pointLightColors[i]);
+            shader->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
+        }
+    }
+    
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, brickDiffuseMap);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, whiteTexture);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, brickNormalMap);
+    shader->setMat4("modelMtx", glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)));
+    cube1.draw();
+    
+    glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f));
+    //transform = glm::rotate(transform, -glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
+    transform = glm::scale(transform, glm::vec3(0.5f, 0.5f, 0.5f));
+    //transform = glm::scale(transform, glm::vec3(1.4f, 1.4f, 1.4f));
+    shader->setMat4("modelMtx", transform);
+    modelTest.draw(*shader);
 }
 
 void Simulator::processInput(GLFWwindow* window, float deltaTime) {

@@ -32,7 +32,7 @@ class Model {
     private:
     void _processNode(aiNode* node, const aiScene* scene, const glm::mat4& transformMtx);
     Mesh _processMesh(aiMesh* mesh, const aiScene* scene, const glm::mat4& transformMtx);
-    void _loadMaterialTextures(aiMaterial* material, aiTextureType type, const string& uniformName, vector<Mesh::Texture>& textures);
+    void _loadMaterialTextures(aiMaterial* material, aiTextureType type, const string& uniformName, unsigned int index, vector<Mesh::Texture>& textures);
 };
 
 #endif
