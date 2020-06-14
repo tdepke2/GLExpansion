@@ -20,7 +20,7 @@ void main() {
     fPosition = vec3(modelMtx * vec4(vPosition, 1.0));    // Fragment position in world space.
     fTexCoords = vTexCoords;
     mat3 normalMtx = transpose(inverse(mat3(modelMtx)));
-    fTBNMtx = mat3(normalize(normalMtx * vTangent), normalize(normalMtx * -vBitangent), normalize(normalMtx * vNormal));
+    fTBNMtx = mat3(normalize(normalMtx * vTangent), normalize(normalMtx * vBitangent), normalize(normalMtx * vNormal));
     
     gl_Position = projectionMtx * viewMtx * modelMtx * vec4(vPosition, 1.0);
 }

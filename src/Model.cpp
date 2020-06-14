@@ -105,7 +105,7 @@ Mesh Model::_processMesh(aiMesh* mesh, const aiScene* scene, const glm::mat4& tr
             vTexCoords.y = 0.0f;
         }
         glm::vec3 vTangent(mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z);
-        glm::vec3 vBitangent(mesh->mBitangents[i].x, mesh->mBitangents[i].y, mesh->mBitangents[i].z);
+        glm::vec3 vBitangent(-mesh->mBitangents[i].x, -mesh->mBitangents[i].y, -mesh->mBitangents[i].z);
         
         if (applyTransform) {    // Uhh idk how to transform tangent/bitangent, need to check this ####################################################################################################################
             //vPosition = transformMtx * vPosition;

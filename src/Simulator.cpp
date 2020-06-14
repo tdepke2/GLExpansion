@@ -655,14 +655,12 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         }
     }
     
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, brickDiffuseMap);
+    //glActiveTexture(GL_TEXTURE0);
+    //glBindTexture(GL_TEXTURE_2D, brickDiffuseMap);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, whiteTexture);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, brickNormalMap);
-    shader->setMat4("modelMtx", glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)));
-    cube1.draw();
+    //glActiveTexture(GL_TEXTURE2);
+    //glBindTexture(GL_TEXTURE_2D, brickNormalMap);
     
     glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f));
     //transform = glm::rotate(transform, -glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
@@ -670,6 +668,11 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
     //transform = glm::scale(transform, glm::vec3(1.4f, 1.4f, 1.4f));
     shader->setMat4("modelMtx", transform);
     modelTest.draw(*shader);
+    
+    shader->setMat4("modelMtx", glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)));
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    sphere1.draw();
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
 void Simulator::processInput(GLFWwindow* window, float deltaTime) {
