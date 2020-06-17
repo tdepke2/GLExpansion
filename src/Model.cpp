@@ -124,10 +124,11 @@ Mesh Model::_processMesh(aiMesh* mesh, const aiScene* scene, const glm::mat4& tr
         }
     }
     
-    vector<Mesh::Texture> textures;
+    vector<Mesh::Texture> textures;    // No need to pass vector reference to _loadMaterialTextures anymore. ################################################################################################################
     _loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_DIFFUSE, "material.texDiffuse", 0, textures);
     _loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_SPECULAR, "material.texSpecular", 1, textures);
-    _loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_HEIGHT, "material.texNormal", 2, textures);
+    _loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_NORMALS, "material.texNormal", 2, textures);
+    _loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_DISPLACEMENT, "material.texDisplacement", 3, textures);
     
     return Mesh(move(vertices), move(indices), move(textures));
 }

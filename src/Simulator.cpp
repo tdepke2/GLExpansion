@@ -623,7 +623,9 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         shader->setInt("material.texDiffuse0", 0);
         shader->setInt("material.texSpecular0", 1);
         shader->setInt("material.texNormal0", 2);
+        shader->setInt("material.texDisplacement0", 3);
         shader->setFloat("material.shininess", 64.0f);
+        shader->setFloat("material.heightScale", 0.1f);
         
         shader->setVec3("viewPosition", camera.position);
         shader->setUnsignedIntArray("lightStates", NUM_LIGHTS, lightStates);
