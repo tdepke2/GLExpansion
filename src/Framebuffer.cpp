@@ -25,7 +25,7 @@ void Framebuffer::setBufferSize(const glm::ivec2& bufferSize) {
     _bufferSize = bufferSize;
     for (const TextureData& texture : _textures) {
         glBindTexture(GL_TEXTURE_2D, texture.handle);
-        glTexImage2D(GL_TEXTURE_2D, 0, texture.internalFormat, bufferSize.x, bufferSize.y, 0, texture.format, GL_UNSIGNED_BYTE, nullptr);
+        glTexImage2D(GL_TEXTURE_2D, 0, texture.internalFormat, bufferSize.x, bufferSize.y, 0, texture.format, texture.type, nullptr);
     }
     glBindTexture(GL_TEXTURE_2D, 0);
     
@@ -36,13 +36,13 @@ void Framebuffer::setBufferSize(const glm::ivec2& bufferSize) {
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
 }
 
-void Framebuffer::attachTexture(GLenum attachment, GLint internalFormat, GLenum format, GLint filter, GLint wrap, const glm::vec4& borderColor) {
+void Framebuffer::attachTexture(GLenum attachment, GLint internalFormat, GLenum format, GLenum type, GLint filter, GLint wrap, const glm::vec4& borderColor) {
     glBindFramebuffer(GL_FRAMEBUFFER, _framebufferHandle);
     
-    _textures.emplace_back(0, internalFormat, format);
+    _textures.emplace_back(0, internalFormat, format, type);
     glGenTextures(1, &_textures.back().handle);    // Create color buffer (using a 2D texture).
     glBindTexture(GL_TEXTURE_2D, _textures.back().handle);
-    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, _bufferSize.x, _bufferSize.y, 0, format, GL_UNSIGNED_BYTE, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, _bufferSize.x, _bufferSize.y, 0, format, type, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);

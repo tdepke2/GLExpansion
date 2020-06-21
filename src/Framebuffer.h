@@ -16,7 +16,7 @@ class Framebuffer {
     ~Framebuffer();
     const glm::ivec2& getBufferSize() const;
     void setBufferSize(const glm::ivec2& bufferSize);
-    void attachTexture(GLenum attachment, GLint internalFormat, GLenum format, GLint filter, GLint wrap, const glm::vec4& borderColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+    void attachTexture(GLenum attachment, GLint internalFormat, GLenum format, GLenum type, GLint filter, GLint wrap, const glm::vec4& borderColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
     void attachRenderbuffer(GLenum attachment, GLenum internalFormat);
     void disableColorBuffer() const;
     void validate() const;
@@ -28,8 +28,9 @@ class Framebuffer {
         unsigned int handle;
         GLint internalFormat;
         GLenum format;
+        GLenum type;
         
-        TextureData(unsigned int handle, GLint internalFormat, GLenum format) : handle(handle), internalFormat(internalFormat), format(format) {}
+        TextureData(unsigned int handle, GLint internalFormat, GLenum format, GLenum type) : handle(handle), internalFormat(internalFormat), format(format), type(type) {}
     };
     struct RenderbufferData {
         unsigned int handle;

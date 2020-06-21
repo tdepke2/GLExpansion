@@ -95,17 +95,16 @@ int Simulator::start() {
             glEnable(GL_CULL_FACE);
             
             glBindFramebuffer(GL_FRAMEBUFFER, 0);    // Draw framebuffer.
-            glEnable(GL_FRAMEBUFFER_SRGB);    // Apply gamma correction to final render.
             glViewport(0, 0, windowSize.x, windowSize.y);
             glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
             glDisable(GL_DEPTH_TEST);
             framebufferShader->use();
             framebufferShader->setInt("tex", 0);
+            framebufferShader->setFloat("exposure", 1.0f);
             renderFramebuffer->bindTexture(0);
             windowQuad.draw();
             glEnable(GL_DEPTH_TEST);
-            glDisable(GL_FRAMEBUFFER_SRGB);
             
             glfwSwapBuffers(window);
             glfwPollEvents();
@@ -438,13 +437,13 @@ void Simulator::setupShaders() {
 
 void Simulator::setupSimulation() {
     renderFramebuffer = make_unique<Framebuffer>(windowSize);
-    renderFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGB12, GL_RGB, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    renderFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
     renderFramebuffer->attachRenderbuffer(GL_DEPTH_STENCIL_ATTACHMENT, GL_DEPTH24_STENCIL8);
     renderFramebuffer->validate();
     
     shadowFramebuffer = make_unique<Framebuffer>(glm::ivec2(2048, 2048));
     shadowFramebuffer->disableColorBuffer();
-    shadowFramebuffer->attachTexture(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_NEAREST, GL_CLAMP_TO_BORDER, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    shadowFramebuffer->attachTexture(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, GL_NEAREST, GL_CLAMP_TO_BORDER, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
     shadowFramebuffer->validate();
     
     vector<Mesh::Vertex> windowQuadVertices = {
@@ -506,10 +505,10 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         {0.0f, 0.0f, -3.0f}
     };
     glm::vec3 pointLightColors[4] = {
-        {1.0f, 1.0f, 1.0f},
-        {1.0f, 1.0f, 1.0f},
-        {1.0f, 1.0f, 1.0f},
-        {1.0f, 1.0f, 1.0f}
+        {200.0f, 200.0f, 200.0f},
+        {0.1f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.2f},
+        {0.0f, 0.1f, 0.0f}
     };
     unsigned int lightStates[NUM_LIGHTS] = {0, 0, 0, 0, 0, 0, 0, 0};
     lightStates[0] = (sunlightOn ? 1u : 0u);
@@ -579,7 +578,7 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
             shader->setVec3("lights[" + to_string(i + 2) + "].ambient", pointLightColors[i] * 0.05f);
             shader->setVec3("lights[" + to_string(i + 2) + "].diffuse", pointLightColors[i] * 0.8f);
             shader->setVec3("lights[" + to_string(i + 2) + "].specular", pointLightColors[i]);
-            shader->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
+            shader->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", glm::vec3(0.0f, 0.0f, 1.0f));
         }
     }
     
