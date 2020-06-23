@@ -69,15 +69,6 @@ void Framebuffer::attachRenderbuffer(GLenum attachment, GLenum internalFormat) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Framebuffer::disableColorBuffer() const {
-    glBindFramebuffer(GL_FRAMEBUFFER, _framebufferHandle);
-    
-    glDrawBuffer(GL_NONE);
-    glReadBuffer(GL_NONE);
-    
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
 void Framebuffer::validate() const {
     glBindFramebuffer(GL_FRAMEBUFFER, _framebufferHandle);
     

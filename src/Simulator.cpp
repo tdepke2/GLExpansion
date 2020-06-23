@@ -16,8 +16,8 @@ Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 3.0f));
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 unordered_map<string, unsigned int> Simulator::loadedTextures;
-unique_ptr<Shader> Simulator::skyboxShader, Simulator::lightShader, Simulator::phongShader, Simulator::shadowMapShader, Simulator::phongParallaxShader, Simulator::framebufferShader;
-unique_ptr<Framebuffer> Simulator::renderFramebuffer, Simulator::shadowFramebuffer;
+unique_ptr<Shader> Simulator::skyboxShader, Simulator::lightShader, Simulator::phongShader, Simulator::shadowMapShader, Simulator::phongParallaxShader, Simulator::gaussianBlurShader, Simulator::framebufferShader;
+unique_ptr<Framebuffer> Simulator::renderFramebuffer, Simulator::shadowFramebuffer, Simulator::bloom1Framebuffer, Simulator::bloom2Framebuffer;
 unsigned int Simulator::blackTexture, Simulator::whiteTexture, Simulator::cubeDiffuseMap, Simulator::cubeSpecularMap, Simulator::woodTexture, Simulator::skyboxCubemap, Simulator::brickDiffuseMap, Simulator::brickNormalMap;
 unsigned int Simulator::uniformBufferVPMtx;
 Mesh Simulator::lightCube, Simulator::cube1, Simulator::sphere1, Simulator::windowQuad, Simulator::skybox;
@@ -77,13 +77,14 @@ int Simulator::start() {
             
             renderFramebuffer->bind();    // Prepare framebuffer for drawing.
             glViewport(0, 0, renderFramebuffer->getBufferSize().x, renderFramebuffer->getBufferSize().y);
-            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glm::mat4 viewMtx = camera.getViewMatrix();
             glm::mat4 projectionMtx = glm::perspective(glm::radians(camera.fov), static_cast<float>(windowSize.x) / windowSize.y, NEAR_PLANE, FAR_PLANE);
             
             renderScene(viewMtx, projectionMtx, false, lightProjectionMtx * lightViewMtx);
             
+            glDrawBuffer(GL_COLOR_ATTACHMENT0);
             skyboxShader->use();    // Draw the skybox.
             glDepthFunc(GL_LEQUAL);
             glDisable(GL_CULL_FACE);
@@ -93,6 +94,26 @@ int Simulator::start() {
             skybox.draw();
             glDepthFunc(GL_LESS);
             glEnable(GL_CULL_FACE);
+            unsigned int attachments[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+            glDrawBuffers(2, attachments);
+            
+            gaussianBlurShader->use();    // Apply gaussian blur to bloom texture.
+            glActiveTexture(GL_TEXTURE0);
+            for (unsigned int i = 0; i < 5; ++i) {
+                bloom1Framebuffer->bind();
+                gaussianBlurShader->setBool("blurHorizontal", true);
+                if (i != 0) {
+                    bloom2Framebuffer->bindTexture(0);
+                } else {
+                    renderFramebuffer->bindTexture(1);
+                }
+                windowQuad.draw();
+                
+                bloom2Framebuffer->bind();
+                gaussianBlurShader->setBool("blurHorizontal", false);
+                bloom1Framebuffer->bindTexture(0);
+                windowQuad.draw();
+            }
             
             glBindFramebuffer(GL_FRAMEBUFFER, 0);    // Draw framebuffer.
             glViewport(0, 0, windowSize.x, windowSize.y);
@@ -100,9 +121,13 @@ int Simulator::start() {
             glClear(GL_COLOR_BUFFER_BIT);
             glDisable(GL_DEPTH_TEST);
             framebufferShader->use();
-            framebufferShader->setInt("tex", 0);
+            framebufferShader->setInt("image", 0);
+            framebufferShader->setInt("bloomBlur", 1);
             framebufferShader->setFloat("exposure", 1.0f);
+            glActiveTexture(GL_TEXTURE0);
             renderFramebuffer->bindTexture(0);
+            glActiveTexture(GL_TEXTURE1);
+            bloom2Framebuffer->bindTexture(0);
             windowQuad.draw();
             glEnable(GL_DEPTH_TEST);
             
@@ -131,9 +156,12 @@ int Simulator::start() {
     phongShader.reset();
     shadowMapShader.reset();
     phongParallaxShader.reset();
+    gaussianBlurShader.reset();
     framebufferShader.reset();
     renderFramebuffer.reset();
     shadowFramebuffer.reset();
+    bloom1Framebuffer.reset();
+    bloom2Framebuffer.reset();
     
     glCheckError();
     glfwDestroyWindow(window);
@@ -311,6 +339,8 @@ void Simulator::framebufferSizeCallback(GLFWwindow* window, int width, int heigh
     windowSize.x = width;
     windowSize.y = height;
     renderFramebuffer->setBufferSize(windowSize);
+    bloom1Framebuffer->setBufferSize(windowSize);
+    bloom2Framebuffer->setBufferSize(windowSize);
 }
 
 void Simulator::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -432,19 +462,35 @@ void Simulator::setupShaders() {
     phongParallaxShader = make_unique<Shader>("shaders/phongParallax.v.glsl", "shaders/phongParallax.f.glsl");
     phongParallaxShader->setUniformBlockBinding("ViewProjectionMtx", 0);
     
+    gaussianBlurShader = make_unique<Shader>("shaders/gaussianBlur.v.glsl", "shaders/gaussianBlur.f.glsl");
+    
     framebufferShader = make_unique<Shader>("shaders/framebufferShader.v.glsl", "shaders/framebufferShader.f.glsl");
 }
 
 void Simulator::setupSimulation() {
     renderFramebuffer = make_unique<Framebuffer>(windowSize);
     renderFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    renderFramebuffer->attachTexture(GL_COLOR_ATTACHMENT1, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
     renderFramebuffer->attachRenderbuffer(GL_DEPTH_STENCIL_ATTACHMENT, GL_DEPTH24_STENCIL8);
+    renderFramebuffer->bind();
+    unsigned int attachments[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, attachments);
     renderFramebuffer->validate();
     
     shadowFramebuffer = make_unique<Framebuffer>(glm::ivec2(2048, 2048));
-    shadowFramebuffer->disableColorBuffer();
     shadowFramebuffer->attachTexture(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, GL_NEAREST, GL_CLAMP_TO_BORDER, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    shadowFramebuffer->bind();
+    glDrawBuffer(GL_NONE);    // Disable color rendering.
+    glReadBuffer(GL_NONE);
     shadowFramebuffer->validate();
+    
+    bloom1Framebuffer = make_unique<Framebuffer>(windowSize);
+    bloom1Framebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    bloom1Framebuffer->validate();
+    
+    bloom2Framebuffer = make_unique<Framebuffer>(windowSize);
+    bloom2Framebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    bloom2Framebuffer->validate();
     
     vector<Mesh::Vertex> windowQuadVertices = {
         {{ 1.0f,  1.0f,  0.0f}, { 0.0f,  0.0f,  0.0f}, { 1.0f, 1.0f}},
@@ -505,10 +551,10 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         {0.0f, 0.0f, -3.0f}
     };
     glm::vec3 pointLightColors[4] = {
-        {200.0f, 200.0f, 200.0f},
-        {0.1f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 0.2f},
-        {0.0f, 0.1f, 0.0f}
+        {5.0f, 5.0f, 5.0f},
+        {10.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 15.0f},
+        {0.0f, 5.0f, 0.0f}
     };
     unsigned int lightStates[NUM_LIGHTS] = {0, 0, 0, 0, 0, 0, 0, 0};
     lightStates[0] = (sunlightOn ? 1u : 0u);

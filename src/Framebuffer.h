@@ -18,7 +18,6 @@ class Framebuffer {
     void setBufferSize(const glm::ivec2& bufferSize);
     void attachTexture(GLenum attachment, GLint internalFormat, GLenum format, GLenum type, GLint filter, GLint wrap, const glm::vec4& borderColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
     void attachRenderbuffer(GLenum attachment, GLenum internalFormat);
-    void disableColorBuffer() const;
     void validate() const;
     void bind() const;
     void bindTexture(unsigned int index) const;

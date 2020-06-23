@@ -36,7 +36,8 @@ in vec3 fPosition;
 in vec2 fTexCoords;
 in mat3 fTBNMtx;
 
-out vec4 fragColor;
+layout (location = 0) out vec4 fragColor;
+layout (location = 1) out vec4 bloomColor;
 
 vec2 mapParallax(vec2 texCoords, vec3 viewDir) {    // Applies parallax to a texture coordinate given the current view and displacement map. All positions/directions in tangent space.
     float numLayers = mix(MAX_PARALLAX_LAYERS, MIN_PARALLAX_LAYERS, abs(dot(vec3(0.0, 0.0, 1.0), viewDir)));
@@ -106,4 +107,9 @@ void main() {
     }
     
     fragColor = vec4(color, 1.0);
+    if (dot(fragColor.rgb, vec3(0.2126, 0.7152, 0.0722)) > 1.0) {    // Convert to grayscale and check if fragment above brightness threshold.
+        bloomColor = fragColor;
+    } else {
+        bloomColor = vec4(0.0, 0.0, 0.0, 1.0);
+    }
 }

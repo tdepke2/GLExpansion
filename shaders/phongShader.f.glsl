@@ -32,7 +32,8 @@ in vec3 fNormal;
 in vec2 fTexCoords;
 in vec4 fPositionLightSpace;
 
-out vec4 fragColor;
+layout (location = 0) out vec4 fragColor;
+layout (location = 1) out vec4 bloomColor;
 
 float calculateShadow(vec4 positionLightSpace, vec3 normalDir, vec3 lightDir) {
     vec3 normalizedDeviceCoords = (positionLightSpace.xyz / positionLightSpace.w) * 0.5 + 0.5;
@@ -108,4 +109,9 @@ void main() {
     }
     
     fragColor = vec4(color, 1.0);
+    if (dot(fragColor.rgb, vec3(0.2126, 0.7152, 0.0722)) > 1.0) {    // Convert to grayscale and check if fragment above brightness threshold.
+        bloomColor = fragColor;
+    } else {
+        bloomColor = vec4(0.0, 0.0, 0.0, 1.0);
+    }
 }
