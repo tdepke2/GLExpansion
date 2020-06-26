@@ -277,18 +277,14 @@ GLenum Simulator::glCheckError_(const char* file, int line) {
 }
 
 unsigned int Simulator::loadTexture(const string& filename, bool gammaCorrection, bool flip) {
-    auto findResult = loadedTextures.find(filename);
+    string textureName = filename + (gammaCorrection ? "-g" : "") + (flip ? "-f" : "");
+    auto findResult = loadedTextures.find(textureName);
     if (findResult != loadedTextures.end()) {
         return findResult->second;
     }
     
-    stbi_set_flip_vertically_on_load(flip);    // Need to add this to the filename string during lookup ###########################################################################################################################
-    cout << "Loading texture \"" << filename << "\"";
-    if (gammaCorrection) {
-        cout << " (with gamma correction).\n";
-    } else {
-        cout << ".\n";
-    }
+    stbi_set_flip_vertically_on_load(flip);
+    cout << "Loading texture \"" << textureName << "\".\n";
     unsigned int texHandle;
     glGenTextures(1, &texHandle);
     glBindTexture(GL_TEXTURE_2D, texHandle);
@@ -323,21 +319,21 @@ unsigned int Simulator::loadTexture(const string& filename, bool gammaCorrection
     }
     stbi_image_free(imageData);
     
-    loadedTextures[filename] = texHandle;
+    loadedTextures[textureName] = texHandle;
     return texHandle;
 }
 
 unsigned int Simulator::loadCubemap(const string& filename, bool gammaCorrection, bool flip) {
-    auto findResult = loadedTextures.find(filename);
+    string textureName = filename + (gammaCorrection ? "-g" : "") + (flip ? "-f" : "");
+    auto findResult = loadedTextures.find(textureName);
     if (findResult != loadedTextures.end()) {
         return findResult->second;
     }
     
     stbi_set_flip_vertically_on_load(flip);    // For skybox cubemap, textures are not flipped to match the specifications of a cubemap.
-                                               // Need to add this to the filename string during lookup ###########################################################################################################################
     string prefix = filename.substr(0, filename.find('.'));
     string postfix = filename.substr(filename.find('.'));
-    cout << "Loading cubemap.\n";
+    cout << "Loading cubemap \"" << textureName << "\".\n";
     unsigned int texHandle;
     glGenTextures(1, &texHandle);
     glBindTexture(GL_TEXTURE_CUBE_MAP, texHandle);
@@ -383,7 +379,7 @@ unsigned int Simulator::loadCubemap(const string& filename, bool gammaCorrection
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     
-    loadedTextures[filename] = texHandle;
+    loadedTextures[textureName] = texHandle;
     return texHandle;
 }
 
