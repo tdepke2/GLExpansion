@@ -16,10 +16,11 @@ class Framebuffer {
     ~Framebuffer();
     const glm::ivec2& getBufferSize() const;
     void setBufferSize(const glm::ivec2& bufferSize);
+    void setDrawBuffers(const vector<GLenum>& attachments) const;
     void attachTexture(GLenum attachment, GLint internalFormat, GLenum format, GLenum type, GLint filter, GLint wrap, const glm::vec4& borderColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
     void attachRenderbuffer(GLenum attachment, GLenum internalFormat);
     void validate() const;
-    void bind() const;
+    void bind(GLenum target = GL_FRAMEBUFFER) const;
     void bindTexture(unsigned int index) const;
     
     private:

@@ -33,7 +33,11 @@ void Framebuffer::setBufferSize(const glm::ivec2& bufferSize) {
         glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer.handle);
         glRenderbufferStorage(GL_RENDERBUFFER, renderbuffer.internalFormat, bufferSize.x, bufferSize.y);
     }
-    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+}
+
+void Framebuffer::setDrawBuffers(const vector<GLenum>& attachments) const {
+    glBindFramebuffer(GL_FRAMEBUFFER, _framebufferHandle);
+    glDrawBuffers(static_cast<int>(attachments.size()), attachments.data());
 }
 
 void Framebuffer::attachTexture(GLenum attachment, GLint internalFormat, GLenum format, GLenum type, GLint filter, GLint wrap, const glm::vec4& borderColor) {
@@ -52,8 +56,6 @@ void Framebuffer::attachTexture(GLenum attachment, GLint internalFormat, GLenum 
     }
     glBindTexture(GL_TEXTURE_2D, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, _textures.back().handle, 0);
-    
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Framebuffer::attachRenderbuffer(GLenum attachment, GLenum internalFormat) {
@@ -65,8 +67,6 @@ void Framebuffer::attachRenderbuffer(GLenum attachment, GLenum internalFormat) {
     glRenderbufferStorage(GL_RENDERBUFFER, internalFormat, _bufferSize.x, _bufferSize.y);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, attachment, GL_RENDERBUFFER, _renderbuffers.back().handle);
-    
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Framebuffer::validate() const {
@@ -75,12 +75,10 @@ void Framebuffer::validate() const {
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
         throw runtime_error("Framebuffer is not complete. Error code " + to_string(glCheckFramebufferStatus(GL_FRAMEBUFFER)) + ".\n");
     }
-    
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Framebuffer::bind() const {
-    glBindFramebuffer(GL_FRAMEBUFFER, _framebufferHandle);
+void Framebuffer::bind(GLenum target) const {
+    glBindFramebuffer(target, _framebufferHandle);
 }
 
 void Framebuffer::bindTexture(unsigned int index) const {
