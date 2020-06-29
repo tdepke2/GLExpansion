@@ -16,9 +16,9 @@ Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 3.0f));
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 unordered_map<string, unsigned int> Simulator::loadedTextures;
-unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::lightingPassShader, Simulator::postProcessShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::gaussianBlurShader;
-unique_ptr<Framebuffer> Simulator::geometryFramebuffer, Simulator::renderFramebuffer, Simulator::shadowFramebuffer, Simulator::bloomFramebuffer;
-unsigned int Simulator::blackTexture, Simulator::whiteTexture, Simulator::blueTexture, Simulator::cubeDiffuseMap, Simulator::cubeSpecularMap, Simulator::woodTexture, Simulator::skyboxCubemap, Simulator::brickDiffuseMap, Simulator::brickNormalMap;
+unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::lightingPassShader, Simulator::postProcessShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::gaussianBlurShader, Simulator::ssaoShader, Simulator::ssaoBlurShader;
+unique_ptr<Framebuffer> Simulator::geometryFramebuffer, Simulator::renderFramebuffer, Simulator::shadowFramebuffer, Simulator::bloomFramebuffer, Simulator::ssaoFramebuffer, Simulator::ssaoBlurFramebuffer;
+unsigned int Simulator::blackTexture, Simulator::whiteTexture, Simulator::blueTexture, Simulator::cubeDiffuseMap, Simulator::cubeSpecularMap, Simulator::woodTexture, Simulator::skyboxCubemap, Simulator::brickDiffuseMap, Simulator::brickNormalMap, Simulator::ssaoNoiseTexture;
 unsigned int Simulator::uniformBufferVPMtx;
 Mesh Simulator::lightCube, Simulator::cube1, Simulator::sphere1, Simulator::windowQuad, Simulator::skybox;
 Model Simulator::modelTest, Simulator::planetModel, Simulator::rockModel;
@@ -40,6 +40,32 @@ int Simulator::start() {
         setupSimulation();
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        
+        constexpr unsigned int SSAO_NUM_SAMPLES = 64;
+        vector<glm::vec3> ssaoSampleKernel;
+        ssaoSampleKernel.reserve(SSAO_NUM_SAMPLES);
+        for (unsigned int i = 0; i < SSAO_NUM_SAMPLES; ++i) {
+            glm::vec3 sample(randomFloat(-1.0f, 1.0f), randomFloat(-1.0f, 1.0f), randomFloat(0.0f, 1.0f));
+            float scale = 0.1f + (1.0f - 0.1f) * pow(static_cast<float>(i) / SSAO_NUM_SAMPLES, 2.0f);
+            sample = glm::normalize(sample) * randomFloat(0.0f, 1.0f) * scale;
+            ssaoSampleKernel.push_back(sample);
+        }
+        ssaoShader->use();
+        for (unsigned int i = 0; i < SSAO_NUM_SAMPLES; ++i) {
+            ssaoShader->setVec3("samples[" + to_string(i) + "]", ssaoSampleKernel[i]);
+        }
+        
+        glGenTextures(1, &ssaoNoiseTexture);
+        glBindTexture(GL_TEXTURE_2D, ssaoNoiseTexture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        vector<glm::vec3> ssaoNoise;
+        for (unsigned int i = 0; i < 16; ++i) {
+            ssaoNoise.emplace_back(randomFloat(-1.0f, 1.0f), randomFloat(-1.0f, 1.0f), 0.0f);
+        }
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 4, 4, 0, GL_RGB, GL_FLOAT, ssaoNoise.data());
         
         double lastTime = glfwGetTime();
         float deltaTime = 0.0f;
@@ -97,7 +123,6 @@ int Simulator::start() {
             
             geometryFramebuffer->bind();    // Render to geometry buffer (geometry pass).
             glViewport(0, 0, geometryFramebuffer->getBufferSize().x, geometryFramebuffer->getBufferSize().y);
-            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glm::mat4 viewMtx = camera.getViewMatrix();
             glm::mat4 projectionMtx = glm::perspective(glm::radians(camera.fov), static_cast<float>(windowSize.x) / windowSize.y, NEAR_PLANE, FAR_PLANE);
@@ -107,16 +132,41 @@ int Simulator::start() {
             renderFramebuffer->bind(GL_DRAW_FRAMEBUFFER);
             glBlitFramebuffer(0, 0, geometryFramebuffer->getBufferSize().x, geometryFramebuffer->getBufferSize().y, 0, 0, renderFramebuffer->getBufferSize().x, renderFramebuffer->getBufferSize().y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
             
+            ssaoFramebuffer->bind();    // Render SSAO texture.
+            glViewport(0, 0, ssaoFramebuffer->getBufferSize().x, ssaoFramebuffer->getBufferSize().y);
+            glClear(GL_COLOR_BUFFER_BIT);
+            ssaoShader->use();
+            ssaoShader->setInt("texPosition", 0);
+            ssaoShader->setInt("texNormal", 1);
+            ssaoShader->setInt("texNoise", 2);
+            ssaoShader->setVec2("noiseScale", glm::vec2(windowSize.x / 4.0f, windowSize.y / 4.0f));
+            glActiveTexture(GL_TEXTURE0);
+            geometryFramebuffer->bindTexture(0);
+            glActiveTexture(GL_TEXTURE1);
+            geometryFramebuffer->bindTexture(1);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, ssaoNoiseTexture);
+            windowQuad.draw();
+            
+            ssaoBlurFramebuffer->bind();    // Blur SSAO texture.
+            glViewport(0, 0, ssaoBlurFramebuffer->getBufferSize().x, ssaoBlurFramebuffer->getBufferSize().y);
+            glClear(GL_COLOR_BUFFER_BIT);
+            ssaoBlurShader->use();
+            ssaoBlurShader->setInt("image", 0);
+            glActiveTexture(GL_TEXTURE0);
+            ssaoFramebuffer->bindTexture(0);
+            windowQuad.draw();
+            
             renderFramebuffer->bind();    // Render lighting (lighting pass).
             glViewport(0, 0, renderFramebuffer->getBufferSize().x, renderFramebuffer->getBufferSize().y);
-            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
             glDisable(GL_DEPTH_TEST);
             lightingPassShader->use();
             lightingPassShader->setInt("texPosition", 0);
             lightingPassShader->setInt("texNormal", 1);
             lightingPassShader->setInt("texAlbedoSpec", 2);
-            lightingPassShader->setInt("shadowMap", 3);
+            lightingPassShader->setInt("texSSAO", 3);
+            lightingPassShader->setInt("shadowMap", 4);
             lightingPassShader->setMat4("viewToLightSpaceMtx", lightProjectionMtx * lightViewMtx * inverse(viewMtx));
             lightingPassShader->setUnsignedIntArray("lightStates", NUM_LIGHTS, lightStates);
             lightingPassShader->setUnsignedInt("lights[0].type", 0);
@@ -149,6 +199,8 @@ int Simulator::start() {
             glActiveTexture(GL_TEXTURE2);
             geometryFramebuffer->bindTexture(2);
             glActiveTexture(GL_TEXTURE3);
+            ssaoBlurFramebuffer->bindTexture(0);
+            glActiveTexture(GL_TEXTURE4);
             shadowFramebuffer->bindTexture(0);
             windowQuad.draw();
             glEnable(GL_DEPTH_TEST);
@@ -196,7 +248,6 @@ int Simulator::start() {
             
             glBindFramebuffer(GL_FRAMEBUFFER, 0);    // Apply post-processing and render to window.
             glViewport(0, 0, windowSize.x, windowSize.y);
-            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
             glDisable(GL_DEPTH_TEST);
             postProcessShader->use();
@@ -237,11 +288,15 @@ int Simulator::start() {
     lampShader.reset();
     shadowMapShader.reset();
     gaussianBlurShader.reset();
+    ssaoShader.reset();
+    ssaoBlurShader.reset();
     
     geometryFramebuffer.reset();
     renderFramebuffer.reset();
     shadowFramebuffer.reset();
     bloomFramebuffer.reset();
+    ssaoFramebuffer.reset();
+    ssaoBlurFramebuffer.reset();
     
     glCheckError();
     glfwDestroyWindow(window);
@@ -417,6 +472,8 @@ void Simulator::framebufferSizeCallback(GLFWwindow* window, int width, int heigh
     geometryFramebuffer->setBufferSize(windowSize);
     renderFramebuffer->setBufferSize(windowSize);
     bloomFramebuffer->setBufferSize(windowSize);
+    ssaoFramebuffer->setBufferSize(windowSize);
+    ssaoBlurFramebuffer->setBufferSize(windowSize);
 }
 
 void Simulator::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -500,7 +557,7 @@ GLFWwindow* Simulator::setupOpenGL() {
     glEnable(GL_CULL_FACE);
     glFrontFace(GL_CCW);
     glCullFace(GL_BACK);
-    //glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     
     glfwSetCursorPos(window, windowSize.x / 2.0f, windowSize.y / 2.0f);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -543,6 +600,11 @@ void Simulator::setupShaders() {
     shadowMapShader = make_unique<Shader>("shaders/shadowMap.v.glsl", "shaders/shadowMap.f.glsl");
     
     gaussianBlurShader = make_unique<Shader>("shaders/gaussianBlur.v.glsl", "shaders/gaussianBlur.f.glsl");
+    
+    ssaoShader = make_unique<Shader>("shaders/ssao.v.glsl", "shaders/ssao.f.glsl");
+    ssaoShader->setUniformBlockBinding("ViewProjectionMtx", 0);
+    
+    ssaoBlurShader = make_unique<Shader>("shaders/ssaoBlur.v.glsl", "shaders/ssaoBlur.f.glsl");
 }
 
 void Simulator::setupSimulation() {
@@ -550,14 +612,14 @@ void Simulator::setupSimulation() {
     geometryFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Position color buffer.
     geometryFramebuffer->attachTexture(GL_COLOR_ATTACHMENT1, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Normal color buffer.
     geometryFramebuffer->attachTexture(GL_COLOR_ATTACHMENT2, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Albedo and specular color buffer.
-    geometryFramebuffer->attachRenderbuffer(GL_DEPTH_STENCIL_ATTACHMENT, GL_DEPTH24_STENCIL8);
+    geometryFramebuffer->attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT);
     geometryFramebuffer->setDrawBuffers({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2});
     geometryFramebuffer->validate();
     
     renderFramebuffer = make_unique<Framebuffer>(windowSize);
     renderFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
     renderFramebuffer->attachTexture(GL_COLOR_ATTACHMENT1, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
-    renderFramebuffer->attachRenderbuffer(GL_DEPTH_STENCIL_ATTACHMENT, GL_DEPTH24_STENCIL8);
+    renderFramebuffer->attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT);    // May want GL_DEPTH_STENCIL_ATTACHMENT, GL_DEPTH24_STENCIL8 in future #######################################################################
     renderFramebuffer->setDrawBuffers({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1});
     renderFramebuffer->validate();
     
@@ -571,6 +633,14 @@ void Simulator::setupSimulation() {
     bloomFramebuffer = make_unique<Framebuffer>(windowSize);
     bloomFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
     bloomFramebuffer->validate();
+    
+    ssaoFramebuffer = make_unique<Framebuffer>(windowSize);
+    ssaoFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RED, GL_RED, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    ssaoFramebuffer->validate();
+    
+    ssaoBlurFramebuffer = make_unique<Framebuffer>(windowSize);
+    ssaoBlurFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RED, GL_RED, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    ssaoBlurFramebuffer->validate();
     
     vector<Mesh::Vertex> windowQuadVertices = {
         {{ 1.0f,  1.0f,  0.0f}, { 0.0f,  0.0f,  0.0f}, { 1.0f, 1.0f}},

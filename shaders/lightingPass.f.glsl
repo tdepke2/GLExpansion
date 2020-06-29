@@ -8,6 +8,7 @@ const uint SPOT_LIGHT = 2u;
 uniform sampler2D texPosition;
 uniform sampler2D texNormal;
 uniform sampler2D texAlbedoSpec;
+uniform sampler2D texSSAO;
 uniform sampler2D shadowMap;
 uniform mat4 viewToLightSpaceMtx;
 uniform bool lightStates[NUM_LIGHTS];
@@ -47,7 +48,7 @@ float calculateShadow(vec4 positionLightSpace, vec3 normal, vec3 lightDir) {
     return brightness;
 }
 
-vec3 calculateLight(Light light, vec3 position, vec3 normal, vec3 diffuseColor, float specularColor, vec3 viewDir) {    // Computes the color of a fragment with one light source. All positions/directions in view space.
+vec3 calculateLight(Light light, vec3 position, vec3 normal, vec3 diffuseColor, float specularColor, float ambientOcclusion, vec3 viewDir) {    // Computes the color of a fragment with one light source. All positions/directions in view space.
     vec3 lightDir;
     float lightScalar;
     if (light.type == DIRECTIONAL_LIGHT) {
@@ -59,7 +60,7 @@ vec3 calculateLight(Light light, vec3 position, vec3 normal, vec3 diffuseColor, 
         lightScalar = 1.0 / (light.attenuationVals.x + light.attenuationVals.y * distance + light.attenuationVals.z * distance * distance);
     }
     
-    vec3 ambient = light.ambient * diffuseColor * lightScalar;
+    vec3 ambient = light.ambient * diffuseColor * lightScalar * ambientOcclusion;
     
     if (light.type == SPOT_LIGHT) {
         float theta = dot(lightDir, normalize(-light.directionViewSpace));
@@ -84,15 +85,17 @@ void main() {
     vec3 normal = texture(texNormal, fTexCoords).rgb;
     vec3 diffuseColor = texture(texAlbedoSpec, fTexCoords).rgb;
     float specularColor = texture(texAlbedoSpec, fTexCoords).a;
+    float ambientOcclusion = texture(texSSAO, fTexCoords).r;
     vec3 viewDir = normalize(-position);
     
     vec3 color = vec3(0.0, 0.0, 0.0);
     for (uint i = 0u; i < NUM_LIGHTS; ++i) {
         if (lightStates[i]) {
-            color += calculateLight(lights[i], position, normal, diffuseColor, specularColor, viewDir);
+            color += calculateLight(lights[i], position, normal, diffuseColor, specularColor, ambientOcclusion, viewDir);
         }
     }
     
+    //color = color * 0.0001 + vec3(ambientOcclusion);    // Override color to visualize AO #################################################################################
     fragColor = vec4(color, 1.0);
     if (dot(fragColor.rgb, vec3(0.2126, 0.7152, 0.0722)) > 1.0) {    // Convert to grayscale and check if fragment above brightness threshold.
         bloomColor = fragColor;

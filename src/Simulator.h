@@ -46,9 +46,9 @@ class Simulator {
     static glm::ivec2 windowSize;
     static glm::vec2 lastMousePos;
     static unordered_map<string, unsigned int> loadedTextures;
-    static unique_ptr<Shader> geometryShader, geometryNormalMapShader, lightingPassShader, postProcessShader, skyboxShader, lampShader, shadowMapShader, gaussianBlurShader;
-    static unique_ptr<Framebuffer> geometryFramebuffer, renderFramebuffer, shadowFramebuffer, bloomFramebuffer;
-    static unsigned int blackTexture, whiteTexture, blueTexture, cubeDiffuseMap, cubeSpecularMap, woodTexture, skyboxCubemap, brickDiffuseMap, brickNormalMap;
+    static unique_ptr<Shader> geometryShader, geometryNormalMapShader, lightingPassShader, postProcessShader, skyboxShader, lampShader, shadowMapShader, gaussianBlurShader, ssaoShader, ssaoBlurShader;
+    static unique_ptr<Framebuffer> geometryFramebuffer, renderFramebuffer, shadowFramebuffer, bloomFramebuffer, ssaoFramebuffer, ssaoBlurFramebuffer;
+    static unsigned int blackTexture, whiteTexture, blueTexture, cubeDiffuseMap, cubeSpecularMap, woodTexture, skyboxCubemap, brickDiffuseMap, brickNormalMap, ssaoNoiseTexture;
     static unsigned int uniformBufferVPMtx;
     static Mesh lightCube, cube1, sphere1, windowQuad, skybox;
     static Model modelTest, planetModel, rockModel;
