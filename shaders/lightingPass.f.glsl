@@ -95,7 +95,7 @@ void main() {
         }
     }
     
-    //color = color * 0.0001 + vec3(ambientOcclusion);    // Override color to visualize AO #################################################################################
+    //color += vec3(ambientOcclusion);    // Override color to visualize AO #################################################################################
     fragColor = vec4(color, 1.0);
     if (dot(fragColor.rgb, vec3(0.2126, 0.7152, 0.0722)) > 1.0) {    // Convert to grayscale and check if fragment above brightness threshold.
         bloomColor = fragColor;

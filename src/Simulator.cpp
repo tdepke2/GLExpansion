@@ -41,7 +41,7 @@ int Simulator::start() {
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
-        constexpr unsigned int SSAO_NUM_SAMPLES = 64;
+        constexpr unsigned int SSAO_NUM_SAMPLES = 32;
         vector<glm::vec3> ssaoSampleKernel;
         ssaoSampleKernel.reserve(SSAO_NUM_SAMPLES);
         for (unsigned int i = 0; i < SSAO_NUM_SAMPLES; ++i) {
@@ -139,7 +139,7 @@ int Simulator::start() {
             ssaoShader->setInt("texPosition", 0);
             ssaoShader->setInt("texNormal", 1);
             ssaoShader->setInt("texNoise", 2);
-            ssaoShader->setVec2("noiseScale", glm::vec2(windowSize.x / 4.0f, windowSize.y / 4.0f));
+            ssaoShader->setVec2("noiseScale", glm::vec2(ssaoFramebuffer->getBufferSize().x / 4.0f, ssaoFramebuffer->getBufferSize().y / 4.0f));
             glActiveTexture(GL_TEXTURE0);
             geometryFramebuffer->bindTexture(0);
             glActiveTexture(GL_TEXTURE1);
@@ -472,8 +472,8 @@ void Simulator::framebufferSizeCallback(GLFWwindow* window, int width, int heigh
     geometryFramebuffer->setBufferSize(windowSize);
     renderFramebuffer->setBufferSize(windowSize);
     bloomFramebuffer->setBufferSize(windowSize);
-    ssaoFramebuffer->setBufferSize(windowSize);
-    ssaoBlurFramebuffer->setBufferSize(windowSize);
+    ssaoFramebuffer->setBufferSize(windowSize / 2);
+    ssaoBlurFramebuffer->setBufferSize(windowSize / 2);
 }
 
 void Simulator::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -634,12 +634,12 @@ void Simulator::setupSimulation() {
     bloomFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
     bloomFramebuffer->validate();
     
-    ssaoFramebuffer = make_unique<Framebuffer>(windowSize);
+    ssaoFramebuffer = make_unique<Framebuffer>(windowSize / 2);
     ssaoFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RED, GL_RED, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
     ssaoFramebuffer->validate();
     
-    ssaoBlurFramebuffer = make_unique<Framebuffer>(windowSize);
-    ssaoBlurFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RED, GL_RED, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    ssaoBlurFramebuffer = make_unique<Framebuffer>(windowSize / 2);
+    ssaoBlurFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RED, GL_RED, GL_FLOAT, GL_LINEAR, GL_CLAMP_TO_EDGE);
     ssaoBlurFramebuffer->validate();
     
     vector<Mesh::Vertex> windowQuadVertices = {
@@ -658,7 +658,7 @@ void Simulator::setupSimulation() {
     lightCube.generateCube(0.2f);
     cube1.generateCube();
     sphere1.generateSphere();
-    modelTest.loadFile("models/backpack/backpack.obj");
+    modelTest.loadFile("models/sponza/sponza.obj");
     
     // Instancing example.
     /*planetModel.loadFile("models/planet/planet.obj");
@@ -750,7 +750,7 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
     
     glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f));
     //transform = glm::rotate(transform, -glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
-    transform = glm::scale(transform, glm::vec3(0.5f, 0.5f, 0.5f));
+    transform = glm::scale(transform, glm::vec3(0.01f, 0.01f, 0.01f));
     //transform = glm::scale(transform, glm::vec3(1.4f, 1.4f, 1.4f));
     shader->setMat4("modelMtx", transform);
     modelTest.draw(*shader);
