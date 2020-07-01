@@ -13,17 +13,20 @@
 atomic<Simulator::State> Simulator::state = {State::Uninitialized};
 mt19937 Simulator::mainRNG;
 Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Configuration Simulator::config;
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 unordered_map<string, unsigned int> Simulator::loadedTextures;
-unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::lightingPassShader, Simulator::postProcessShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::gaussianBlurShader, Simulator::ssaoShader, Simulator::ssaoBlurShader;
-unique_ptr<Framebuffer> Simulator::geometryFramebuffer, Simulator::renderFramebuffer, Simulator::shadowFramebuffer, Simulator::bloomFramebuffer, Simulator::ssaoFramebuffer, Simulator::ssaoBlurFramebuffer;
+unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::lightingPassShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader;
+unique_ptr<Shader> Simulator::postProcessShader, Simulator::bloomShader, Simulator::gaussianBlurShader, Simulator::ssaoShader, Simulator::ssaoBlurShader;
+unique_ptr<Framebuffer> Simulator::geometryFBO, Simulator::renderFBO, Simulator::shadowFBO;
+unique_ptr<Framebuffer> Simulator::bloom1FBO, Simulator::bloom2FBO, Simulator::ssaoFBO, Simulator::ssaoBlurFBO;
 unsigned int Simulator::blackTexture, Simulator::whiteTexture, Simulator::blueTexture, Simulator::cubeDiffuseMap, Simulator::cubeSpecularMap, Simulator::woodTexture, Simulator::skyboxCubemap, Simulator::brickDiffuseMap, Simulator::brickNormalMap, Simulator::ssaoNoiseTexture;
-unsigned int Simulator::uniformBufferVPMtx;
+unsigned int Simulator::viewProjectionMtxUBO;
 Mesh Simulator::lightCube, Simulator::cube1, Simulator::sphere1, Simulator::windowQuad, Simulator::skybox;
 Model Simulator::modelTest, Simulator::planetModel, Simulator::rockModel;
-bool Simulator::flashlightOn = false, Simulator::sunlightOn = true, Simulator::lampsOn = false, Simulator::test = false;
-float Simulator::sunT = 0.0f, Simulator::sunSpeed = 0.01f;
+bool Simulator::flashlightOn = false, Simulator::sunlightOn = true, Simulator::lampsOn = false, Simulator::test;
+float Simulator::sunT = 0.0f, Simulator::sunSpeed = 1.0f;
 
 int Simulator::start() {
     cout << "Initializing setup...\n";
@@ -37,7 +40,12 @@ int Simulator::start() {
         window = setupOpenGL();
         setupTextures();
         setupShaders();
+        setupBuffers();
         setupSimulation();
+        
+        config.setVsync(true);
+        config.setBloom(true);
+        config.setSSAO(true);
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
@@ -89,7 +97,7 @@ int Simulator::start() {
             }
             
             processInput(window, deltaTime);
-            sunT += sunSpeed;
+            sunT += sunSpeed * deltaTime;
             
             constexpr int NUM_LIGHTS = 8;
             glm::vec3 pointLightPositions[4] = {
@@ -112,8 +120,8 @@ int Simulator::start() {
             }
             glm::vec3 sunPosition = glm::vec3(glm::rotate(glm::mat4(1.0f), sunT, glm::vec3(1.0f, 1.0f, 1.0f)) * glm::vec4(0.0f, 0.0f, 40.0f, 1.0f));
             
-            shadowFramebuffer->bind();    // Render from light source POV for shadows.
-            glViewport(0, 0, shadowFramebuffer->getBufferSize().x, shadowFramebuffer->getBufferSize().y);
+            shadowFBO->bind();    // Render from light source POV for shadows.
+            glViewport(0, 0, shadowFBO->getBufferSize().x, shadowFBO->getBufferSize().y);
             glClear(GL_DEPTH_BUFFER_BIT);
             glm::mat4 lightViewMtx = glm::lookAt(sunPosition + camera.position, camera.position, glm::vec3(0.0f, 1.0f, 0.0f));
             glm::mat4 lightProjectionMtx = glm::ortho(-40.0f, 40.0f, -40.0f, 40.0f, 0.1f, 80.0f);
@@ -121,44 +129,46 @@ int Simulator::start() {
             renderScene(glm::mat4(1.0f), glm::mat4(1.0f), true, lightProjectionMtx * lightViewMtx);
             glEnable(GL_CULL_FACE);
             
-            geometryFramebuffer->bind();    // Render to geometry buffer (geometry pass).
-            glViewport(0, 0, geometryFramebuffer->getBufferSize().x, geometryFramebuffer->getBufferSize().y);
+            geometryFBO->bind();    // Render to geometry buffer (geometry pass).
+            glViewport(0, 0, geometryFBO->getBufferSize().x, geometryFBO->getBufferSize().y);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glm::mat4 viewMtx = camera.getViewMatrix();
             glm::mat4 projectionMtx = glm::perspective(glm::radians(camera.fov), static_cast<float>(windowSize.x) / windowSize.y, NEAR_PLANE, FAR_PLANE);
             renderScene(viewMtx, projectionMtx, false, glm::mat4(1.0f));
             
-            geometryFramebuffer->bind(GL_READ_FRAMEBUFFER);    // Copy depth buffer over.
-            renderFramebuffer->bind(GL_DRAW_FRAMEBUFFER);
-            glBlitFramebuffer(0, 0, geometryFramebuffer->getBufferSize().x, geometryFramebuffer->getBufferSize().y, 0, 0, renderFramebuffer->getBufferSize().x, renderFramebuffer->getBufferSize().y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+            geometryFBO->bind(GL_READ_FRAMEBUFFER);    // Copy depth buffer over.
+            renderFBO->bind(GL_DRAW_FRAMEBUFFER);
+            glBlitFramebuffer(0, 0, geometryFBO->getBufferSize().x, geometryFBO->getBufferSize().y, 0, 0, renderFBO->getBufferSize().x, renderFBO->getBufferSize().y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
             
-            ssaoFramebuffer->bind();    // Render SSAO texture.
-            glViewport(0, 0, ssaoFramebuffer->getBufferSize().x, ssaoFramebuffer->getBufferSize().y);
-            glClear(GL_COLOR_BUFFER_BIT);
-            ssaoShader->use();
-            ssaoShader->setInt("texPosition", 0);
-            ssaoShader->setInt("texNormal", 1);
-            ssaoShader->setInt("texNoise", 2);
-            ssaoShader->setVec2("noiseScale", glm::vec2(ssaoFramebuffer->getBufferSize().x / 4.0f, ssaoFramebuffer->getBufferSize().y / 4.0f));
-            glActiveTexture(GL_TEXTURE0);
-            geometryFramebuffer->bindTexture(0);
-            glActiveTexture(GL_TEXTURE1);
-            geometryFramebuffer->bindTexture(1);
-            glActiveTexture(GL_TEXTURE2);
-            glBindTexture(GL_TEXTURE_2D, ssaoNoiseTexture);
-            windowQuad.draw();
+            if (config.getSSAO()) {
+                ssaoFBO->bind();    // Render SSAO texture.
+                glViewport(0, 0, ssaoFBO->getBufferSize().x, ssaoFBO->getBufferSize().y);
+                glClear(GL_COLOR_BUFFER_BIT);
+                ssaoShader->use();
+                ssaoShader->setInt("texPosition", 0);
+                ssaoShader->setInt("texNormal", 1);
+                ssaoShader->setInt("texNoise", 2);
+                ssaoShader->setVec2("noiseScale", glm::vec2(ssaoFBO->getBufferSize().x / 4.0f, ssaoFBO->getBufferSize().y / 4.0f));
+                glActiveTexture(GL_TEXTURE0);
+                geometryFBO->bindTexture(0);
+                glActiveTexture(GL_TEXTURE1);
+                geometryFBO->bindTexture(1);
+                glActiveTexture(GL_TEXTURE2);
+                glBindTexture(GL_TEXTURE_2D, ssaoNoiseTexture);
+                windowQuad.draw();
+                
+                ssaoBlurFBO->bind();    // Blur SSAO texture.
+                glViewport(0, 0, ssaoBlurFBO->getBufferSize().x, ssaoBlurFBO->getBufferSize().y);
+                glClear(GL_COLOR_BUFFER_BIT);
+                ssaoBlurShader->use();
+                ssaoBlurShader->setInt("image", 0);
+                glActiveTexture(GL_TEXTURE0);
+                ssaoFBO->bindTexture(0);
+                windowQuad.draw();
+            }
             
-            ssaoBlurFramebuffer->bind();    // Blur SSAO texture.
-            glViewport(0, 0, ssaoBlurFramebuffer->getBufferSize().x, ssaoBlurFramebuffer->getBufferSize().y);
-            glClear(GL_COLOR_BUFFER_BIT);
-            ssaoBlurShader->use();
-            ssaoBlurShader->setInt("image", 0);
-            glActiveTexture(GL_TEXTURE0);
-            ssaoFramebuffer->bindTexture(0);
-            windowQuad.draw();
-            
-            renderFramebuffer->bind();    // Render lighting (lighting pass).
-            glViewport(0, 0, renderFramebuffer->getBufferSize().x, renderFramebuffer->getBufferSize().y);
+            renderFBO->bind();    // Render lighting (lighting pass).
+            glViewport(0, 0, renderFBO->getBufferSize().x, renderFBO->getBufferSize().y);
             glClear(GL_COLOR_BUFFER_BIT);
             glDisable(GL_DEPTH_TEST);
             lightingPassShader->use();
@@ -167,6 +177,7 @@ int Simulator::start() {
             lightingPassShader->setInt("texAlbedoSpec", 2);
             lightingPassShader->setInt("texSSAO", 3);
             lightingPassShader->setInt("shadowMap", 4);
+            lightingPassShader->setBool("applySSAO", config.getSSAO());
             lightingPassShader->setMat4("viewToLightSpaceMtx", lightProjectionMtx * lightViewMtx * inverse(viewMtx));
             lightingPassShader->setUnsignedIntArray("lightStates", NUM_LIGHTS, lightStates);
             lightingPassShader->setUnsignedInt("lights[0].type", 0);
@@ -193,15 +204,17 @@ int Simulator::start() {
                 lightingPassShader->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
             }
             glActiveTexture(GL_TEXTURE0);
-            geometryFramebuffer->bindTexture(0);
+            geometryFBO->bindTexture(0);
             glActiveTexture(GL_TEXTURE1);
-            geometryFramebuffer->bindTexture(1);
+            geometryFBO->bindTexture(1);
             glActiveTexture(GL_TEXTURE2);
-            geometryFramebuffer->bindTexture(2);
-            glActiveTexture(GL_TEXTURE3);
-            ssaoBlurFramebuffer->bindTexture(0);
+            geometryFBO->bindTexture(2);
+            if (config.getSSAO()) {
+                glActiveTexture(GL_TEXTURE3);
+                ssaoBlurFBO->bindTexture(0);
+            }
             glActiveTexture(GL_TEXTURE4);
-            shadowFramebuffer->bindTexture(0);
+            shadowFBO->bindTexture(0);
             windowQuad.draw();
             glEnable(GL_DEPTH_TEST);
             
@@ -217,8 +230,6 @@ int Simulator::start() {
             lampShader->setMat4("modelMtx", glm::translate(glm::mat4(1.0f), sunPosition + camera.position));
             lightCube.draw();
             
-            renderFramebuffer->setDrawBuffers({GL_COLOR_ATTACHMENT0});
-            
             skyboxShader->use();    // Draw the skybox.
             glDepthFunc(GL_LEQUAL);
             glDisable(GL_CULL_FACE);
@@ -229,22 +240,31 @@ int Simulator::start() {
             glDepthFunc(GL_LESS);
             glEnable(GL_CULL_FACE);
             
-            gaussianBlurShader->use();    // Apply gaussian blur to bloom texture (uses bloom framebuffer for intermediate results).
-            gaussianBlurShader->setInt("image", 0);
-            glActiveTexture(GL_TEXTURE0);
-            renderFramebuffer->setDrawBuffers({GL_COLOR_ATTACHMENT1});
-            for (unsigned int i = 0; i < 5; ++i) {
-                bloomFramebuffer->bind();    // Draw to bloom framebuffer.
-                gaussianBlurShader->setBool("blurHorizontal", true);
-                renderFramebuffer->bindTexture(1);
+            if (config.getBloom()) {
+                bloom1FBO->bind();    // Compute bloom texture.
+                glViewport(0, 0, bloom1FBO->getBufferSize().x, bloom1FBO->getBufferSize().y);
+                glClear(GL_COLOR_BUFFER_BIT);
+                bloomShader->use();
+                bloomShader->setInt("image", 0);
+                glActiveTexture(GL_TEXTURE0);
+                renderFBO->bindTexture(0);
                 windowQuad.draw();
                 
-                renderFramebuffer->bind();    // Draw back to render framebuffer.
-                gaussianBlurShader->setBool("blurHorizontal", false);
-                bloomFramebuffer->bindTexture(0);
-                windowQuad.draw();
+                gaussianBlurShader->use();    // Apply Gaussian blur to texture.
+                gaussianBlurShader->setInt("image", 0);
+                glActiveTexture(GL_TEXTURE0);
+                for (unsigned int i = 0; i < 5; ++i) {
+                    bloom2FBO->bind();    // Draw to bloom 2 framebuffer.
+                    gaussianBlurShader->setBool("blurHorizontal", true);
+                    bloom1FBO->bindTexture(0);
+                    windowQuad.draw();
+                    
+                    bloom1FBO->bind();    // Draw to bloom 1 framebuffer.
+                    gaussianBlurShader->setBool("blurHorizontal", false);
+                    bloom2FBO->bindTexture(0);
+                    windowQuad.draw();
+                }
             }
-            renderFramebuffer->setDrawBuffers({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1});
             
             glBindFramebuffer(GL_FRAMEBUFFER, 0);    // Apply post-processing and render to window.
             glViewport(0, 0, windowSize.x, windowSize.y);
@@ -254,10 +274,13 @@ int Simulator::start() {
             postProcessShader->setInt("image", 0);
             postProcessShader->setInt("bloomBlur", 1);
             postProcessShader->setFloat("exposure", 1.0f);
+            postProcessShader->setBool("applyBloom", config.getBloom());
             glActiveTexture(GL_TEXTURE0);
-            renderFramebuffer->bindTexture(0);
-            glActiveTexture(GL_TEXTURE1);
-            renderFramebuffer->bindTexture(1);
+            renderFBO->bindTexture(0);
+            if (config.getBloom()) {
+                glActiveTexture(GL_TEXTURE1);
+                bloom1FBO->bindTexture(0);
+            }
             windowQuad.draw();
             glEnable(GL_DEPTH_TEST);
             
@@ -280,23 +303,25 @@ int Simulator::start() {
         exitCode = -1;
     }
     
-    glDeleteBuffers(1, &uniformBufferVPMtx);    // Clean up allocated resources.
+    glDeleteBuffers(1, &viewProjectionMtxUBO);    // Clean up allocated resources.
     geometryNormalMapShader.reset();
     lightingPassShader.reset();
-    postProcessShader.reset();
     skyboxShader.reset();
     lampShader.reset();
     shadowMapShader.reset();
+    postProcessShader.reset();
+    bloomShader.reset();
     gaussianBlurShader.reset();
     ssaoShader.reset();
     ssaoBlurShader.reset();
     
-    geometryFramebuffer.reset();
-    renderFramebuffer.reset();
-    shadowFramebuffer.reset();
-    bloomFramebuffer.reset();
-    ssaoFramebuffer.reset();
-    ssaoBlurFramebuffer.reset();
+    geometryFBO.reset();
+    renderFBO.reset();
+    shadowFBO.reset();
+    bloom1FBO.reset();
+    bloom2FBO.reset();
+    ssaoFBO.reset();
+    ssaoBlurFBO.reset();
     
     glCheckError();
     glfwDestroyWindow(window);
@@ -469,11 +494,12 @@ unsigned int Simulator::generateTexture(int r, int g, int b) {
 void Simulator::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
     windowSize.x = width;
     windowSize.y = height;
-    geometryFramebuffer->setBufferSize(windowSize);
-    renderFramebuffer->setBufferSize(windowSize);
-    bloomFramebuffer->setBufferSize(windowSize);
-    ssaoFramebuffer->setBufferSize(windowSize / 2);
-    ssaoBlurFramebuffer->setBufferSize(windowSize / 2);
+    geometryFBO->setBufferSize(windowSize);
+    renderFBO->setBufferSize(windowSize);
+    bloom1FBO->setBufferSize(windowSize);
+    bloom2FBO->setBufferSize(windowSize);
+    ssaoFBO->setBufferSize(windowSize / 2);
+    ssaoBlurFBO->setBufferSize(windowSize / 2);
 }
 
 void Simulator::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -505,6 +531,12 @@ void Simulator::keyCallback(GLFWwindow* window, int key, int scancode, int actio
             if (sunSpeed > 0.00001f) {
                 sunSpeed /= 2.0f;
             }
+        } else if (key == GLFW_KEY_V) {
+            config.setVsync(!config.getVsync());
+        } else if (key == GLFW_KEY_B) {
+            config.setBloom(!config.getBloom());
+        } else if (key == GLFW_KEY_N) {
+            config.setSSAO(!config.getSSAO());
         } else if (key == GLFW_KEY_T) {
             test = !test;
         }
@@ -538,7 +570,6 @@ GLFWwindow* Simulator::setupOpenGL() {
         throw runtime_error("Error: Failed to create GLFW window.");
     }
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1);    // Update our screen after at least 1 screen refresh.
     
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);    // Set function callbacks.
     glfwSetKeyCallback(window, keyCallback);
@@ -578,18 +609,16 @@ void Simulator::setupTextures() {
 }
 
 void Simulator::setupShaders() {
-    glGenBuffers(1, &uniformBufferVPMtx);    // Create a uniform buffer for ViewProjectionMtx.
-    glBindBuffer(GL_UNIFORM_BUFFER, uniformBufferVPMtx);
+    glGenBuffers(1, &viewProjectionMtxUBO);    // Create a uniform buffer for ViewProjectionMtx.
+    glBindBuffer(GL_UNIFORM_BUFFER, viewProjectionMtxUBO);
     glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    glBindBufferRange(GL_UNIFORM_BUFFER, 0, uniformBufferVPMtx, 0, 2 * sizeof(glm::mat4));    // Link to binding point 0.
+    glBindBufferRange(GL_UNIFORM_BUFFER, 0, viewProjectionMtxUBO, 0, 2 * sizeof(glm::mat4));    // Link to binding point 0.
     
     geometryNormalMapShader = make_unique<Shader>("shaders/geometryNormalMap.v.glsl", "shaders/geometryNormalMap.f.glsl");
     geometryNormalMapShader->setUniformBlockBinding("ViewProjectionMtx", 0);
     
-    lightingPassShader = make_unique<Shader>("shaders/lightingPass.v.glsl", "shaders/lightingPass.f.glsl");
-    
-    postProcessShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/postProcess.f.glsl");
+    lightingPassShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/lightingPass.f.glsl");
     
     skyboxShader = make_unique<Shader>("shaders/skybox.v.glsl", "shaders/skybox.f.glsl");
     skyboxShader->setUniformBlockBinding("ViewProjectionMtx", 0);
@@ -599,49 +628,57 @@ void Simulator::setupShaders() {
     
     shadowMapShader = make_unique<Shader>("shaders/shadowMap.v.glsl", "shaders/shadowMap.f.glsl");
     
-    gaussianBlurShader = make_unique<Shader>("shaders/gaussianBlur.v.glsl", "shaders/gaussianBlur.f.glsl");
+    postProcessShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/postProcess.f.glsl");
     
-    ssaoShader = make_unique<Shader>("shaders/ssao.v.glsl", "shaders/ssao.f.glsl");
+    bloomShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/bloom.f.glsl");
+    
+    gaussianBlurShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/gaussianBlur.f.glsl");
+    
+    ssaoShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/ssao.f.glsl");
     ssaoShader->setUniformBlockBinding("ViewProjectionMtx", 0);
     
-    ssaoBlurShader = make_unique<Shader>("shaders/ssaoBlur.v.glsl", "shaders/ssaoBlur.f.glsl");
+    ssaoBlurShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/ssaoBlur.f.glsl");
+}
+
+void Simulator::setupBuffers() {
+    geometryFBO = make_unique<Framebuffer>(windowSize);
+    geometryFBO->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Position color buffer.
+    geometryFBO->attachTexture(GL_COLOR_ATTACHMENT1, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Normal color buffer.
+    geometryFBO->attachTexture(GL_COLOR_ATTACHMENT2, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Albedo and specular color buffer.
+    geometryFBO->attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT);
+    geometryFBO->setDrawBuffers({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2});
+    geometryFBO->validate();
+    
+    renderFBO = make_unique<Framebuffer>(windowSize);
+    renderFBO->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    renderFBO->attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT);    // May want GL_DEPTH_STENCIL_ATTACHMENT, GL_DEPTH24_STENCIL8 in future #######################################################################
+    renderFBO->validate();
+    
+    shadowFBO = make_unique<Framebuffer>(glm::ivec2(2048, 2048));
+    shadowFBO->attachTexture(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, GL_NEAREST, GL_CLAMP_TO_BORDER, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    shadowFBO->bind();
+    glDrawBuffer(GL_NONE);    // Disable color rendering.
+    glReadBuffer(GL_NONE);
+    shadowFBO->validate();
+    
+    bloom1FBO = make_unique<Framebuffer>(windowSize);
+    bloom1FBO->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    bloom1FBO->validate();
+    
+    bloom2FBO = make_unique<Framebuffer>(windowSize);
+    bloom2FBO->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    bloom2FBO->validate();
+    
+    ssaoFBO = make_unique<Framebuffer>(windowSize / 2);
+    ssaoFBO->attachTexture(GL_COLOR_ATTACHMENT0, GL_RED, GL_RED, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    ssaoFBO->validate();
+    
+    ssaoBlurFBO = make_unique<Framebuffer>(windowSize / 2);
+    ssaoBlurFBO->attachTexture(GL_COLOR_ATTACHMENT0, GL_RED, GL_RED, GL_FLOAT, GL_LINEAR, GL_CLAMP_TO_EDGE);
+    ssaoBlurFBO->validate();
 }
 
 void Simulator::setupSimulation() {
-    geometryFramebuffer = make_unique<Framebuffer>(windowSize);
-    geometryFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Position color buffer.
-    geometryFramebuffer->attachTexture(GL_COLOR_ATTACHMENT1, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Normal color buffer.
-    geometryFramebuffer->attachTexture(GL_COLOR_ATTACHMENT2, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Albedo and specular color buffer.
-    geometryFramebuffer->attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT);
-    geometryFramebuffer->setDrawBuffers({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2});
-    geometryFramebuffer->validate();
-    
-    renderFramebuffer = make_unique<Framebuffer>(windowSize);
-    renderFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
-    renderFramebuffer->attachTexture(GL_COLOR_ATTACHMENT1, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
-    renderFramebuffer->attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT);    // May want GL_DEPTH_STENCIL_ATTACHMENT, GL_DEPTH24_STENCIL8 in future #######################################################################
-    renderFramebuffer->setDrawBuffers({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1});
-    renderFramebuffer->validate();
-    
-    shadowFramebuffer = make_unique<Framebuffer>(glm::ivec2(2048, 2048));
-    shadowFramebuffer->attachTexture(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, GL_NEAREST, GL_CLAMP_TO_BORDER, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-    shadowFramebuffer->bind();
-    glDrawBuffer(GL_NONE);    // Disable color rendering.
-    glReadBuffer(GL_NONE);
-    shadowFramebuffer->validate();
-    
-    bloomFramebuffer = make_unique<Framebuffer>(windowSize);
-    bloomFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
-    bloomFramebuffer->validate();
-    
-    ssaoFramebuffer = make_unique<Framebuffer>(windowSize / 2);
-    ssaoFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RED, GL_RED, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
-    ssaoFramebuffer->validate();
-    
-    ssaoBlurFramebuffer = make_unique<Framebuffer>(windowSize / 2);
-    ssaoBlurFramebuffer->attachTexture(GL_COLOR_ATTACHMENT0, GL_RED, GL_RED, GL_FLOAT, GL_LINEAR, GL_CLAMP_TO_EDGE);
-    ssaoBlurFramebuffer->validate();
-    
     vector<Mesh::Vertex> windowQuadVertices = {
         {{ 1.0f,  1.0f,  0.0f}, { 0.0f,  0.0f,  0.0f}, { 1.0f, 1.0f}},
         {{-1.0f,  1.0f,  0.0f}, { 0.0f,  0.0f,  0.0f}, { 0.0f, 1.0f}},
@@ -699,7 +736,7 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         shader->use();
         shader->setMat4("lightSpaceMtx", lightSpaceMtx);
     } else {
-        glBindBuffer(GL_UNIFORM_BUFFER, uniformBufferVPMtx);    // Update uniform buffer.
+        glBindBuffer(GL_UNIFORM_BUFFER, viewProjectionMtxUBO);    // Update uniform buffer.
         glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(viewMtx));
         glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projectionMtx));
         glBindBuffer(GL_UNIFORM_BUFFER, 0);

@@ -12,6 +12,7 @@ class Shader;
 #define glCheckError() Simulator::glCheckError_(__FILE__, __LINE__)
 
 #include "Camera.h"
+#include "Configuration.h"
 #include "Mesh.h"
 #include "Model.h"
 #include <atomic>
@@ -43,13 +44,16 @@ class Simulator {
     static atomic<State> state;
     static mt19937 mainRNG;
     static Camera camera;
+    static Configuration config;
     static glm::ivec2 windowSize;
     static glm::vec2 lastMousePos;
     static unordered_map<string, unsigned int> loadedTextures;
-    static unique_ptr<Shader> geometryShader, geometryNormalMapShader, lightingPassShader, postProcessShader, skyboxShader, lampShader, shadowMapShader, gaussianBlurShader, ssaoShader, ssaoBlurShader;
-    static unique_ptr<Framebuffer> geometryFramebuffer, renderFramebuffer, shadowFramebuffer, bloomFramebuffer, ssaoFramebuffer, ssaoBlurFramebuffer;
+    static unique_ptr<Shader> geometryNormalMapShader, lightingPassShader, skyboxShader, lampShader, shadowMapShader;
+    static unique_ptr<Shader> postProcessShader, bloomShader, gaussianBlurShader, ssaoShader, ssaoBlurShader;
+    static unique_ptr<Framebuffer> geometryFBO, renderFBO, shadowFBO;
+    static unique_ptr<Framebuffer> bloom1FBO, bloom2FBO, ssaoFBO, ssaoBlurFBO;
     static unsigned int blackTexture, whiteTexture, blueTexture, cubeDiffuseMap, cubeSpecularMap, woodTexture, skyboxCubemap, brickDiffuseMap, brickNormalMap, ssaoNoiseTexture;
-    static unsigned int uniformBufferVPMtx;
+    static unsigned int viewProjectionMtxUBO;
     static Mesh lightCube, cube1, sphere1, windowQuad, skybox;
     static Model modelTest, planetModel, rockModel;
     static bool flashlightOn, sunlightOn, lampsOn, test;
@@ -64,11 +68,13 @@ class Simulator {
     static GLFWwindow* setupOpenGL();
     static void setupTextures();
     static void setupShaders();
+    static void setupBuffers();
     static void setupSimulation();
     static void nextTick(GLFWwindow* window);
     static void renderScene(const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender, const glm::mat4& lightSpaceMtx);
-    
     static void processInput(GLFWwindow* window, float deltaTime);
+    
+    friend class Configuration;
 };
 
 #endif

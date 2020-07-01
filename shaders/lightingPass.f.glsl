@@ -10,6 +10,7 @@ uniform sampler2D texNormal;
 uniform sampler2D texAlbedoSpec;
 uniform sampler2D texSSAO;
 uniform sampler2D shadowMap;
+uniform bool applySSAO;
 uniform mat4 viewToLightSpaceMtx;
 uniform bool lightStates[NUM_LIGHTS];
 
@@ -27,8 +28,7 @@ uniform Light lights[NUM_LIGHTS];
 
 in vec2 fTexCoords;
 
-layout (location = 0) out vec4 fragColor;
-layout (location = 1) out vec4 bloomColor;
+out vec4 fragColor;
 
 float calculateShadow(vec4 positionLightSpace, vec3 normal, vec3 lightDir) {
     vec3 normalizedDeviceCoords = (positionLightSpace.xyz / positionLightSpace.w) * 0.5 + 0.5;
@@ -85,7 +85,7 @@ void main() {
     vec3 normal = texture(texNormal, fTexCoords).rgb;
     vec3 diffuseColor = texture(texAlbedoSpec, fTexCoords).rgb;
     float specularColor = texture(texAlbedoSpec, fTexCoords).a;
-    float ambientOcclusion = texture(texSSAO, fTexCoords).r;
+    float ambientOcclusion = (applySSAO ? texture(texSSAO, fTexCoords).r : 1.0);
     vec3 viewDir = normalize(-position);
     
     vec3 color = vec3(0.0, 0.0, 0.0);
@@ -97,9 +97,4 @@ void main() {
     
     //color += vec3(ambientOcclusion);    // Override color to visualize AO #################################################################################
     fragColor = vec4(color, 1.0);
-    if (dot(fragColor.rgb, vec3(0.2126, 0.7152, 0.0722)) > 1.0) {    // Convert to grayscale and check if fragment above brightness threshold.
-        bloomColor = fragColor;
-    } else {
-        bloomColor = vec4(0.0, 0.0, 0.0, 1.0);
-    }
 }
