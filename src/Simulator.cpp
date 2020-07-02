@@ -1,5 +1,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#include "ft2build.h"
+#include FT_FREETYPE_H
 
 #include "Framebuffer.h"
 #include "Shader.h"
@@ -49,31 +51,55 @@ int Simulator::start() {
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
-        constexpr unsigned int SSAO_NUM_SAMPLES = 32;
-        vector<glm::vec3> ssaoSampleKernel;
-        ssaoSampleKernel.reserve(SSAO_NUM_SAMPLES);
-        for (unsigned int i = 0; i < SSAO_NUM_SAMPLES; ++i) {
-            glm::vec3 sample(randomFloat(-1.0f, 1.0f), randomFloat(-1.0f, 1.0f), randomFloat(0.0f, 1.0f));
-            float scale = 0.1f + (1.0f - 0.1f) * pow(static_cast<float>(i) / SSAO_NUM_SAMPLES, 2.0f);
-            sample = glm::normalize(sample) * randomFloat(0.0f, 1.0f) * scale;
-            ssaoSampleKernel.push_back(sample);
-        }
-        ssaoShader->use();
-        for (unsigned int i = 0; i < SSAO_NUM_SAMPLES; ++i) {
-            ssaoShader->setVec3("samples[" + to_string(i) + "]", ssaoSampleKernel[i]);
+        FT_Library ft;
+        if (FT_Init_FreeType(&ft)) {
+            throw runtime_error("Failed to initialize FreeType library.");
         }
         
-        glGenTextures(1, &ssaoNoiseTexture);
-        glBindTexture(GL_TEXTURE_2D, ssaoNoiseTexture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        vector<glm::vec3> ssaoNoise;
-        for (unsigned int i = 0; i < 16; ++i) {
-            ssaoNoise.emplace_back(randomFloat(-1.0f, 1.0f), randomFloat(-1.0f, 1.0f), 0.0f);
+        FT_Face face;
+        if (FT_New_Face(ft, "fonts/arial.ttf", 0, &face)) {
+            throw runtime_error("Failed to load font \"fonts/arial.ttf\".");
         }
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 4, 4, 0, GL_RGB, GL_FLOAT, ssaoNoise.data());
+        
+        FT_Set_Pixel_Sizes(face, 0, 48);
+        
+        struct Glyph {
+            unsigned int texHandle;
+            glm::ivec2 size;    // Size of glyph.
+            glm::ivec2 bearing;    // Offset from baseline to top-right of glyph.
+            unsigned int advance;    // Offset to advance to next glyph.
+        };
+        unordered_map<char, Glyph> glyphs;
+        
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);    // Disable 4-byte alignment restriction when loading glyph textures.
+        for (unsigned char c = 0; c < 128; ++c) {
+            if (FT_Load_Char(face, c, FT_LOAD_RENDER)) {
+                cout << "Error: Failed to load font glyph \"" << c << "\".\n";
+                continue;
+            }
+            
+            unsigned int texHandle;
+            glGenTextures(1, &texHandle);
+            glBindTexture(GL_TEXTURE_2D, texHandle);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, face->glyph->bitmap.width, face->glyph->bitmap.rows, 0, GL_RED, GL_UNSIGNED_BYTE, face->glyph->bitmap.buffer);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            
+            Glyph glyph = {
+                texHandle,
+                glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
+                glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
+                static_cast<unsigned int>(face->glyph->advance.x)
+            };
+            
+            glyphs.emplace(c, glyph);
+        }
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        
+        FT_Done_Face(face);
+        FT_Done_FreeType(ft);
         
         double lastTime = glfwGetTime();
         float deltaTime = 0.0f;
@@ -567,7 +593,7 @@ GLFWwindow* Simulator::setupOpenGL() {
     
     GLFWwindow* window = glfwCreateWindow(windowSize.x, windowSize.y, "LearnOpenGL", nullptr, nullptr);    // Create the window.
     if (window == nullptr) {
-        throw runtime_error("Error: Failed to create GLFW window.");
+        throw runtime_error("Failed to create GLFW window.");
     }
     glfwMakeContextCurrent(window);
     
@@ -578,7 +604,7 @@ GLFWwindow* Simulator::setupOpenGL() {
     glfwSetScrollCallback(window, scrollCallback);
     
     if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {    // Load all OpenGL function pointers with GLAD.
-        throw runtime_error("Error: Failed to initialize GLAD.");
+        throw runtime_error("Failed to initialize GLAD.");
     }
     
     glEnable(GL_DEPTH_TEST);
@@ -606,6 +632,18 @@ void Simulator::setupTextures() {
     skyboxCubemap = loadCubemap("textures/skybox/.jpg", true);
     brickDiffuseMap = loadTexture("textures/grid512.bmp", true);
     brickNormalMap = loadTexture("textures/bricks2_normal.jpg", false);
+    
+    glGenTextures(1, &ssaoNoiseTexture);
+    glBindTexture(GL_TEXTURE_2D, ssaoNoiseTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    vector<glm::vec3> ssaoNoise;
+    for (unsigned int i = 0; i < 16; ++i) {
+        ssaoNoise.emplace_back(randomFloat(-1.0f, 1.0f), randomFloat(-1.0f, 1.0f), 0.0f);
+    }
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 4, 4, 0, GL_RGB, GL_FLOAT, ssaoNoise.data());
 }
 
 void Simulator::setupShaders() {
@@ -636,6 +674,19 @@ void Simulator::setupShaders() {
     
     ssaoShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/ssao.f.glsl");
     ssaoShader->setUniformBlockBinding("ViewProjectionMtx", 0);
+    ssaoShader->use();
+    constexpr unsigned int SSAO_NUM_SAMPLES = 32;
+    vector<glm::vec3> ssaoSampleKernel;
+    ssaoSampleKernel.reserve(SSAO_NUM_SAMPLES);
+    for (unsigned int i = 0; i < SSAO_NUM_SAMPLES; ++i) {
+        glm::vec3 sample(randomFloat(-1.0f, 1.0f), randomFloat(-1.0f, 1.0f), randomFloat(0.0f, 1.0f));
+        float scale = 0.1f + (1.0f - 0.1f) * pow(static_cast<float>(i) / SSAO_NUM_SAMPLES, 2.0f);
+        sample = glm::normalize(sample) * randomFloat(0.0f, 1.0f) * scale;
+        ssaoSampleKernel.push_back(sample);
+    }
+    for (unsigned int i = 0; i < SSAO_NUM_SAMPLES; ++i) {
+        ssaoShader->setVec3("samples[" + to_string(i) + "]", ssaoSampleKernel[i]);
+    }
     
     ssaoBlurShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/ssaoBlur.f.glsl");
 }

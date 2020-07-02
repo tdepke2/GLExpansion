@@ -4,6 +4,7 @@ x64/
 wip/
 textures/
 models/
+fonts/
 *.vcxproj*
 *.o
 *.exe
