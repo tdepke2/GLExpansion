@@ -1,11 +1,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#include "ft2build.h"
-#include FT_FREETYPE_H
 
 #include "Framebuffer.h"
 #include "Shader.h"
 #include "Simulator.h"
+#include "TextRender.h"
 #include <cassert>
 #include <chrono>
 #include <iostream>
@@ -19,7 +18,7 @@ Configuration Simulator::config;
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 unordered_map<string, unsigned int> Simulator::loadedTextures;
-unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::lightingPassShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader;
+unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::lightingPassShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::textRenderShader;
 unique_ptr<Shader> Simulator::postProcessShader, Simulator::bloomShader, Simulator::gaussianBlurShader, Simulator::ssaoShader, Simulator::ssaoBlurShader;
 unique_ptr<Framebuffer> Simulator::geometryFBO, Simulator::renderFBO, Simulator::shadowFBO;
 unique_ptr<Framebuffer> Simulator::bloom1FBO, Simulator::bloom2FBO, Simulator::ssaoFBO, Simulator::ssaoBlurFBO;
@@ -49,57 +48,12 @@ int Simulator::start() {
         config.setBloom(true);
         config.setSSAO(true);
         
+        TextRender textRenderOld, textRender;
+        textRender.loadFont("fonts/arial.ttf", 48);
+        textRender.setText("This is sample text");
+        textRenderOld.loadFontOldMethod("fonts/arial.ttf");
+        
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        
-        FT_Library ft;
-        if (FT_Init_FreeType(&ft)) {
-            throw runtime_error("Failed to initialize FreeType library.");
-        }
-        
-        FT_Face face;
-        if (FT_New_Face(ft, "fonts/arial.ttf", 0, &face)) {
-            throw runtime_error("Failed to load font \"fonts/arial.ttf\".");
-        }
-        
-        FT_Set_Pixel_Sizes(face, 0, 48);
-        
-        struct Glyph {
-            unsigned int texHandle;
-            glm::ivec2 size;    // Size of glyph.
-            glm::ivec2 bearing;    // Offset from baseline to top-right of glyph.
-            unsigned int advance;    // Offset to advance to next glyph.
-        };
-        unordered_map<char, Glyph> glyphs;
-        
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);    // Disable 4-byte alignment restriction when loading glyph textures.
-        for (unsigned char c = 0; c < 128; ++c) {
-            if (FT_Load_Char(face, c, FT_LOAD_RENDER)) {
-                cout << "Error: Failed to load font glyph \"" << c << "\".\n";
-                continue;
-            }
-            
-            unsigned int texHandle;
-            glGenTextures(1, &texHandle);
-            glBindTexture(GL_TEXTURE_2D, texHandle);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, face->glyph->bitmap.width, face->glyph->bitmap.rows, 0, GL_RED, GL_UNSIGNED_BYTE, face->glyph->bitmap.buffer);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            
-            Glyph glyph = {
-                texHandle,
-                glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
-                glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
-                static_cast<unsigned int>(face->glyph->advance.x)
-            };
-            
-            glyphs.emplace(c, glyph);
-        }
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-        
-        FT_Done_Face(face);
-        FT_Done_FreeType(ft);
         
         double lastTime = glfwGetTime();
         float deltaTime = 0.0f;
@@ -310,6 +264,18 @@ int Simulator::start() {
             windowQuad.draw();
             glEnable(GL_DEPTH_TEST);
             
+            glEnable(GL_BLEND);
+            glDisable(GL_DEPTH_TEST);
+            glm::mat4 projectionMtx2 = glm::ortho(0.0f, static_cast<float>(windowSize.x), 0.0f, static_cast<float>(windowSize.y));
+            textRenderShader->use();
+            textRenderShader->setMat4("projectionMtx", glm::translate(projectionMtx2, glm::vec3(0.0f, 10.0f, 0.0f)));
+            textRenderShader->setInt("texGlyph", 0);
+            textRenderShader->setVec3("color", glm::vec3(1.0f, 0.0f, 0.0f));
+            textRender.draw();
+            textRenderOld.drawOldMethod("This is sample text", 0.0f, 100.0f, 1.0f);
+            glDisable(GL_BLEND);
+            glEnable(GL_DEPTH_TEST);
+            
             glfwSwapBuffers(window);
             glfwPollEvents();
             glCheckError();
@@ -335,6 +301,7 @@ int Simulator::start() {
     skyboxShader.reset();
     lampShader.reset();
     shadowMapShader.reset();
+    textRenderShader.reset();
     postProcessShader.reset();
     bloomShader.reset();
     gaussianBlurShader.reset();
@@ -666,6 +633,8 @@ void Simulator::setupShaders() {
     
     shadowMapShader = make_unique<Shader>("shaders/shadowMap.v.glsl", "shaders/shadowMap.f.glsl");
     
+    textRenderShader = make_unique<Shader>("shaders/textRender.v.glsl", "shaders/textRender.f.glsl");
+    
     postProcessShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/postProcess.f.glsl");
     
     bloomShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/bloom.f.glsl");
@@ -746,7 +715,7 @@ void Simulator::setupSimulation() {
     lightCube.generateCube(0.2f);
     cube1.generateCube();
     sphere1.generateSphere();
-    modelTest.loadFile("models/sponza/sponza.obj");
+    modelTest.loadFile("models/backpack/backpack.obj");
     
     // Instancing example.
     /*planetModel.loadFile("models/planet/planet.obj");
@@ -838,8 +807,8 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
     
     glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f));
     //transform = glm::rotate(transform, -glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
-    transform = glm::scale(transform, glm::vec3(0.01f, 0.01f, 0.01f));
-    //transform = glm::scale(transform, glm::vec3(1.4f, 1.4f, 1.4f));
+    //transform = glm::scale(transform, glm::vec3(0.01f, 0.01f, 0.01f));
+    transform = glm::scale(transform, glm::vec3(0.5f, 0.5f, 0.5f));
     shader->setMat4("modelMtx", transform);
     modelTest.draw(*shader);
 }
