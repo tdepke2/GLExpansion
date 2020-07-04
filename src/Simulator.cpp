@@ -1,10 +1,11 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include "Font.h"
 #include "Framebuffer.h"
 #include "Shader.h"
 #include "Simulator.h"
-#include "TextRender.h"
+#include "Text.h"
 #include <cassert>
 #include <chrono>
 #include <iostream>
@@ -18,7 +19,7 @@ Configuration Simulator::config;
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 unordered_map<string, unsigned int> Simulator::loadedTextures;
-unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::lightingPassShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::textRenderShader;
+unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::lightingPassShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::textShader;
 unique_ptr<Shader> Simulator::postProcessShader, Simulator::bloomShader, Simulator::gaussianBlurShader, Simulator::ssaoShader, Simulator::ssaoBlurShader;
 unique_ptr<Framebuffer> Simulator::geometryFBO, Simulator::renderFBO, Simulator::shadowFBO;
 unique_ptr<Framebuffer> Simulator::bloom1FBO, Simulator::bloom2FBO, Simulator::ssaoFBO, Simulator::ssaoBlurFBO;
@@ -48,10 +49,11 @@ int Simulator::start() {
         config.setBloom(true);
         config.setSSAO(true);
         
-        TextRender textRenderOld, textRender;
-        textRender.loadFont("fonts/arial.ttf", 48);
-        textRender.setText("This is sample text");
-        textRenderOld.loadFontOldMethod("fonts/arial.ttf");
+        shared_ptr<Font> font = make_shared<Font>();
+        font->loadFont("fonts/arial.ttf", 20);
+        
+        Text text;
+        text.setFont(font);
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
@@ -264,15 +266,15 @@ int Simulator::start() {
             windowQuad.draw();
             glEnable(GL_DEPTH_TEST);
             
-            glEnable(GL_BLEND);
+            glEnable(GL_BLEND);    // Render text.
             glDisable(GL_DEPTH_TEST);
             glm::mat4 projectionMtx2 = glm::ortho(0.0f, static_cast<float>(windowSize.x), 0.0f, static_cast<float>(windowSize.y));
-            textRenderShader->use();
-            textRenderShader->setMat4("projectionMtx", glm::translate(projectionMtx2, glm::vec3(0.0f, 10.0f, 0.0f)));
-            textRenderShader->setInt("texGlyph", 0);
-            textRenderShader->setVec3("color", glm::vec3(1.0f, 0.0f, 0.0f));
-            textRender.draw();
-            textRenderOld.drawOldMethod("This is sample text", 0.0f, 100.0f, 1.0f);
+            textShader->use();
+            textShader->setMat4("projectionMtx", glm::scale(glm::translate(projectionMtx2, glm::vec3(0.0f, 80.0f, 0.0f)), glm::vec3(1.0f)));
+            textShader->setInt("texFont", 0);
+            textShader->setVec3("color", glm::vec3(1.0f, 0.5f, 0.5f));
+            text.setString("The time is: " + to_string(currentTime));
+            text.draw();
             glDisable(GL_BLEND);
             glEnable(GL_DEPTH_TEST);
             
@@ -301,7 +303,7 @@ int Simulator::start() {
     skyboxShader.reset();
     lampShader.reset();
     shadowMapShader.reset();
-    textRenderShader.reset();
+    textShader.reset();
     postProcessShader.reset();
     bloomShader.reset();
     gaussianBlurShader.reset();
@@ -633,7 +635,7 @@ void Simulator::setupShaders() {
     
     shadowMapShader = make_unique<Shader>("shaders/shadowMap.v.glsl", "shaders/shadowMap.f.glsl");
     
-    textRenderShader = make_unique<Shader>("shaders/textRender.v.glsl", "shaders/textRender.f.glsl");
+    textShader = make_unique<Shader>("shaders/text.v.glsl", "shaders/text.f.glsl");
     
     postProcessShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/postProcess.f.glsl");
     
