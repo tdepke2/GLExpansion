@@ -3,6 +3,7 @@
 
 #include "Font.h"
 #include "Framebuffer.h"
+#include "PerformanceMonitor.h"
 #include "Shader.h"
 #include "Simulator.h"
 #include "Text.h"
@@ -49,11 +50,13 @@ int Simulator::start() {
         config.setBloom(true);
         config.setSSAO(true);
         
-        shared_ptr<Font> font = make_shared<Font>();
-        font->loadFont("fonts/arial.ttf", 20);
+        shared_ptr<Font> arialFont = make_shared<Font>();    // why not combine these two, no reason to reset a font. #####################################################################################
+        arialFont->loadFont("fonts/arial.ttf", 20);
         
         Text text;
-        text.setFont(font);
+        text.setFont(arialFont);
+        
+        PerformanceMonitor monitor("Test", arialFont);
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
@@ -66,6 +69,8 @@ int Simulator::start() {
             double currentTime = glfwGetTime();
             deltaTime = static_cast<float>(currentTime - lastTime);
             lastTime = currentTime;
+            
+            monitor.startGPUTimer();
             
             ++frameCounter;
             if (currentTime - lastFrameTime >= 1.0) {
@@ -273,10 +278,13 @@ int Simulator::start() {
             textShader->setMat4("projectionMtx", glm::scale(glm::translate(projectionMtx2, glm::vec3(0.0f, 80.0f, 0.0f)), glm::vec3(1.0f)));
             textShader->setInt("texFont", 0);
             textShader->setVec3("color", glm::vec3(1.0f, 0.5f, 0.5f));
-            text.setString("The time is: " + to_string(currentTime));
-            text.draw();
+            //text.setString("The time is: " + to_string(currentTime));
+            //text.draw();
+            monitor.draw();
             glDisable(GL_BLEND);
             glEnable(GL_DEPTH_TEST);
+            
+            monitor.stopGPUTimer();
             
             glfwSwapBuffers(window);
             glfwPollEvents();
