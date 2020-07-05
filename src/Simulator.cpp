@@ -633,7 +633,7 @@ void Simulator::setupShaders() {
     geometryNormalMapShader = make_unique<Shader>("shaders/geometryNormalMap.v.glsl", "shaders/geometryNormalMap.f.glsl");
     geometryNormalMapShader->setUniformBlockBinding("ViewProjectionMtx", 0);
     
-    lightingPassShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/lightingPass.f.glsl");
+    lightingPassShader = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/lightingPass.f.glsl");
     
     skyboxShader = make_unique<Shader>("shaders/skybox.v.glsl", "shaders/skybox.f.glsl");
     skyboxShader->setUniformBlockBinding("ViewProjectionMtx", 0);
@@ -641,17 +641,17 @@ void Simulator::setupShaders() {
     lampShader = make_unique<Shader>("shaders/lamp.v.glsl", "shaders/lamp.f.glsl");
     lampShader->setUniformBlockBinding("ViewProjectionMtx", 0);
     
-    shadowMapShader = make_unique<Shader>("shaders/shadowMap.v.glsl", "shaders/shadowMap.f.glsl");
+    shadowMapShader = make_unique<Shader>("shaders/effects/shadowMap.v.glsl", "shaders/effects/shadowMap.f.glsl");
     
-    textShader = make_unique<Shader>("shaders/text.v.glsl", "shaders/text.f.glsl");
+    textShader = make_unique<Shader>("shaders/ui/text.v.glsl", "shaders/ui/text.f.glsl");
     
-    postProcessShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/postProcess.f.glsl");
+    postProcessShader = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/postProcess.f.glsl");
     
-    bloomShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/bloom.f.glsl");
+    bloomShader = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/bloom.f.glsl");
     
-    gaussianBlurShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/gaussianBlur.f.glsl");
+    gaussianBlurShader = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/gaussianBlur.f.glsl");
     
-    ssaoShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/ssao.f.glsl");
+    ssaoShader = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/ssao.f.glsl");
     ssaoShader->setUniformBlockBinding("ViewProjectionMtx", 0);
     ssaoShader->use();
     constexpr unsigned int SSAO_NUM_SAMPLES = 32;
@@ -667,7 +667,7 @@ void Simulator::setupShaders() {
         ssaoShader->setVec3("samples[" + to_string(i) + "]", ssaoSampleKernel[i]);
     }
     
-    ssaoBlurShader = make_unique<Shader>("shaders/postProcess.v.glsl", "shaders/ssaoBlur.f.glsl");
+    ssaoBlurShader = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/ssaoBlur.f.glsl");
 }
 
 void Simulator::setupBuffers() {
