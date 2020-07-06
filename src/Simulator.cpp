@@ -20,7 +20,7 @@ Configuration Simulator::config;
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 unordered_map<string, unsigned int> Simulator::loadedTextures;
-unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::lightingPassShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::textShader;
+unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::lightingPassShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::textShader, Simulator::shapeShader;
 unique_ptr<Shader> Simulator::postProcessShader, Simulator::bloomShader, Simulator::gaussianBlurShader, Simulator::ssaoShader, Simulator::ssaoBlurShader;
 unique_ptr<Framebuffer> Simulator::geometryFBO, Simulator::renderFBO, Simulator::shadowFBO;
 unique_ptr<Framebuffer> Simulator::bloom1FBO, Simulator::bloom2FBO, Simulator::ssaoFBO, Simulator::ssaoBlurFBO;
@@ -271,16 +271,25 @@ int Simulator::start() {
             windowQuad.draw();
             glEnable(GL_DEPTH_TEST);
             
-            glEnable(GL_BLEND);    // Render text.
+            glEnable(GL_BLEND);    // Render GUI.
             glDisable(GL_DEPTH_TEST);
-            glm::mat4 projectionMtx2 = glm::ortho(0.0f, static_cast<float>(windowSize.x), 0.0f, static_cast<float>(windowSize.y));
+            glm::mat4 windowProjectionMtx = glm::ortho(0.0f, static_cast<float>(windowSize.x), 0.0f, static_cast<float>(windowSize.y));
+            shapeShader->use();
+            shapeShader->setMat4("projectionMtx", glm::scale(glm::translate(windowProjectionMtx, glm::vec3(0.0f, 80.0f, 0.0f)), glm::vec3(1.0f)));
+            shapeShader->setInt("tex", 0);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, whiteTexture);
+            shapeShader->setVec4("color", glm::vec4(0.5f, 0.5f, 0.5f, 1.0f));
+            monitor.drawBox();
+            shapeShader->setVec4("color", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+            monitor.drawLine();
             textShader->use();
-            textShader->setMat4("projectionMtx", glm::scale(glm::translate(projectionMtx2, glm::vec3(0.0f, 80.0f, 0.0f)), glm::vec3(1.0f)));
+            textShader->setMat4("projectionMtx", glm::scale(glm::translate(windowProjectionMtx, glm::vec3(0.0f, 80.0f, 0.0f)), glm::vec3(1.0f)));
             textShader->setInt("texFont", 0);
             textShader->setVec3("color", glm::vec3(1.0f, 0.5f, 0.5f));
             //text.setString("The time is: " + to_string(currentTime));
             //text.draw();
-            monitor.draw();
+            monitor.drawText();
             glDisable(GL_BLEND);
             glEnable(GL_DEPTH_TEST);
             
@@ -312,6 +321,7 @@ int Simulator::start() {
     lampShader.reset();
     shadowMapShader.reset();
     textShader.reset();
+    shapeShader.reset();
     postProcessShader.reset();
     bloomShader.reset();
     gaussianBlurShader.reset();
@@ -643,7 +653,9 @@ void Simulator::setupShaders() {
     
     shadowMapShader = make_unique<Shader>("shaders/effects/shadowMap.v.glsl", "shaders/effects/shadowMap.f.glsl");
     
-    textShader = make_unique<Shader>("shaders/ui/text.v.glsl", "shaders/ui/text.f.glsl");
+    textShader = make_unique<Shader>("shaders/ui/shape.v.glsl", "shaders/ui/text.f.glsl");
+    
+    shapeShader = make_unique<Shader>("shaders/ui/shape.v.glsl", "shaders/ui/shape.f.glsl");
     
     postProcessShader = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/postProcess.f.glsl");
     
