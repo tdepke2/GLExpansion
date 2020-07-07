@@ -52,7 +52,7 @@ class Simulator {
     static unique_ptr<Shader> postProcessShader, bloomShader, gaussianBlurShader, ssaoShader, ssaoBlurShader;
     static unique_ptr<Framebuffer> geometryFBO, renderFBO, shadowFBO;
     static unique_ptr<Framebuffer> bloom1FBO, bloom2FBO, ssaoFBO, ssaoBlurFBO;
-    static unsigned int blackTexture, whiteTexture, blueTexture, cubeDiffuseMap, cubeSpecularMap, woodTexture, skyboxCubemap, brickDiffuseMap, brickNormalMap, ssaoNoiseTexture;
+    static unsigned int blackTexture, whiteTexture, blueTexture, cubeDiffuseMap, cubeSpecularMap, woodTexture, skyboxCubemap, brickDiffuseMap, brickNormalMap, ssaoNoiseTexture, monitorGridTexture;
     static unsigned int viewProjectionMtxUBO;
     static Mesh lightCube, cube1, sphere1, windowQuad, skybox;
     static Model modelTest, planetModel, rockModel;

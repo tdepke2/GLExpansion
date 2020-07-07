@@ -4,6 +4,8 @@
 #include <iostream>
 
 Text::Text() {
+    modelMtx = glm::mat4(1.0f);
+    
     glGenVertexArrays(1, &_vertexArrayHandle);
     glBindVertexArray(_vertexArrayHandle);
     glGenBuffers(1, &_vertexBufferHandle);
@@ -78,7 +80,8 @@ void Text::setString(const string& text) {
     }
 }
 
-void Text::draw() const {
+void Text::draw(const Shader* shader, const glm::mat4& modelMtx) const {
+    shader->setMat4("modelMtx", modelMtx * this->modelMtx);
     glBindVertexArray(_vertexArrayHandle);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, _font->getBitmapHandle());

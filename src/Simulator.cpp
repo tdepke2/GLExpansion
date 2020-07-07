@@ -6,7 +6,6 @@
 #include "PerformanceMonitor.h"
 #include "Shader.h"
 #include "Simulator.h"
-#include "Text.h"
 #include <cassert>
 #include <chrono>
 #include <iostream>
@@ -24,7 +23,7 @@ unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::lightingPassSh
 unique_ptr<Shader> Simulator::postProcessShader, Simulator::bloomShader, Simulator::gaussianBlurShader, Simulator::ssaoShader, Simulator::ssaoBlurShader;
 unique_ptr<Framebuffer> Simulator::geometryFBO, Simulator::renderFBO, Simulator::shadowFBO;
 unique_ptr<Framebuffer> Simulator::bloom1FBO, Simulator::bloom2FBO, Simulator::ssaoFBO, Simulator::ssaoBlurFBO;
-unsigned int Simulator::blackTexture, Simulator::whiteTexture, Simulator::blueTexture, Simulator::cubeDiffuseMap, Simulator::cubeSpecularMap, Simulator::woodTexture, Simulator::skyboxCubemap, Simulator::brickDiffuseMap, Simulator::brickNormalMap, Simulator::ssaoNoiseTexture;
+unsigned int Simulator::blackTexture, Simulator::whiteTexture, Simulator::blueTexture, Simulator::cubeDiffuseMap, Simulator::cubeSpecularMap, Simulator::woodTexture, Simulator::skyboxCubemap, Simulator::brickDiffuseMap, Simulator::brickNormalMap, Simulator::ssaoNoiseTexture, Simulator::monitorGridTexture;
 unsigned int Simulator::viewProjectionMtxUBO;
 Mesh Simulator::lightCube, Simulator::cube1, Simulator::sphere1, Simulator::windowQuad, Simulator::skybox;
 Model Simulator::modelTest, Simulator::planetModel, Simulator::rockModel;
@@ -51,12 +50,14 @@ int Simulator::start() {
         config.setSSAO(true);
         
         shared_ptr<Font> arialFont = make_shared<Font>();    // why not combine these two, no reason to reset a font. #####################################################################################
-        arialFont->loadFont("fonts/arial.ttf", 20);
+        arialFont->loadFont("fonts/arial.ttf", 15);
         
-        Text text;
-        text.setFont(arialFont);
-        
-        PerformanceMonitor monitor("Test", arialFont);
+        PerformanceMonitor frameMonitor("FRAME", arialFont);
+        frameMonitor.modelMtx = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+        PerformanceMonitor ssaoMonitor("SSAO", arialFont);
+        ssaoMonitor.modelMtx = glm::translate(glm::mat4(1.0f), glm::vec3(220.0f, 0.0f, 0.0f));
+        PerformanceMonitor bloomMonitor("BLOOM", arialFont);
+        bloomMonitor.modelMtx = glm::translate(glm::mat4(1.0f), glm::vec3(440.0f, 0.0f, 0.0f));
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
@@ -70,7 +71,7 @@ int Simulator::start() {
             deltaTime = static_cast<float>(currentTime - lastTime);
             lastTime = currentTime;
             
-            monitor.startGPUTimer();
+            frameMonitor.startGPUTimer();
             
             ++frameCounter;
             if (currentTime - lastFrameTime >= 1.0) {
@@ -127,6 +128,7 @@ int Simulator::start() {
             renderFBO->bind(GL_DRAW_FRAMEBUFFER);
             glBlitFramebuffer(0, 0, geometryFBO->getBufferSize().x, geometryFBO->getBufferSize().y, 0, 0, renderFBO->getBufferSize().x, renderFBO->getBufferSize().y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
             
+            ssaoMonitor.startGPUTimer();
             if (config.getSSAO()) {
                 ssaoFBO->bind();    // Render SSAO texture.
                 glViewport(0, 0, ssaoFBO->getBufferSize().x, ssaoFBO->getBufferSize().y);
@@ -153,6 +155,7 @@ int Simulator::start() {
                 ssaoFBO->bindTexture(0);
                 windowQuad.draw();
             }
+            ssaoMonitor.stopGPUTimer();
             
             renderFBO->bind();    // Render lighting (lighting pass).
             glViewport(0, 0, renderFBO->getBufferSize().x, renderFBO->getBufferSize().y);
@@ -227,6 +230,7 @@ int Simulator::start() {
             glDepthFunc(GL_LESS);
             glEnable(GL_CULL_FACE);
             
+            bloomMonitor.startGPUTimer();
             if (config.getBloom()) {
                 bloom1FBO->bind();    // Compute bloom texture.
                 glViewport(0, 0, bloom1FBO->getBufferSize().x, bloom1FBO->getBufferSize().y);
@@ -252,6 +256,7 @@ int Simulator::start() {
                     windowQuad.draw();
                 }
             }
+            bloomMonitor.stopGPUTimer();
             
             glBindFramebuffer(GL_FRAMEBUFFER, 0);    // Apply post-processing and render to window.
             glViewport(0, 0, windowSize.x, windowSize.y);
@@ -275,25 +280,34 @@ int Simulator::start() {
             glDisable(GL_DEPTH_TEST);
             glm::mat4 windowProjectionMtx = glm::ortho(0.0f, static_cast<float>(windowSize.x), 0.0f, static_cast<float>(windowSize.y));
             shapeShader->use();
-            shapeShader->setMat4("projectionMtx", glm::scale(glm::translate(windowProjectionMtx, glm::vec3(0.0f, 80.0f, 0.0f)), glm::vec3(1.0f)));
+            textShader->setMat4("projectionMtx", windowProjectionMtx);
             shapeShader->setInt("tex", 0);
+            shapeShader->setVec4("color", glm::vec4(1.0f, 1.0f, 1.0f, 0.7f));
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, whiteTexture);
-            shapeShader->setVec4("color", glm::vec4(0.5f, 0.5f, 0.5f, 1.0f));
-            monitor.drawBox();
+            glBindTexture(GL_TEXTURE_2D, monitorGridTexture);
+            frameMonitor.drawBox(shapeShader.get());
+            ssaoMonitor.drawBox(shapeShader.get());
+            bloomMonitor.drawBox(shapeShader.get());
             shapeShader->setVec4("color", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
-            monitor.drawLine();
+            glBindTexture(GL_TEXTURE_2D, whiteTexture);
+            frameMonitor.drawLine(shapeShader.get());
+            ssaoMonitor.drawLine(shapeShader.get());
+            bloomMonitor.drawLine(shapeShader.get());
             textShader->use();
-            textShader->setMat4("projectionMtx", glm::scale(glm::translate(windowProjectionMtx, glm::vec3(0.0f, 80.0f, 0.0f)), glm::vec3(1.0f)));
+            textShader->setMat4("projectionMtx", windowProjectionMtx);
             textShader->setInt("texFont", 0);
-            textShader->setVec3("color", glm::vec3(1.0f, 0.5f, 0.5f));
-            //text.setString("The time is: " + to_string(currentTime));
-            //text.draw();
-            monitor.drawText();
+            textShader->setVec3("color", glm::vec3(0.8f, 0.8f, 0.8f));
+            frameMonitor.drawText(textShader.get());
+            ssaoMonitor.drawText(textShader.get());
+            bloomMonitor.drawText(textShader.get());
             glDisable(GL_BLEND);
             glEnable(GL_DEPTH_TEST);
             
-            monitor.stopGPUTimer();
+            frameMonitor.stopGPUTimer();
+            
+            frameMonitor.update();    // Monitor update must occur after drawing.
+            ssaoMonitor.update();
+            bloomMonitor.update();
             
             glfwSwapBuffers(window);
             glfwPollEvents();
@@ -619,6 +633,7 @@ void Simulator::setupTextures() {
     skyboxCubemap = loadCubemap("textures/skybox/.jpg", true);
     brickDiffuseMap = loadTexture("textures/grid512.bmp", true);
     brickNormalMap = loadTexture("textures/bricks2_normal.jpg", false);
+    monitorGridTexture = loadTexture("textures/monitorGrid.png", true);
     
     glGenTextures(1, &ssaoNoiseTexture);
     glBindTexture(GL_TEXTURE_2D, ssaoNoiseTexture);
