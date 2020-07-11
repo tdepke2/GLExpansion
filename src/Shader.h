@@ -29,9 +29,15 @@ class Shader {
     void setVec3(const string& name, float x, float y, float z) const;
     void setVec4(const string& name, const glm::vec4& value) const;
     void setVec4(const string& name, float x, float y, float z, float w) const;
+    void setVec2Array(const string& name, unsigned int count, const glm::vec2* valuePtr) const;
+    void setVec3Array(const string& name, unsigned int count, const glm::vec3* valuePtr) const;
+    void setVec4Array(const string& name, unsigned int count, const glm::vec4* valuePtr) const;
     void setMat2(const string& name, const glm::mat2& value) const;
     void setMat3(const string& name, const glm::mat3& value) const;
     void setMat4(const string& name, const glm::mat4& value) const;
+    void setMat2Array(const string& name, unsigned int count, const glm::mat2* valuePtr) const;
+    void setMat3Array(const string& name, unsigned int count, const glm::mat3* valuePtr) const;
+    void setMat4Array(const string& name, unsigned int count, const glm::mat4* valuePtr) const;
     void setUniformBlockBinding(const string& name, unsigned int value) const;
     void use() const;
     

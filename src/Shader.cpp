@@ -112,16 +112,40 @@ void Shader::setVec4(const string& name, float x, float y, float z, float w) con
     glUniform4f(_getUniformLocation(name), x, y, z, w);
 }
 
+void Shader::setVec2Array(const string& name, unsigned int count, const glm::vec2* valuePtr) const {
+    glUniform2fv(_getUniformLocation(name), count, glm::value_ptr(valuePtr[0]));
+}
+
+void Shader::setVec3Array(const string& name, unsigned int count, const glm::vec3* valuePtr) const {
+    glUniform3fv(_getUniformLocation(name), count, glm::value_ptr(valuePtr[0]));
+}
+
+void Shader::setVec4Array(const string& name, unsigned int count, const glm::vec4* valuePtr) const {
+    glUniform4fv(_getUniformLocation(name), count, glm::value_ptr(valuePtr[0]));
+}
+
 void Shader::setMat2(const string& name, const glm::mat2& value) const {
-    glUniformMatrix2fv(_getUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
+    glUniformMatrix2fv(_getUniformLocation(name), 1, false, glm::value_ptr(value));
 }
 
 void Shader::setMat3(const string& name, const glm::mat3& value) const {
-    glUniformMatrix3fv(_getUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
+    glUniformMatrix3fv(_getUniformLocation(name), 1, false, glm::value_ptr(value));
 }
 
 void Shader::setMat4(const string& name, const glm::mat4& value) const {
-    glUniformMatrix4fv(_getUniformLocation(name), 1, GL_FALSE, glm::value_ptr(value));
+    glUniformMatrix4fv(_getUniformLocation(name), 1, false, glm::value_ptr(value));
+}
+
+void Shader::setMat2Array(const string& name, unsigned int count, const glm::mat2* valuePtr) const {
+    glUniformMatrix2fv(_getUniformLocation(name), count, false, glm::value_ptr(valuePtr[0]));
+}
+
+void Shader::setMat3Array(const string& name, unsigned int count, const glm::mat3* valuePtr) const {
+    glUniformMatrix3fv(_getUniformLocation(name), count, false, glm::value_ptr(valuePtr[0]));
+}
+
+void Shader::setMat4Array(const string& name, unsigned int count, const glm::mat4* valuePtr) const {
+    glUniformMatrix4fv(_getUniformLocation(name), count, false, glm::value_ptr(valuePtr[0]));
 }
 
 void Shader::setUniformBlockBinding(const string& name, unsigned int value) const {

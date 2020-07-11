@@ -19,14 +19,14 @@ Configuration Simulator::config;
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 unordered_map<string, unsigned int> Simulator::loadedTextures;
-unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::lightingPassShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::textShader, Simulator::shapeShader;
+unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::geometrySkinningShader, Simulator::lightingPassShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::textShader, Simulator::shapeShader;
 unique_ptr<Shader> Simulator::postProcessShader, Simulator::bloomShader, Simulator::gaussianBlurShader, Simulator::ssaoShader, Simulator::ssaoBlurShader;
 unique_ptr<Framebuffer> Simulator::geometryFBO, Simulator::renderFBO, Simulator::shadowFBO;
 unique_ptr<Framebuffer> Simulator::bloom1FBO, Simulator::bloom2FBO, Simulator::ssaoFBO, Simulator::ssaoBlurFBO;
 unsigned int Simulator::blackTexture, Simulator::whiteTexture, Simulator::blueTexture, Simulator::cubeDiffuseMap, Simulator::cubeSpecularMap, Simulator::woodTexture, Simulator::skyboxCubemap, Simulator::brickDiffuseMap, Simulator::brickNormalMap, Simulator::ssaoNoiseTexture, Simulator::monitorGridTexture;
 unsigned int Simulator::viewProjectionMtxUBO;
 Mesh Simulator::lightCube, Simulator::cube1, Simulator::sphere1, Simulator::windowQuad, Simulator::skybox;
-Model Simulator::modelTest, Simulator::planetModel, Simulator::rockModel;
+ModelRigged Simulator::modelTest;
 bool Simulator::flashlightOn = false, Simulator::sunlightOn = true, Simulator::lampsOn = false, Simulator::test;
 float Simulator::sunT = 0.0f, Simulator::sunSpeed = 1.0f;
 
@@ -59,6 +59,14 @@ int Simulator::start() {
         PerformanceMonitor bloomMonitor("BLOOM", arialFont);
         bloomMonitor.modelMtx = glm::translate(glm::mat4(1.0f), glm::vec3(440.0f, 0.0f, 0.0f));
         
+        vector<glm::mat4> boneTransforms(128);
+        for (size_t i = 0; i < boneTransforms.size(); ++i) {
+            boneTransforms[i] = glm::mat4(1.0f);
+        }
+        
+        geometrySkinningShader->use();
+        geometrySkinningShader->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms.size()), boneTransforms.data());
+        
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
         double lastTime = glfwGetTime();
@@ -86,6 +94,8 @@ int Simulator::start() {
             
             processInput(window, deltaTime);
             sunT += sunSpeed * deltaTime;
+            
+            modelTest.animate(geometrySkinningShader.get(), 0, currentTime, boneTransforms);
             
             constexpr int NUM_LIGHTS = 8;
             glm::vec3 pointLightPositions[4] = {
@@ -330,6 +340,7 @@ int Simulator::start() {
     
     glDeleteBuffers(1, &viewProjectionMtxUBO);    // Clean up allocated resources.
     geometryNormalMapShader.reset();
+    geometrySkinningShader.reset();
     lightingPassShader.reset();
     skyboxShader.reset();
     lampShader.reset();
@@ -658,6 +669,9 @@ void Simulator::setupShaders() {
     geometryNormalMapShader = make_unique<Shader>("shaders/geometryNormalMap.v.glsl", "shaders/geometryNormalMap.f.glsl");
     geometryNormalMapShader->setUniformBlockBinding("ViewProjectionMtx", 0);
     
+    geometrySkinningShader = make_unique<Shader>("shaders/geometrySkinning.v.glsl", "shaders/geometryNormalMap.f.glsl");
+    geometrySkinningShader->setUniformBlockBinding("ViewProjectionMtx", 0);
+    
     lightingPassShader = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/lightingPass.f.glsl");
     
     skyboxShader = make_unique<Shader>("shaders/skybox.v.glsl", "shaders/skybox.f.glsl");
@@ -752,7 +766,8 @@ void Simulator::setupSimulation() {
     lightCube.generateCube(0.2f);
     cube1.generateCube();
     sphere1.generateSphere();
-    modelTest.loadFile("models/backpack/backpack.obj");
+    modelTest.loadFile("models/bob_lamp_update/bob_lamp_update.md5mesh");
+    //modelTest.loadFile("models/spaceship/Intergalactic Spaceship_Blender_2.8_Packed textures.dae");
     
     // Instancing example.
     /*planetModel.loadFile("models/planet/planet.obj");
@@ -841,6 +856,16 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
     glBindTexture(GL_TEXTURE_2D, woodTexture);
     shader->setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(15.0f, 0.2f, 15.0f)));
     cube1.draw();
+    
+    if (!shadowRender) {
+        shader = geometrySkinningShader.get();
+        shader->use();
+        shader->setInt("texDiffuse", 0);
+        shader->setInt("texSpecular", 1);
+        shader->setInt("texNormal", 2);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, blueTexture);
+    }
     
     glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f));
     //transform = glm::rotate(transform, -glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));

@@ -15,6 +15,7 @@ class Shader;
 #include "Configuration.h"
 #include "Mesh.h"
 #include "Model.h"
+#include "ModelRigged.h"
 #include <atomic>
 #include <memory>
 #include <random>
@@ -26,7 +27,13 @@ using namespace std;
 class Simulator {
     public:
     static constexpr float NEAR_PLANE = 0.1f, FAR_PLANE = 100.0f;
-    static constexpr int ATTRIBUTE_LOCATION_V_POSITION = 0, ATTRIBUTE_LOCATION_V_NORMAL = 1, ATTRIBUTE_LOCATION_V_TEX_COORDS = 2, ATTRIBUTE_LOCATION_V_TANGENT = 3, ATTRIBUTE_LOCATION_V_BITANGENT = 4;
+    static constexpr int ATTRIBUTE_LOCATION_V_POSITION = 0;
+    static constexpr int ATTRIBUTE_LOCATION_V_NORMAL = 1;
+    static constexpr int ATTRIBUTE_LOCATION_V_TEX_COORDS = 2;
+    static constexpr int ATTRIBUTE_LOCATION_V_TANGENT = 3;
+    static constexpr int ATTRIBUTE_LOCATION_V_BITANGENT = 4;
+    static constexpr int ATTRIBUTE_LOCATION_V_BONE = 5;
+    static constexpr int ATTRIBUTE_LOCATION_V_WEIGHT = 6;
     
     static int start();
     static float randomFloat(float min = 0.0f, float max = 1.0f);    // Generates a random float between min (inclusive) and max (exclusive).
@@ -48,14 +55,14 @@ class Simulator {
     static glm::ivec2 windowSize;
     static glm::vec2 lastMousePos;
     static unordered_map<string, unsigned int> loadedTextures;
-    static unique_ptr<Shader> geometryNormalMapShader, lightingPassShader, skyboxShader, lampShader, shadowMapShader, textShader, shapeShader;
+    static unique_ptr<Shader> geometryNormalMapShader, geometrySkinningShader, lightingPassShader, skyboxShader, lampShader, shadowMapShader, textShader, shapeShader;
     static unique_ptr<Shader> postProcessShader, bloomShader, gaussianBlurShader, ssaoShader, ssaoBlurShader;
     static unique_ptr<Framebuffer> geometryFBO, renderFBO, shadowFBO;
     static unique_ptr<Framebuffer> bloom1FBO, bloom2FBO, ssaoFBO, ssaoBlurFBO;
     static unsigned int blackTexture, whiteTexture, blueTexture, cubeDiffuseMap, cubeSpecularMap, woodTexture, skyboxCubemap, brickDiffuseMap, brickNormalMap, ssaoNoiseTexture, monitorGridTexture;
     static unsigned int viewProjectionMtxUBO;
     static Mesh lightCube, cube1, sphere1, windowQuad, skybox;
-    static Model modelTest, planetModel, rockModel;
+    static ModelRigged modelTest;
     static bool flashlightOn, sunlightOn, lampsOn, test;
     static float sunT, sunSpeed;
     

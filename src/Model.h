@@ -16,7 +16,7 @@ using namespace std;
 
 class Model {
     public:
-    static constexpr bool VERBOSE_OUTPUT = false;
+    static constexpr bool VERBOSE_OUTPUT = true;
     vector<Mesh> meshes;
     string directoryPath;
     
@@ -29,10 +29,10 @@ class Model {
     void drawInstanced(unsigned int count) const;
     void drawInstanced(const Shader& shader, unsigned int count) const;
     
-    private:
-    void _processNode(aiNode* node, const aiScene* scene, const glm::mat4& transformMtx);
-    Mesh _processMesh(aiMesh* mesh, const aiScene* scene, const glm::mat4& transformMtx);
-    void _loadMaterialTextures(aiMaterial* material, aiTextureType type, const string& uniformName, unsigned int index, vector<Mesh::Texture>& textures);
+    protected:
+    virtual void _processNode(aiNode* node, const aiScene* scene, const glm::mat4& transformMtx);
+    virtual Mesh _processMesh(aiMesh* mesh, const aiScene* scene, const glm::mat4& transformMtx);
+    virtual void _loadMaterialTextures(aiMaterial* material, aiTextureType type, const string& uniformName, unsigned int index, vector<Mesh::Texture>& textures);
 };
 
 #endif
