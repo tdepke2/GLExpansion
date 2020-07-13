@@ -14,7 +14,6 @@ class Shader;
 #include "Camera.h"
 #include "Configuration.h"
 #include "Mesh.h"
-#include "Model.h"
 #include "ModelRigged.h"
 #include <atomic>
 #include <memory>

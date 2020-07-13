@@ -1,5 +1,5 @@
-#ifndef _MESH_H
-#define _MESH_H
+#ifndef MESH_H_
+#define MESH_H_
 
 #include "Shader.h"
 #include <glad/glad.h>
@@ -15,15 +15,29 @@ using namespace std;
 class Mesh {
     public:
     struct Vertex {
-        float x, y, z;       // Position.
-        float nx, ny, nz;    // Normal.
-        float s, t;          // Texture coords.
-        float tx, ty, tz;    // Tangent.
-        float bx, by, bz;    // Bitangent.
+        glm::vec3 pos;    // Position.
+        glm::vec3 norm;    // Normal.
+        glm::vec2 tex;    // Texture coords.
+        glm::vec3 tan;    // Tangent.
+        glm::vec3 bitan;    // Bitangent.
         
         Vertex() {}
-        Vertex(const glm::vec3& p, const glm::vec3& n, const glm::vec2& c) : x(p.x), y(p.y), z(p.z), nx(n.x), ny(n.y), nz(n.z), s(c.s), t(c.t), tx(0.0f), ty(0.0f), tz(0.0f), bx(0.0f), by(0.0f), bz(0.0f) {}
-        Vertex(const glm::vec3& p, const glm::vec3& n, const glm::vec2& c, const glm::vec3& t, const glm::vec3& b) : x(p.x), y(p.y), z(p.z), nx(n.x), ny(n.y), nz(n.z), s(c.s), t(c.t), tx(t.x), ty(t.y), tz(t.z), bx(b.x), by(b.y), bz(b.z) {}
+        Vertex(const glm::vec3& pos, const glm::vec2& tex) : pos(pos), norm(0.0f), tex(tex), tan(0.0f), bitan(0.0f) {}
+        Vertex(const glm::vec3& pos, const glm::vec3& norm, const glm::vec2& tex, const glm::vec3& tan, const glm::vec3& bitan) : pos(pos), norm(norm), tex(tex), tan(tan), bitan(bitan) {}
+    };
+    
+    struct VertexBone {
+        glm::vec3 pos;    // Position.
+        glm::vec3 norm;    // Normal.
+        glm::vec2 tex;    // Texture coords.
+        glm::vec3 tan;    // Tangent.
+        glm::vec3 bitan;    // Bitangent.
+        glm::uvec4 bone;    // Bone ID.
+        glm::vec4 weight;    // Bone weight.
+        
+        VertexBone() {}
+        VertexBone(const glm::vec3& pos, const glm::vec3& norm, const glm::vec2& tex, const glm::vec3& tan, const glm::vec3& bitan) : pos(pos), norm(norm), tex(tex), tan(tan), bitan(bitan), bone(0), weight(0.0f) {}
+        void addBone(unsigned int id, float w);
     };
     
     struct Texture {
@@ -34,13 +48,15 @@ class Mesh {
         Texture(unsigned int handle, unsigned int index) : handle(handle), index(index) {}
     };
     
-    vector<Vertex> vertices;
-    vector<unsigned int> indices;
-    vector<Texture> textures;
+    vector<glm::vec3> vertexPositions_;
+    vector<unsigned int> indices_;
+    vector<Texture> textures_;
     
     Mesh();
     Mesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices);
     Mesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures);
+    Mesh(vector<VertexBone>&& vertices, vector<unsigned int>&& indices);
+    Mesh(vector<VertexBone>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures);
     ~Mesh();
     Mesh(const Mesh& mesh) = delete;
     Mesh& operator=(const Mesh& mesh) = delete;
@@ -48,6 +64,8 @@ class Mesh {
     Mesh& operator=(Mesh&& mesh);
     void generateMesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices);
     void generateMesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures);
+    void generateMesh(vector<VertexBone>&& vertices, vector<unsigned int>&& indices);
+    void generateMesh(vector<VertexBone>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures);
     void generateCube(float sideLength = 1.0f);
     void generateSphere(float radius = 1.0f, int numSectors = 32, int numStacks = 16);
     void applyInstanceBuffer(unsigned int startIndex) const;
@@ -57,7 +75,9 @@ class Mesh {
     void drawInstanced(const Shader& shader, unsigned int count) const;
     
     private:
-    unsigned int _vertexArrayHandle, _vertexBufferHandle, _elementBufferHandle;
+    unsigned int vertexArrayHandle_, vertexBufferHandle_, elementBufferHandle_;
+    
+    void generateBuffers();
 };
 
 #endif

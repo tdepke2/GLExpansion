@@ -2,71 +2,99 @@
 #include "Simulator.h"
 #include <cassert>
 #include <cmath>
+#include <iostream>
 #include <utility>
 
+void Mesh::VertexBone::addBone(unsigned int id, float w) {
+    if (weight.x == 0.0f) {
+        bone.x = id;
+        weight.x = w;
+    } else if (weight.y == 0.0f) {
+        bone.y = id;
+        weight.y = w;
+    } else if (weight.z == 0.0f) {
+        bone.z = id;
+        weight.z = w;
+    } else if (weight.w == 0.0f) {
+        bone.w = id;
+        weight.w = w;
+    } else {
+        cout << "Warn: Vertex with more than four bone attachments not allowed.\n";
+    }
+}
+
 Mesh::Mesh() {
-    _vertexArrayHandle = 0;
-    _vertexBufferHandle = 0;
-    _elementBufferHandle = 0;
+    vertexArrayHandle_ = 0;
+    vertexBufferHandle_ = 0;
+    elementBufferHandle_ = 0;
 }
 
 Mesh::Mesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices) {
-    _vertexArrayHandle = 0;
-    _vertexBufferHandle = 0;
-    _elementBufferHandle = 0;
+    vertexArrayHandle_ = 0;
+    vertexBufferHandle_ = 0;
+    elementBufferHandle_ = 0;
     generateMesh(move(vertices), move(indices));
 }
 
 Mesh::Mesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures) {
-    _vertexArrayHandle = 0;
-    _vertexBufferHandle = 0;
-    _elementBufferHandle = 0;
+    vertexArrayHandle_ = 0;
+    vertexBufferHandle_ = 0;
+    elementBufferHandle_ = 0;
+    generateMesh(move(vertices), move(indices), move(textures));
+}
+
+Mesh::Mesh(vector<VertexBone>&& vertices, vector<unsigned int>&& indices) {
+    vertexArrayHandle_ = 0;
+    vertexBufferHandle_ = 0;
+    elementBufferHandle_ = 0;
+    generateMesh(move(vertices), move(indices));
+}
+
+Mesh::Mesh(vector<VertexBone>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures) {
+    vertexArrayHandle_ = 0;
+    vertexBufferHandle_ = 0;
+    elementBufferHandle_ = 0;
     generateMesh(move(vertices), move(indices), move(textures));
 }
 
 Mesh::~Mesh() {
-    glDeleteVertexArrays(1, &_vertexArrayHandle);
-    glDeleteBuffers(1, &_vertexBufferHandle);
-    glDeleteBuffers(1, &_elementBufferHandle);
+    glDeleteVertexArrays(1, &vertexArrayHandle_);
+    glDeleteBuffers(1, &vertexBufferHandle_);
+    glDeleteBuffers(1, &elementBufferHandle_);
 }
 
-Mesh::Mesh(Mesh&& mesh) : _vertexArrayHandle(mesh._vertexArrayHandle), _vertexBufferHandle(mesh._vertexBufferHandle), _elementBufferHandle(mesh._elementBufferHandle) {
-    vertices = move(mesh.vertices);
-    indices = move(mesh.indices);
-    textures = move(mesh.textures);
-    mesh._vertexArrayHandle = 0;
-    mesh._vertexBufferHandle = 0;
-    mesh._elementBufferHandle = 0;
+Mesh::Mesh(Mesh&& mesh) : vertexArrayHandle_(mesh.vertexArrayHandle_), vertexBufferHandle_(mesh.vertexBufferHandle_), elementBufferHandle_(mesh.elementBufferHandle_) {
+    vertexPositions_ = move(mesh.vertexPositions_);
+    indices_ = move(mesh.indices_);
+    textures_ = move(mesh.textures_);
+    mesh.vertexArrayHandle_ = 0;
+    mesh.vertexBufferHandle_ = 0;
+    mesh.elementBufferHandle_ = 0;
 }
 
 Mesh& Mesh::operator=(Mesh&& mesh) {
-    vertices = move(mesh.vertices);
-    indices = move(mesh.indices);
-    textures = move(mesh.textures);
-    _vertexArrayHandle = mesh._vertexArrayHandle;
-    _vertexBufferHandle = mesh._vertexBufferHandle;
-    _elementBufferHandle = mesh._elementBufferHandle;
-    mesh._vertexArrayHandle = 0;
-    mesh._vertexBufferHandle = 0;
-    mesh._elementBufferHandle = 0;
+    vertexPositions_ = move(mesh.vertexPositions_);
+    indices_ = move(mesh.indices_);
+    textures_ = move(mesh.textures_);
+    vertexArrayHandle_ = mesh.vertexArrayHandle_;
+    vertexBufferHandle_ = mesh.vertexBufferHandle_;
+    elementBufferHandle_ = mesh.elementBufferHandle_;
+    mesh.vertexArrayHandle_ = 0;
+    mesh.vertexBufferHandle_ = 0;
+    mesh.elementBufferHandle_ = 0;
     return *this;
 }
 
 void Mesh::generateMesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices) {
-    assert(_vertexArrayHandle == 0);
-    this->vertices = vertices;
-    this->indices = indices;
+    vertexPositions_.reserve(vertices.size());
+    for (const Vertex& v : vertices) {
+        vertexPositions_.emplace_back(v.pos);
+    }
+    indices_ = indices;
     
-    glGenVertexArrays(1, &_vertexArrayHandle);    // Generate handles for VAO, VBO, and EBO and send data.
-    glBindVertexArray(_vertexArrayHandle);
-    
-    glGenBuffers(1, &_vertexBufferHandle);
-    glBindBuffer(GL_ARRAY_BUFFER, _vertexBufferHandle);
-    glBufferData(GL_ARRAY_BUFFER, this->vertices.size() * sizeof(Vertex), this->vertices.data(), GL_STATIC_DRAW);
-    
-    glGenBuffers(1, &_elementBufferHandle);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _elementBufferHandle);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->indices.size() * sizeof(unsigned int), this->indices.data(), GL_STATIC_DRAW);
+    generateBuffers();    // Generate handles for VAO, VBO, and EBO and send data.
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_.size() * sizeof(unsigned int), indices_.data(), GL_STATIC_DRAW);
     
     glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_POSITION);    // Specify the position and stride for vertices, normals, and tex coords in the array.
     glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_POSITION, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(0));
@@ -82,7 +110,39 @@ void Mesh::generateMesh(vector<Vertex>&& vertices, vector<unsigned int>&& indice
 
 void Mesh::generateMesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures) {
     generateMesh(move(vertices), move(indices));
-    this->textures = textures;
+    textures_ = textures;
+}
+
+void Mesh::generateMesh(vector<VertexBone>&& vertices, vector<unsigned int>&& indices) {
+    vertexPositions_.reserve(vertices.size());
+    for (const VertexBone& v : vertices) {
+        vertexPositions_.emplace_back(v.pos);
+    }
+    indices_ = indices;
+    
+    generateBuffers();    // Generate handles for VAO, VBO, and EBO and send data.
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(VertexBone), vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_.size() * sizeof(unsigned int), indices_.data(), GL_STATIC_DRAW);
+    
+    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_POSITION);    // Specify the position and stride for vertices, normals, and tex coords in the array.
+    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_POSITION, 3, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(0));
+    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_NORMAL);
+    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_NORMAL, 3, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 3));
+    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_TEX_COORDS);
+    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_TEX_COORDS, 2, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 6));
+    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_TANGENT);
+    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_TANGENT, 3, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 8));
+    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_BITANGENT);
+    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_BITANGENT, 3, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 11));
+    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_BONE);
+    glVertexAttribIPointer(Simulator::ATTRIBUTE_LOCATION_V_BONE, 4, GL_UNSIGNED_INT, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 14));
+    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_WEIGHT);
+    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_WEIGHT, 4, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 14 + sizeof(unsigned int) * 4));
+}
+
+void Mesh::generateMesh(vector<VertexBone>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures) {
+    generateMesh(move(vertices), move(indices));
+    textures_ = textures;
 }
 
 void Mesh::generateCube(float sideLength) {
@@ -185,7 +245,7 @@ void Mesh::generateSphere(float radius, int numSectors, int numStacks) {
 }
 
 void Mesh::applyInstanceBuffer(unsigned int startIndex) const {
-    glBindVertexArray(_vertexArrayHandle);
+    glBindVertexArray(vertexArrayHandle_);
     glEnableVertexAttribArray(startIndex);
     glVertexAttribPointer(startIndex, 4, GL_FLOAT, false, 4 * sizeof(glm::vec4), reinterpret_cast<void*>(0));
     glVertexAttribDivisor(startIndex, 1);
@@ -201,27 +261,39 @@ void Mesh::applyInstanceBuffer(unsigned int startIndex) const {
 }
 
 void Mesh::draw() const {
-    glBindVertexArray(_vertexArrayHandle);
-    glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, 0);
+    glBindVertexArray(vertexArrayHandle_);
+    glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices_.size()), GL_UNSIGNED_INT, 0);
 }
 
 void Mesh::draw(const Shader& shader) const {
-    for (unsigned int i = 0; i < textures.size(); ++i) {
-        glActiveTexture(GL_TEXTURE0 + textures[i].index);    // ############################################################# Maybe there is no need to pass a shader?
-        glBindTexture(GL_TEXTURE_2D, textures[i].handle);
+    for (unsigned int i = 0; i < textures_.size(); ++i) {
+        glActiveTexture(GL_TEXTURE0 + textures_[i].index);    // ############################################################# Maybe there is no need to pass a shader?
+        glBindTexture(GL_TEXTURE_2D, textures_[i].handle);
     }
     draw();
 }
 
 void Mesh::drawInstanced(unsigned int count) const {
-    glBindVertexArray(_vertexArrayHandle);
-    glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, 0, count);
+    glBindVertexArray(vertexArrayHandle_);
+    glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(indices_.size()), GL_UNSIGNED_INT, 0, count);
 }
 
 void Mesh::drawInstanced(const Shader& shader, unsigned int count) const {
-    for (unsigned int i = 0; i < textures.size(); ++i) {
-        glActiveTexture(GL_TEXTURE0 + textures[i].index);
-        glBindTexture(GL_TEXTURE_2D, textures[i].handle);
+    for (unsigned int i = 0; i < textures_.size(); ++i) {
+        glActiveTexture(GL_TEXTURE0 + textures_[i].index);
+        glBindTexture(GL_TEXTURE_2D, textures_[i].handle);
     }
     drawInstanced(count);
+}
+
+void Mesh::generateBuffers() {
+    assert(vertexArrayHandle_ == 0);
+    glGenVertexArrays(1, &vertexArrayHandle_);
+    glBindVertexArray(vertexArrayHandle_);
+    
+    glGenBuffers(1, &vertexBufferHandle_);
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBufferHandle_);
+    
+    glGenBuffers(1, &elementBufferHandle_);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBufferHandle_);
 }

@@ -95,7 +95,7 @@ int Simulator::start() {
             processInput(window, deltaTime);
             sunT += sunSpeed * deltaTime;
             
-            modelTest.animate(geometrySkinningShader.get(), 0, currentTime, boneTransforms);
+            modelTest.animate(*geometrySkinningShader, 0, currentTime, boneTransforms);
             
             constexpr int NUM_LIGHTS = 8;
             glm::vec3 pointLightPositions[4] = {
@@ -751,10 +751,10 @@ void Simulator::setupBuffers() {
 
 void Simulator::setupSimulation() {
     vector<Mesh::Vertex> windowQuadVertices = {
-        {{ 1.0f,  1.0f,  0.0f}, { 0.0f,  0.0f,  0.0f}, { 1.0f, 1.0f}},
-        {{-1.0f,  1.0f,  0.0f}, { 0.0f,  0.0f,  0.0f}, { 0.0f, 1.0f}},
-        {{-1.0f, -1.0f,  0.0f}, { 0.0f,  0.0f,  0.0f}, { 0.0f, 0.0f}},
-        {{ 1.0f, -1.0f,  0.0f}, { 0.0f,  0.0f,  0.0f}, { 1.0f, 0.0f}}
+        {{ 1.0f,  1.0f,  0.0f}, { 1.0f, 1.0f}},
+        {{-1.0f,  1.0f,  0.0f}, { 0.0f, 1.0f}},
+        {{-1.0f, -1.0f,  0.0f}, { 0.0f, 0.0f}},
+        {{ 1.0f, -1.0f,  0.0f}, { 1.0f, 0.0f}}
     };
     vector<unsigned int> windowQuadIndices = {
         0, 1, 2, 2, 3, 0
@@ -871,8 +871,8 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
     //transform = glm::rotate(transform, -glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
     //transform = glm::scale(transform, glm::vec3(0.01f, 0.01f, 0.01f));
     transform = glm::scale(transform, glm::vec3(0.5f, 0.5f, 0.5f));
-    shader->setMat4("modelMtx", transform);
-    modelTest.draw(*shader);
+    //shader->setMat4("modelMtx", transform);
+    modelTest.draw(*shader, transform);
 }
 
 void Simulator::processInput(GLFWwindow* window, float deltaTime) {
