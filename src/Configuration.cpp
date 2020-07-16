@@ -3,11 +3,11 @@
 #include <GLFW/glfw3.h>
 
 bool Configuration::getVsync() const {
-    return _vsync;
+    return vsync_;
 }
 
 void Configuration::setVsync(bool state) {
-    _vsync = state;
+    vsync_ = state;
     if (state) {
         glfwSwapInterval(1);    // Update our screen after at least 1 screen refresh.
     } else {
@@ -16,17 +16,17 @@ void Configuration::setVsync(bool state) {
 }
 
 bool Configuration::getBloom() const {
-    return _bloom;
+    return bloom_;
 }
 
 void Configuration::setBloom(bool state) {
-    _bloom = state;
+    bloom_ = state;
 }
 
 bool Configuration::getSSAO() const {
-    return _SSAO;
+    return SSAO_;
 }
 
 void Configuration::setSSAO(bool state) {
-    _SSAO = state;
+    SSAO_ = state;
 }

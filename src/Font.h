@@ -1,5 +1,5 @@
-#ifndef _FONT_H
-#define _FONT_H
+#ifndef FONT_H_
+#define FONT_H_
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -27,11 +27,11 @@ class Font {
     void loadFont(const string& filename, unsigned int fontSize);
     
     private:
-    unsigned int _bitmapHandle;
-    glm::uvec2 _bitmapSize;
-    unordered_map<char, Glyph> _glyphs;
-    glm::uvec2 _glyphSizeMax;
-    float _lineSpacing;
+    unsigned int bitmapHandle_;
+    glm::uvec2 bitmapSize_;
+    unordered_map<char, Glyph> glyphs_;
+    glm::uvec2 glyphSizeMax_;
+    float lineSpacing_;
 };
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef _FRAMEBUFFER_H
-#define _FRAMEBUFFER_H
+#ifndef FRAMEBUFFER_H_
+#define FRAMEBUFFER_H_
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -39,10 +39,10 @@ class Framebuffer {
         RenderbufferData(unsigned int handle, GLenum internalFormat) : handle(handle), internalFormat(internalFormat) {}
     };
     
-    unsigned int _framebufferHandle;
-    glm::ivec2 _bufferSize;
-    vector<TextureData> _textures;
-    vector<RenderbufferData> _renderbuffers;
+    unsigned int framebufferHandle_;
+    glm::ivec2 bufferSize_;
+    vector<TextureData> textures_;
+    vector<RenderbufferData> renderbuffers_;
 };
 
 #endif

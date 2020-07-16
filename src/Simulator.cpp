@@ -53,11 +53,11 @@ int Simulator::start() {
         arialFont->loadFont("fonts/arial.ttf", 15);
         
         PerformanceMonitor frameMonitor("FRAME", arialFont);
-        frameMonitor.modelMtx = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+        frameMonitor.modelMtx_ = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
         PerformanceMonitor ssaoMonitor("SSAO", arialFont);
-        ssaoMonitor.modelMtx = glm::translate(glm::mat4(1.0f), glm::vec3(220.0f, 0.0f, 0.0f));
+        ssaoMonitor.modelMtx_ = glm::translate(glm::mat4(1.0f), glm::vec3(220.0f, 0.0f, 0.0f));
         PerformanceMonitor bloomMonitor("BLOOM", arialFont);
-        bloomMonitor.modelMtx = glm::translate(glm::mat4(1.0f), glm::vec3(440.0f, 0.0f, 0.0f));
+        bloomMonitor.modelMtx_ = glm::translate(glm::mat4(1.0f), glm::vec3(440.0f, 0.0f, 0.0f));
         
         vector<glm::mat4> boneTransforms(128);
         for (size_t i = 0; i < boneTransforms.size(); ++i) {
@@ -121,7 +121,7 @@ int Simulator::start() {
             shadowFBO->bind();    // Render from light source POV for shadows.
             glViewport(0, 0, shadowFBO->getBufferSize().x, shadowFBO->getBufferSize().y);
             glClear(GL_DEPTH_BUFFER_BIT);
-            glm::mat4 lightViewMtx = glm::lookAt(sunPosition + camera.position, camera.position, glm::vec3(0.0f, 1.0f, 0.0f));
+            glm::mat4 lightViewMtx = glm::lookAt(sunPosition + camera.position_, camera.position_, glm::vec3(0.0f, 1.0f, 0.0f));
             glm::mat4 lightProjectionMtx = glm::ortho(-40.0f, 40.0f, -40.0f, 40.0f, 0.1f, 80.0f);
             glDisable(GL_CULL_FACE);
             renderScene(glm::mat4(1.0f), glm::mat4(1.0f), true, lightProjectionMtx * lightViewMtx);
@@ -131,7 +131,7 @@ int Simulator::start() {
             glViewport(0, 0, geometryFBO->getBufferSize().x, geometryFBO->getBufferSize().y);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glm::mat4 viewMtx = camera.getViewMatrix();
-            glm::mat4 projectionMtx = glm::perspective(glm::radians(camera.fov), static_cast<float>(windowSize.x) / windowSize.y, NEAR_PLANE, FAR_PLANE);
+            glm::mat4 projectionMtx = glm::perspective(glm::radians(camera.fov_), static_cast<float>(windowSize.x) / windowSize.y, NEAR_PLANE, FAR_PLANE);
             renderScene(viewMtx, projectionMtx, false, glm::mat4(1.0f));
             
             geometryFBO->bind(GL_READ_FRAMEBUFFER);    // Copy depth buffer over.
@@ -187,8 +187,8 @@ int Simulator::start() {
             lightingPassShader->setVec3("lights[0].diffuse", directionalLightColor * 0.4f);
             lightingPassShader->setVec3("lights[0].specular", directionalLightColor * 0.5f);
             lightingPassShader->setUnsignedInt("lights[1].type", 2);
-            lightingPassShader->setVec3("lights[1].positionViewSpace", viewMtx * glm::vec4(camera.position, 1.0f));
-            lightingPassShader->setVec3("lights[1].directionViewSpace", viewMtx * glm::vec4(camera.front, 0.0f));
+            lightingPassShader->setVec3("lights[1].positionViewSpace", viewMtx * glm::vec4(camera.position_, 1.0f));
+            lightingPassShader->setVec3("lights[1].directionViewSpace", viewMtx * glm::vec4(camera.front_, 0.0f));
             glm::vec3 spotLightColor(1.0f, 1.0f, 1.0f);
             lightingPassShader->setVec3("lights[1].ambient", spotLightColor * 0.0f);
             lightingPassShader->setVec3("lights[1].diffuse", spotLightColor);
@@ -227,7 +227,7 @@ int Simulator::start() {
                 }
             }
             lampShader->setVec3("lightColor", glm::vec3(1.0f, 1.0f, 0.0f));
-            lampShader->setMat4("modelMtx", glm::translate(glm::mat4(1.0f), sunPosition + camera.position));
+            lampShader->setMat4("modelMtx", glm::translate(glm::mat4(1.0f), sunPosition + camera.position_));
             lightCube.draw();
             
             skyboxShader->use();    // Draw the skybox.
@@ -295,21 +295,21 @@ int Simulator::start() {
             shapeShader->setVec4("color", glm::vec4(1.0f, 1.0f, 1.0f, 0.7f));
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, monitorGridTexture);
-            frameMonitor.drawBox(shapeShader.get());
-            ssaoMonitor.drawBox(shapeShader.get());
-            bloomMonitor.drawBox(shapeShader.get());
+            frameMonitor.drawBox(*shapeShader);
+            ssaoMonitor.drawBox(*shapeShader);
+            bloomMonitor.drawBox(*shapeShader);
             shapeShader->setVec4("color", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
             glBindTexture(GL_TEXTURE_2D, whiteTexture);
-            frameMonitor.drawLine(shapeShader.get());
-            ssaoMonitor.drawLine(shapeShader.get());
-            bloomMonitor.drawLine(shapeShader.get());
+            frameMonitor.drawLine(*shapeShader);
+            ssaoMonitor.drawLine(*shapeShader);
+            bloomMonitor.drawLine(*shapeShader);
             textShader->use();
             textShader->setMat4("projectionMtx", windowProjectionMtx);
             textShader->setInt("texFont", 0);
             textShader->setVec3("color", glm::vec3(0.8f, 0.8f, 0.8f));
-            frameMonitor.drawText(textShader.get());
-            ssaoMonitor.drawText(textShader.get());
-            bloomMonitor.drawText(textShader.get());
+            frameMonitor.drawText(*textShader);
+            ssaoMonitor.drawText(*textShader);
+            bloomMonitor.drawText(*textShader);
             glDisable(GL_BLEND);
             glEnable(GL_DEPTH_TEST);
             
@@ -552,10 +552,10 @@ void Simulator::keyCallback(GLFWwindow* window, int key, int scancode, int actio
                 glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
             }
         } else if (key == GLFW_KEY_UP) {
-            camera.moveSpeed *= 2.0f;
+            camera.moveSpeed_ *= 2.0f;
         } else if (key == GLFW_KEY_DOWN) {
-            if (camera.moveSpeed > 0.1f) {
-                camera.moveSpeed /= 2.0f;
+            if (camera.moveSpeed_ > 0.1f) {
+                camera.moveSpeed_ /= 2.0f;
             }
         } else if (key == GLFW_KEY_F) {
             flashlightOn = !flashlightOn;
@@ -767,6 +767,7 @@ void Simulator::setupSimulation() {
     cube1.generateCube();
     sphere1.generateSphere();
     modelTest.loadFile("models/bob_lamp_update/bob_lamp_update.md5mesh");
+    //modelTest.loadFile("models/hellknight/hellknight.md5mesh");
     //modelTest.loadFile("models/spaceship/Intergalactic Spaceship_Blender_2.8_Packed textures.dae");
     
     // Instancing example.
@@ -847,7 +848,7 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         cube1.draw();
     }
     
-    shader->setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), camera.position), glm::vec3(0.4f, 0.4f, 0.4f)));
+    shader->setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), camera.position_), glm::vec3(0.4f, 0.4f, 0.4f)));
     cube1.draw();
     
     glActiveTexture(GL_TEXTURE0);

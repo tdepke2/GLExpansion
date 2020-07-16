@@ -1,5 +1,8 @@
 #include "Mesh.h"
+#include "Shader.h"
 #include "Simulator.h"
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
 #include <cassert>
 #include <cmath>
 #include <iostream>

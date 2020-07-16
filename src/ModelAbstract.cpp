@@ -1,4 +1,5 @@
 #include "ModelAbstract.h"
+#include "Shader.h"
 #include "Simulator.h"
 #include <cassert>
 #include <iostream>
@@ -40,7 +41,7 @@ void ModelAbstract::drawInstanced(const Shader& shader, unsigned int count) cons
 
 const aiScene* ModelAbstract::loadScene(Assimp::Importer* importer, const string& filename) {
     assert(meshes_.empty());
-    if (VERBOSE_OUTPUT) {
+    if (VERBOSE_OUTPUT_) {
         cout << "Loading model \"" << filename << "\".\n";
     }
     const aiScene* scene = importer->ReadFile(filename, aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate | aiProcess_GenSmoothNormals);
@@ -51,7 +52,7 @@ const aiScene* ModelAbstract::loadScene(Assimp::Importer* importer, const string
     }
     directoryPath_ = filename.substr(0, filename.find_last_of('/'));
     
-    if (VERBOSE_OUTPUT) {
+    if (VERBOSE_OUTPUT_) {
         cout << "  Number of animations: " << scene->mNumAnimations << "\n";
         cout << "  Number of cameras:    " << scene->mNumCameras << "\n";
         cout << "  Number of lights:     " << scene->mNumLights << "\n";
@@ -64,14 +65,14 @@ const aiScene* ModelAbstract::loadScene(Assimp::Importer* importer, const string
 }
 
 void ModelAbstract::loadMaterialTextures(aiMaterial* material, aiTextureType type, const string& uniformName, unsigned int index, vector<Mesh::Texture>& textures) {
-    if (VERBOSE_OUTPUT) {
+    if (VERBOSE_OUTPUT_) {
         cout << "      Material " << uniformName << " has " << material->GetTextureCount(type) << " textures:\n";
     }
     //for (unsigned int i = 0; i < material->GetTextureCount(type); ++i) {    // Right now, only the first texture is used :/ #####################################################################################################
     if (material->GetTextureCount(type) > 0) {
         aiString str;
         material->GetTexture(type, 0, &str);
-        if (VERBOSE_OUTPUT) {
+        if (VERBOSE_OUTPUT_) {
             cout << "      \"" << str.C_Str() << "\"\n";
         }
         textures.emplace_back(Simulator::loadTexture(directoryPath_ + "/" + string(str.C_Str()), type == aiTextureType_DIFFUSE), index);
@@ -80,7 +81,7 @@ void ModelAbstract::loadMaterialTextures(aiMaterial* material, aiTextureType typ
 
 template<typename V>
 void ModelAbstract::processMeshAttributes(aiMesh* mesh, const aiScene* scene, vector<V>& vertices, vector<unsigned int>& indices, vector<Mesh::Texture>& textures) {
-    if (VERBOSE_OUTPUT) {
+    if (VERBOSE_OUTPUT_) {
         cout << "    Mesh " << mesh->mName.C_Str() << " has " << mesh->mNumBones << " bones, " << mesh->mNumFaces << " faces, and " << mesh->mNumVertices << " vertices.\n";
     }
     vertices.reserve(mesh->mNumVertices);

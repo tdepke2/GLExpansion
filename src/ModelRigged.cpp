@@ -1,4 +1,5 @@
 #include "ModelRigged.h"
+#include "Shader.h"
 #include "Simulator.h"
 #include <cassert>
 #include <iostream>
@@ -63,14 +64,14 @@ void ModelRigged::loadFile(const string& filename) {
     for (unsigned int i = 0; i < scene->mNumAnimations; ++i) {
         animations_.emplace_back(string(scene->mAnimations[i]->mName.C_Str()), scene->mAnimations[i]->mDuration, (scene->mAnimations[i]->mTicksPerSecond != 0.0 ? scene->mAnimations[i]->mTicksPerSecond : 20.0));
         
-        animations_.back().channels.resize(numNodes_);
+        animations_.back().channels_.resize(numNodes_);
         for (unsigned int j = 0; j < scene->mAnimations[i]->mNumChannels; ++j) {
             const aiNodeAnim* nodeAnim = scene->mAnimations[i]->mChannels[j];
             auto findResult = nodeMapping.find(nodeAnim->mNodeName.C_Str());
             if (findResult == nodeMapping.end()) {
                 cout << "Warn: Animation contains a channel item with no corresponding node name.\n";
             } else {
-                Animation::Channel* channel = &animations_.back().channels[findResult->second];
+                Animation::Channel* channel = &animations_.back().channels_[findResult->second];
                 
                 channel->translationKeys.reserve(nodeAnim->mNumPositionKeys);
                 for (unsigned int k = 0; k < nodeAnim->mNumPositionKeys; ++k) {
@@ -98,7 +99,7 @@ void ModelRigged::loadFile(const string& filename) {
 void ModelRigged::animate(const Shader& shader, unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) {
     boneTransforms.resize(boneOffsetMatrices_.size());
     
-    double animationTime = fmod(time * animations_[animationIndex].ticksPerSecond, animations_[animationIndex].duration);
+    double animationTime = fmod(time * animations_[animationIndex].ticksPerSecond_, animations_[animationIndex].duration_);
     animateNodes(rootNode_, animations_[animationIndex], animationTime, glm::mat4(1.0f), boneTransforms);
     
     shader.use();
@@ -109,7 +110,7 @@ ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, const ai
     glm::mat4 thisTransformMtx = castMat4(node->mTransformation);
     Node* newNode = new Node(parent, string(node->mName.C_Str()), numNodes_, thisTransformMtx);
     ++numNodes_;
-    if (VERBOSE_OUTPUT) {
+    if (VERBOSE_OUTPUT_) {
         cout << "  Node " << node->mName.C_Str() << " has " << node->mNumMeshes << " meshes and " << node->mNumChildren << " children.\n";
         if (thisTransformMtx == glm::mat4(1.0f)) {
             cout << "  Transform: IdentityMtx\n";
@@ -134,7 +135,7 @@ Mesh ModelRigged::processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<
     processMeshAttributes<Mesh::VertexBone>(mesh, scene, vertices, indices, textures);
     
     for (unsigned int i = 0; i < mesh->mNumBones; ++i) {
-        if (VERBOSE_OUTPUT) {
+        if (VERBOSE_OUTPUT_) {
             cout << "      Bone " << mesh->mBones[i]->mName.C_Str() << " has " << mesh->mBones[i]->mNumWeights << " weights.\n";
         }
         unsigned int boneID;
@@ -158,7 +159,7 @@ Mesh ModelRigged::processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<
 
 void ModelRigged::animateNodes(const Node* node, const Animation& animation, double animationTime, const glm::mat4& parentTransform, vector<glm::mat4>& boneTransforms) const {
     glm::mat4 nodeTransform = node->transform;
-    if (animation.channels[node->id].translationKeys.size() > 0) {    // Check if this node has an animation.
+    if (animation.channels_[node->id].translationKeys.size() > 0) {    // Check if this node has an animation.
         nodeTransform = animation.calcChannelTransform(node->id, animationTime);
     }
     

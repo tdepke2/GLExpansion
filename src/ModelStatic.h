@@ -1,7 +1,6 @@
 #ifndef MODEL_STATIC_H_
 #define MODEL_STATIC_H_
 
-#include "Mesh.h"
 #include "ModelAbstract.h"
 
 using namespace std;

@@ -1,13 +1,11 @@
 #ifndef MESH_H_
 #define MESH_H_
 
-#include "Shader.h"
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
+class Shader;
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <string>
 #include <vector>
 
 using namespace std;

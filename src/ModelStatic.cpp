@@ -23,7 +23,7 @@ void ModelStatic::loadFile(const string& filename) {
 
 void ModelStatic::processNode(aiNode* node, const aiScene* scene) {
     glm::mat4 thisTransformMtx = castMat4(node->mTransformation);
-    if (VERBOSE_OUTPUT) {
+    if (VERBOSE_OUTPUT_) {
         cout << "  Node " << node->mName.C_Str() << " has " << node->mNumMeshes << " meshes and " << node->mNumChildren << " children.\n";
         if (thisTransformMtx == glm::mat4(1.0f)) {
             cout << "  Transform: IdentityMtx\n";
@@ -44,7 +44,7 @@ Mesh ModelStatic::processMesh(aiMesh* mesh, const aiScene* scene) {
     vector<Mesh::Vertex> vertices;
     vector<unsigned int> indices;
     vector<Mesh::Texture> textures;
-    processMeshAttributes(mesh, scene, vertices, indices, textures);
+    processMeshAttributes<Mesh::Vertex>(mesh, scene, vertices, indices, textures);
     
     return Mesh(move(vertices), move(indices), move(textures));
 }

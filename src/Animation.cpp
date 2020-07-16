@@ -1,17 +1,17 @@
 #include "Animation.h"
 #include <cassert>
 
-Animation::Animation(const string& name, double duration, double ticksPerSecond) : name(name), duration(duration), ticksPerSecond(ticksPerSecond) {}
+Animation::Animation(const string& name, double duration, double ticksPerSecond) : name_(name), duration_(duration), ticksPerSecond_(ticksPerSecond) {}
 
 glm::mat4 Animation::calcChannelTransform(unsigned int channelIndex, double animationTime) const {
-    glm::mat4 transform = glm::translate(glm::mat4(1.0f), _interpolateVec3Keys(channels[channelIndex].translationKeys, animationTime));
-    transform *= glm::mat4_cast(_interpolateQuatKeys(channels[channelIndex].rotationKeys, animationTime));
-    transform = glm::scale(transform, _interpolateVec3Keys(channels[channelIndex].scalingKeys, animationTime));
+    glm::mat4 transform = glm::translate(glm::mat4(1.0f), interpolateVec3Keys(channels_[channelIndex].translationKeys, animationTime));
+    transform *= glm::mat4_cast(interpolateQuatKeys(channels_[channelIndex].rotationKeys, animationTime));
+    transform = glm::scale(transform, interpolateVec3Keys(channels_[channelIndex].scalingKeys, animationTime));
     
     return transform;
 }
 
-glm::vec3 Animation::_interpolateVec3Keys(const vector<pair<glm::vec3, double>>& keys, double animationTime) const {
+glm::vec3 Animation::interpolateVec3Keys(const vector<pair<glm::vec3, double>>& keys, double animationTime) const {
     if (keys.size() == 1) {
         return keys[0].first;
     }
@@ -30,7 +30,7 @@ glm::vec3 Animation::_interpolateVec3Keys(const vector<pair<glm::vec3, double>>&
     return glm::mix(keys[i].first, keys[i + 1].first, t);
 }
 
-glm::quat Animation::_interpolateQuatKeys(const vector<pair<glm::quat, double>>& keys, double animationTime) const {
+glm::quat Animation::interpolateQuatKeys(const vector<pair<glm::quat, double>>& keys, double animationTime) const {
     if (keys.size() == 1) {
         return keys[0].first;
     }

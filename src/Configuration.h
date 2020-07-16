@@ -1,5 +1,5 @@
-#ifndef _CONFIGURATION_H
-#define _CONFIGURATION_H
+#ifndef CONFIGURATION_H_
+#define CONFIGURATION_H_
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -17,7 +17,7 @@ class Configuration {
     void setSSAO(bool state);
     
     private:
-    bool _vsync, _bloom, _SSAO;
+    bool vsync_, bloom_, SSAO_;
 };
 
 #endif

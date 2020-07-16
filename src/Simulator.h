@@ -1,5 +1,5 @@
-#ifndef _SIMULATOR_H
-#define _SIMULATOR_H
+#ifndef SIMULATOR_H_
+#define SIMULATOR_H_
 
 class Framebuffer;
 class Shader;
@@ -15,6 +15,7 @@ class Shader;
 #include "Configuration.h"
 #include "Mesh.h"
 #include "ModelRigged.h"
+#include "ModelStatic.h"
 #include <atomic>
 #include <memory>
 #include <random>
@@ -47,7 +48,7 @@ class Simulator {
         Uninitialized, Running, Paused, Exiting
     };
     
-    static atomic<State> state;
+    static atomic<State> state;    // Probably best to refactor these to follow trailing underscore style. ####################################################################################################################
     static mt19937 mainRNG;
     static Camera camera;
     static Configuration config;

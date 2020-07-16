@@ -2,7 +2,6 @@
 #define MODEL_RIGGED_H_
 
 #include "Animation.h"
-#include "Mesh.h"
 #include "ModelAbstract.h"
 #include <unordered_map>
 

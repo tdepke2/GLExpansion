@@ -1,6 +1,8 @@
 #ifndef MODEL_ABSTRACT_H_
 #define MODEL_ABSTRACT_H_
 
+class Shader;
+
 #include "Mesh.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -16,7 +18,7 @@ using namespace std;
 
 class ModelAbstract {
     public:
-    static constexpr bool VERBOSE_OUTPUT = true;
+    static constexpr bool VERBOSE_OUTPUT_ = true;
     glm::mat4 modelMtx_;
     vector<Mesh> meshes_;
     string directoryPath_;
@@ -25,7 +27,7 @@ class ModelAbstract {
     virtual ~ModelAbstract();
     virtual void loadFile(const string& filename) = 0;
     void applyInstanceBuffer(unsigned int startIndex) const;
-    void draw() const;    // consider changing this and drawInstanced(unsigned int count) to drawMaterials(const Shader* shader, const glm::mat4& modelMtx) or just delete it #######################################################################################
+    void draw() const;    // consider changing this and drawInstanced(unsigned int count) to drawMaterials(const Shader& shader, const glm::mat4& modelMtx) or just delete it #######################################################################################
     void draw(const Shader& shader, const glm::mat4& modelMtx) const;
     void drawInstanced(unsigned int count) const;
     void drawInstanced(const Shader& shader, unsigned int count) const;

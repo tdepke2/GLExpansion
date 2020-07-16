@@ -1,5 +1,5 @@
-#ifndef _SHADER_H
-#define _SHADER_H
+#ifndef SHADER_H_
+#define SHADER_H_
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -42,10 +42,10 @@ class Shader {
     void use() const;
     
     private:
-    unsigned int _programHandle;
+    unsigned int programHandle_;
     
-    static unsigned int _compileShader(const string& filename, GLenum shaderType);
-    int _getUniformLocation(const string& name) const;
+    static unsigned int compileShader(const string& filename, GLenum shaderType);
+    int getUniformLocation(const string& name) const;
 };
 
 #endif
