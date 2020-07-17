@@ -154,7 +154,7 @@ int Simulator::start() {
                 geometryFBO->bindTexture(1);
                 glActiveTexture(GL_TEXTURE2);
                 glBindTexture(GL_TEXTURE_2D, ssaoNoiseTexture);
-                windowQuad.draw();
+                windowQuad.drawGeometry();
                 
                 ssaoBlurFBO->bind();    // Blur SSAO texture.
                 glViewport(0, 0, ssaoBlurFBO->getBufferSize().x, ssaoBlurFBO->getBufferSize().y);
@@ -163,7 +163,7 @@ int Simulator::start() {
                 ssaoBlurShader->setInt("image", 0);
                 glActiveTexture(GL_TEXTURE0);
                 ssaoFBO->bindTexture(0);
-                windowQuad.draw();
+                windowQuad.drawGeometry();
             }
             ssaoMonitor.stopGPUTimer();
             
@@ -215,20 +215,18 @@ int Simulator::start() {
             }
             glActiveTexture(GL_TEXTURE4);
             shadowFBO->bindTexture(0);
-            windowQuad.draw();
+            windowQuad.drawGeometry();
             glEnable(GL_DEPTH_TEST);
             
             lampShader->use();    // Draw lamps.
             for (int i = 0; i < 4; ++i) {
                 if (lightStates[i + 2] == 1) {
                     lampShader->setVec3("lightColor", pointLightColors[i]);
-                    lampShader->setMat4("modelMtx", glm::translate(glm::mat4(1.0f), pointLightPositions[i]));
-                    lightCube.draw();
+                    lightCube.drawGeometry(*lampShader, glm::translate(glm::mat4(1.0f), pointLightPositions[i]));
                 }
             }
             lampShader->setVec3("lightColor", glm::vec3(1.0f, 1.0f, 0.0f));
-            lampShader->setMat4("modelMtx", glm::translate(glm::mat4(1.0f), sunPosition + camera.position_));
-            lightCube.draw();
+            lightCube.drawGeometry(*lampShader, glm::translate(glm::mat4(1.0f), sunPosition + camera.position_));
             
             skyboxShader->use();    // Draw the skybox.
             glDepthFunc(GL_LEQUAL);
@@ -236,7 +234,7 @@ int Simulator::start() {
             skyboxShader->setInt("skybox", 0);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxCubemap);
-            skybox.draw();
+            skybox.drawGeometry();
             glDepthFunc(GL_LESS);
             glEnable(GL_CULL_FACE);
             
@@ -249,7 +247,7 @@ int Simulator::start() {
                 bloomShader->setInt("image", 0);
                 glActiveTexture(GL_TEXTURE0);
                 renderFBO->bindTexture(0);
-                windowQuad.draw();
+                windowQuad.drawGeometry();
                 
                 gaussianBlurShader->use();    // Apply Gaussian blur to texture.
                 gaussianBlurShader->setInt("image", 0);
@@ -258,12 +256,12 @@ int Simulator::start() {
                     bloom2FBO->bind();    // Draw to bloom 2 framebuffer.
                     gaussianBlurShader->setBool("blurHorizontal", true);
                     bloom1FBO->bindTexture(0);
-                    windowQuad.draw();
+                    windowQuad.drawGeometry();
                     
                     bloom1FBO->bind();    // Draw to bloom 1 framebuffer.
                     gaussianBlurShader->setBool("blurHorizontal", false);
                     bloom2FBO->bindTexture(0);
-                    windowQuad.draw();
+                    windowQuad.drawGeometry();
                 }
             }
             bloomMonitor.stopGPUTimer();
@@ -283,7 +281,7 @@ int Simulator::start() {
                 glActiveTexture(GL_TEXTURE1);
                 bloom1FBO->bindTexture(0);
             }
-            windowQuad.draw();
+            windowQuad.drawGeometry();
             glEnable(GL_DEPTH_TEST);
             
             glEnable(GL_BLEND);    // Render GUI.
@@ -844,19 +842,16 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         glm::mat4 modelMtx = glm::translate(glm::mat4(1.0f), cubePositions[i]);
         float angle = 20.0f * i;
         modelMtx = glm::rotate(modelMtx, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-        shader->setMat4("modelMtx", modelMtx);
-        cube1.draw();
+        cube1.drawGeometry(*shader, modelMtx);
     }
     
-    shader->setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), camera.position_), glm::vec3(0.4f, 0.4f, 0.4f)));
-    cube1.draw();
+    cube1.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), camera.position_), glm::vec3(0.4f, 0.4f, 0.4f)));
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, woodTexture);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, woodTexture);
-    shader->setMat4("modelMtx", glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(15.0f, 0.2f, 15.0f)));
-    cube1.draw();
+    cube1.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(15.0f, 0.2f, 15.0f)));
     
     if (!shadowRender) {
         shader = geometrySkinningShader.get();
@@ -872,7 +867,6 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
     //transform = glm::rotate(transform, -glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
     //transform = glm::scale(transform, glm::vec3(0.01f, 0.01f, 0.01f));
     transform = glm::scale(transform, glm::vec3(0.5f, 0.5f, 0.5f));
-    //shader->setMat4("modelMtx", transform);
     modelTest.draw(*shader, transform);
 }
 

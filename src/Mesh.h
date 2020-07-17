@@ -3,6 +3,7 @@
 
 class Shader;
 
+#include "DrawableInterface.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -10,7 +11,7 @@ class Shader;
 
 using namespace std;
 
-class Mesh {
+class Mesh : public DrawableInterface {
     public:
     struct Vertex {
         glm::vec3 pos;    // Position.
@@ -67,10 +68,11 @@ class Mesh {
     void generateCube(float sideLength = 1.0f);
     void generateSphere(float radius = 1.0f, int numSectors = 32, int numStacks = 16);
     void applyInstanceBuffer(unsigned int startIndex) const;
-    void draw() const;
-    void draw(const Shader& shader) const;
-    void drawInstanced(unsigned int count) const;
+    void draw(const Shader& shader, const glm::mat4& modelMtx) const;
+    void drawGeometry() const;
+    void drawGeometry(const Shader& shader, const glm::mat4& modelMtx) const;
     void drawInstanced(const Shader& shader, unsigned int count) const;
+    void drawGeometryInstanced(const Shader& shader, unsigned int count) const;
     
     private:
     unsigned int vertexArrayHandle_, vertexBufferHandle_, elementBufferHandle_;

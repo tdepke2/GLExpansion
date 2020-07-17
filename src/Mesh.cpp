@@ -263,30 +263,36 @@ void Mesh::applyInstanceBuffer(unsigned int startIndex) const {
     glVertexAttribDivisor(startIndex + 3, 1);
 }
 
-void Mesh::draw() const {
+void Mesh::draw(const Shader& shader, const glm::mat4& modelMtx) const {
+    for (const Texture& t : textures_) {
+        glActiveTexture(GL_TEXTURE0 + t.index);
+        glBindTexture(GL_TEXTURE_2D, t.handle);
+    }
+    drawGeometry(shader, modelMtx);
+}
+
+void Mesh::drawGeometry() const {
     glBindVertexArray(vertexArrayHandle_);
     glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices_.size()), GL_UNSIGNED_INT, 0);
 }
 
-void Mesh::draw(const Shader& shader) const {
-    for (unsigned int i = 0; i < textures_.size(); ++i) {
-        glActiveTexture(GL_TEXTURE0 + textures_[i].index);    // ############################################################# Maybe there is no need to pass a shader?
-        glBindTexture(GL_TEXTURE_2D, textures_[i].handle);
-    }
-    draw();
-}
-
-void Mesh::drawInstanced(unsigned int count) const {
+void Mesh::drawGeometry(const Shader& shader, const glm::mat4& modelMtx) const {
+    shader.setMat4("modelMtx", modelMtx);
     glBindVertexArray(vertexArrayHandle_);
-    glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(indices_.size()), GL_UNSIGNED_INT, 0, count);
+    glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices_.size()), GL_UNSIGNED_INT, 0);
 }
 
 void Mesh::drawInstanced(const Shader& shader, unsigned int count) const {
-    for (unsigned int i = 0; i < textures_.size(); ++i) {
-        glActiveTexture(GL_TEXTURE0 + textures_[i].index);
-        glBindTexture(GL_TEXTURE_2D, textures_[i].handle);
+    for (const Texture& t : textures_) {
+        glActiveTexture(GL_TEXTURE0 + t.index);
+        glBindTexture(GL_TEXTURE_2D, t.handle);
     }
-    drawInstanced(count);
+    drawGeometryInstanced(shader, count);
+}
+
+void Mesh::drawGeometryInstanced(const Shader& shader, unsigned int count) const {
+    glBindVertexArray(vertexArrayHandle_);
+    glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(indices_.size()), GL_UNSIGNED_INT, 0, count);
 }
 
 void Mesh::generateBuffers() {

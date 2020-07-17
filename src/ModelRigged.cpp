@@ -36,12 +36,12 @@ void ModelRigged::loadFile(const string& filename) {
     if (scene == nullptr) {
         return;
     }
-    modelMtx_ = castMat4(scene->mRootNode->mTransformation);
     meshes_.reserve(scene->mNumMeshes);
+    meshTransforms_.reserve(scene->mNumMeshes);
     numNodes_ = 0;
     unordered_map<string, unsigned int> boneMapping;
     globalInverseMtx_ = glm::inverse(castMat4(scene->mRootNode->mTransformation));
-    rootNode_ = processNode(nullptr, scene->mRootNode, scene, boneMapping);
+    rootNode_ = processNode(nullptr, scene->mRootNode, glm::mat4(1.0f), scene, boneMapping);
     
     unordered_map<string, unsigned int> nodeMapping;    // Traverse node hierarchy again to set bone indices.
     stack<Node*> nodeStack;
@@ -106,8 +106,9 @@ void ModelRigged::animate(const Shader& shader, unsigned int animationIndex, dou
     shader.setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms.size()), boneTransforms.data());
 }
 
-ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, const aiScene* scene, unordered_map<string, unsigned int>& boneMapping) {
+ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, unsigned int>& boneMapping) {
     glm::mat4 thisTransformMtx = castMat4(node->mTransformation);
+    combinedTransform *= thisTransformMtx;
     Node* newNode = new Node(parent, string(node->mName.C_Str()), numNodes_, thisTransformMtx);
     ++numNodes_;
     if (VERBOSE_OUTPUT_) {
@@ -121,9 +122,10 @@ ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, const ai
     
     for (unsigned int i = 0; i < node->mNumMeshes; ++i) {    // Process all meshes in this node.
         meshes_.push_back(processMesh(scene->mMeshes[node->mMeshes[i]], scene, boneMapping));
+        meshTransforms_.push_back(combinedTransform);
     }
     for (unsigned int i = 0; i < node->mNumChildren; ++i) {    // Process all child nodes.
-        newNode->children.push_back(processNode(newNode, node->mChildren[i], scene, boneMapping));
+        newNode->children.push_back(processNode(newNode, node->mChildren[i], combinedTransform, scene, boneMapping));
     }
     return newNode;
 }
@@ -157,19 +159,19 @@ Mesh ModelRigged::processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<
     return Mesh(move(vertices), move(indices), move(textures));
 }
 
-void ModelRigged::animateNodes(const Node* node, const Animation& animation, double animationTime, const glm::mat4& parentTransform, vector<glm::mat4>& boneTransforms) const {
+void ModelRigged::animateNodes(const Node* node, const Animation& animation, double animationTime, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const {
     glm::mat4 nodeTransform = node->transform;
     if (animation.channels_[node->id].translationKeys.size() > 0) {    // Check if this node has an animation.
         nodeTransform = animation.calcChannelTransform(node->id, animationTime);
     }
     
-    nodeTransform = parentTransform * nodeTransform;
+    combinedTransform *= nodeTransform;
     
     if (node->boneIndex != -1) {
-        boneTransforms[node->boneIndex] = globalInverseMtx_ * nodeTransform * boneOffsetMatrices_[node->boneIndex];
+        boneTransforms[node->boneIndex] = globalInverseMtx_ * combinedTransform * boneOffsetMatrices_[node->boneIndex];
     }
     
     for (unsigned int i = 0; i < node->children.size(); ++i) {
-        animateNodes(node->children[i], animation, animationTime, nodeTransform, boneTransforms);
+        animateNodes(node->children[i], animation, animationTime, combinedTransform, boneTransforms);
     }
 }

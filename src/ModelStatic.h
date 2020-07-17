@@ -12,7 +12,7 @@ class ModelStatic : public ModelAbstract {
     void loadFile(const string& filename);
     
     private:
-    void processNode(aiNode* node, const aiScene* scene);
+    void processNode(aiNode* node, glm::mat4 combinedTransform, const aiScene* scene);
     Mesh processMesh(aiMesh* mesh, const aiScene* scene);
 };
 

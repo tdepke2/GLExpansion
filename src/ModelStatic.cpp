@@ -16,13 +16,14 @@ void ModelStatic::loadFile(const string& filename) {
     if (scene == nullptr) {
         return;
     }
-    modelMtx_ = castMat4(scene->mRootNode->mTransformation);
     meshes_.reserve(scene->mNumMeshes);
-    processNode(scene->mRootNode, scene);
+    meshTransforms_.reserve(scene->mNumMeshes);
+    processNode(scene->mRootNode, glm::mat4(1.0f), scene);
 }
 
-void ModelStatic::processNode(aiNode* node, const aiScene* scene) {
+void ModelStatic::processNode(aiNode* node, glm::mat4 combinedTransform, const aiScene* scene) {
     glm::mat4 thisTransformMtx = castMat4(node->mTransformation);
+    combinedTransform *= thisTransformMtx;
     if (VERBOSE_OUTPUT_) {
         cout << "  Node " << node->mName.C_Str() << " has " << node->mNumMeshes << " meshes and " << node->mNumChildren << " children.\n";
         if (thisTransformMtx == glm::mat4(1.0f)) {
@@ -34,9 +35,10 @@ void ModelStatic::processNode(aiNode* node, const aiScene* scene) {
     
     for (unsigned int i = 0; i < node->mNumMeshes; ++i) {    // Process all meshes in this node.
         meshes_.push_back(processMesh(scene->mMeshes[node->mMeshes[i]], scene));
+        meshTransforms_.push_back(combinedTransform);
     }
     for (unsigned int i = 0; i < node->mNumChildren; ++i) {    // Process all child nodes.
-        processNode(node->mChildren[i], scene);
+        processNode(node->mChildren[i], combinedTransform, scene);
     }
 }
 

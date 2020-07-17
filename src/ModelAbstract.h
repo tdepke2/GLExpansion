@@ -3,6 +3,7 @@
 
 class Shader;
 
+#include "DrawableInterface.h"
 #include "Mesh.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -16,21 +17,22 @@ class Shader;
 
 using namespace std;
 
-class ModelAbstract {
+class ModelAbstract : public DrawableInterface {
     public:
     static constexpr bool VERBOSE_OUTPUT_ = true;
-    glm::mat4 modelMtx_;
     vector<Mesh> meshes_;
+    vector<glm::mat4> meshTransforms_;
     string directoryPath_;
     
     ModelAbstract();
     virtual ~ModelAbstract();
     virtual void loadFile(const string& filename) = 0;
-    void applyInstanceBuffer(unsigned int startIndex) const;
-    void draw() const;    // consider changing this and drawInstanced(unsigned int count) to drawMaterials(const Shader& shader, const glm::mat4& modelMtx) or just delete it #######################################################################################
-    void draw(const Shader& shader, const glm::mat4& modelMtx) const;
-    void drawInstanced(unsigned int count) const;
-    void drawInstanced(const Shader& shader, unsigned int count) const;
+    virtual void applyInstanceBuffer(unsigned int startIndex) const;
+    virtual void draw(const Shader& shader, const glm::mat4& modelMtx) const;
+    virtual void drawGeometry() const;
+    virtual void drawGeometry(const Shader& shader, const glm::mat4& modelMtx) const;
+    virtual void drawInstanced(const Shader& shader, unsigned int count) const;
+    virtual void drawGeometryInstanced(const Shader& shader, unsigned int count) const;
     
     protected:
     static inline glm::vec3 castVec3(const aiVector3D& v) { return glm::vec3(v.x, v.y, v.z); }

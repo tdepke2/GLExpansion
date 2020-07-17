@@ -33,9 +33,9 @@ class ModelRigged : public ModelAbstract {
     void animate(const Shader& shader, unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms);
     
     private:
-    Node* processNode(Node* parent, aiNode* node, const aiScene* scene, unordered_map<string, unsigned int>& boneMapping);
+    Node* processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, unsigned int>& boneMapping);
     Mesh processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<string, unsigned int>& boneMapping);
-    void animateNodes(const Node* node, const Animation& animation, double animationTime, const glm::mat4& parentTransform, vector<glm::mat4>& boneTransforms) const;
+    void animateNodes(const Node* node, const Animation& animation, double animationTime, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const;
 };
 
 #endif

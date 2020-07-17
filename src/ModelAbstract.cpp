@@ -4,38 +4,43 @@
 #include <cassert>
 #include <iostream>
 
-ModelAbstract::ModelAbstract() : modelMtx_(1.0f) {}
+ModelAbstract::ModelAbstract() {}
 
 ModelAbstract::~ModelAbstract() {}
 
 void ModelAbstract::applyInstanceBuffer(unsigned int startIndex) const {
-    for (size_t i = 0; i < meshes_.size(); ++i) {
-        meshes_[i].applyInstanceBuffer(startIndex);
-    }
-}
-
-void ModelAbstract::draw() const {
-    for (size_t i = 0; i < meshes_.size(); ++i) {
-        meshes_[i].draw();
+    for (const Mesh& m : meshes_) {
+        m.applyInstanceBuffer(startIndex);
     }
 }
 
 void ModelAbstract::draw(const Shader& shader, const glm::mat4& modelMtx) const {
-    shader.setMat4("modelMtx", modelMtx * modelMtx_);
     for (size_t i = 0; i < meshes_.size(); ++i) {
-        meshes_[i].draw(shader);
+        meshes_[i].draw(shader, modelMtx * meshTransforms_[i]);
     }
 }
 
-void ModelAbstract::drawInstanced(unsigned int count) const {
+void ModelAbstract::drawGeometry() const {
+    for (const Mesh& m : meshes_) {
+        m.drawGeometry();
+    }
+}
+
+void ModelAbstract::drawGeometry(const Shader& shader, const glm::mat4& modelMtx) const {
     for (size_t i = 0; i < meshes_.size(); ++i) {
-        meshes_[i].drawInstanced(count);
+        meshes_[i].drawGeometry(shader, modelMtx * meshTransforms_[i]);
     }
 }
 
 void ModelAbstract::drawInstanced(const Shader& shader, unsigned int count) const {
-    for (size_t i = 0; i < meshes_.size(); ++i) {
-        meshes_[i].drawInstanced(shader, count);
+    for (const Mesh& m : meshes_) {
+        m.drawInstanced(shader, count);
+    }
+}
+
+void ModelAbstract::drawGeometryInstanced(const Shader& shader, unsigned int count) const {
+    for (const Mesh& m : meshes_) {
+        m.drawGeometryInstanced(shader, count);
     }
 }
 
