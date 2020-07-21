@@ -27,6 +27,7 @@ unsigned int Simulator::blackTexture, Simulator::whiteTexture, Simulator::blueTe
 unsigned int Simulator::viewProjectionMtxUBO;
 Mesh Simulator::lightCube, Simulator::cube1, Simulator::sphere1, Simulator::windowQuad, Simulator::skybox;
 ModelRigged Simulator::modelTest;
+Transformable Simulator::modelTestTransform;
 bool Simulator::flashlightOn = false, Simulator::sunlightOn = true, Simulator::lampsOn = false, Simulator::test;
 float Simulator::sunT = 0.0f, Simulator::sunSpeed = 1.0f;
 
@@ -66,6 +67,10 @@ int Simulator::start() {
         
         geometrySkinningShader->use();
         geometrySkinningShader->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms.size()), boneTransforms.data());
+        
+        modelTestTransform.setScale(glm::vec3(0.5f, 0.5f, 0.5f));
+        modelTestTransform.setPosition(glm::vec3(0.0f, 0.0f, 2.0f));
+        modelTestTransform.setOrigin(glm::vec3(0.0f, 0.0f, -3.0f));
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
@@ -293,21 +298,21 @@ int Simulator::start() {
             shapeShader->setVec4("color", glm::vec4(1.0f, 1.0f, 1.0f, 0.7f));
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, monitorGridTexture);
-            frameMonitor.drawBox(*shapeShader);
-            ssaoMonitor.drawBox(*shapeShader);
-            bloomMonitor.drawBox(*shapeShader);
+            frameMonitor.drawBox(*shapeShader, glm::mat4(1.0f));
+            ssaoMonitor.drawBox(*shapeShader, glm::mat4(1.0f));
+            bloomMonitor.drawBox(*shapeShader, glm::mat4(1.0f));
             shapeShader->setVec4("color", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
             glBindTexture(GL_TEXTURE_2D, whiteTexture);
-            frameMonitor.drawLine(*shapeShader);
-            ssaoMonitor.drawLine(*shapeShader);
-            bloomMonitor.drawLine(*shapeShader);
+            frameMonitor.drawLine(*shapeShader, glm::mat4(1.0f));
+            ssaoMonitor.drawLine(*shapeShader, glm::mat4(1.0f));
+            bloomMonitor.drawLine(*shapeShader, glm::mat4(1.0f));
             textShader->use();
             textShader->setMat4("projectionMtx", windowProjectionMtx);
             textShader->setInt("texFont", 0);
             textShader->setVec3("color", glm::vec3(0.8f, 0.8f, 0.8f));
-            frameMonitor.drawText(*textShader);
-            ssaoMonitor.drawText(*textShader);
-            bloomMonitor.drawText(*textShader);
+            frameMonitor.drawText(*textShader, glm::mat4(1.0f));
+            ssaoMonitor.drawText(*textShader, glm::mat4(1.0f));
+            bloomMonitor.drawText(*textShader, glm::mat4(1.0f));
             glDisable(GL_BLEND);
             glEnable(GL_DEPTH_TEST);
             
@@ -764,9 +769,9 @@ void Simulator::setupSimulation() {
     lightCube.generateCube(0.2f);
     cube1.generateCube();
     sphere1.generateSphere();
-    modelTest.loadFile("models/bob_lamp_update/bob_lamp_update.md5mesh");
+    //modelTest.loadFile("models/bob_lamp_update/bob_lamp_update.md5mesh");
     //modelTest.loadFile("models/hellknight/hellknight.md5mesh");
-    //modelTest.loadFile("models/spaceship/Intergalactic Spaceship_Blender_2.8_Packed textures.dae");
+    modelTest.loadFile("models/spaceship/Intergalactic Spaceship_Blender_2.8_Packed textures.dae");
     
     // Instancing example.
     /*planetModel.loadFile("models/planet/planet.obj");
@@ -853,7 +858,7 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
     glBindTexture(GL_TEXTURE_2D, woodTexture);
     cube1.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(15.0f, 0.2f, 15.0f)));
     
-    if (!shadowRender) {
+    /*if (!shadowRender) {
         shader = geometrySkinningShader.get();
         shader->use();
         shader->setInt("texDiffuse", 0);
@@ -861,13 +866,13 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         shader->setInt("texNormal", 2);
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, blueTexture);
-    }
+    }*/
     
-    glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f));
+    //glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f));
     //transform = glm::rotate(transform, -glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
     //transform = glm::scale(transform, glm::vec3(0.01f, 0.01f, 0.01f));
-    transform = glm::scale(transform, glm::vec3(0.5f, 0.5f, 0.5f));
-    modelTest.draw(*shader, transform);
+    //transform = glm::scale(transform, glm::vec3(0.5f, 0.5f, 0.5f));
+    modelTest.draw(*shader, modelTestTransform.getTransform());
 }
 
 void Simulator::processInput(GLFWwindow* window, float deltaTime) {
@@ -892,5 +897,24 @@ void Simulator::processInput(GLFWwindow* window, float deltaTime) {
     }
     if (moveDirection != glm::vec3(0.0f, 0.0f, 0.0f)) {
         camera.processKeyboard(glm::normalize(moveDirection), deltaTime);
+    }
+    
+    if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) {
+        modelTestTransform.rotate(glm::vec3(-0.1f, 0.0f, 0.0f));
+    }
+    if (glfwGetKey(window, GLFW_KEY_SEMICOLON) == GLFW_PRESS) {
+        modelTestTransform.rotate(glm::vec3(0.1f, 0.0f, 0.0f));
+    }
+    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS) {
+        modelTestTransform.rotate(glm::vec3(0.0f, 0.1f, 0.0f));
+    }
+    if (glfwGetKey(window, GLFW_KEY_APOSTROPHE) == GLFW_PRESS) {
+        modelTestTransform.rotate(glm::vec3(0.0f, -0.1f, 0.0f));
+    }
+    if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS) {
+        modelTestTransform.rotate(glm::vec3(0.0f, 0.0f, -0.1f));
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT_BRACKET) == GLFW_PRESS) {
+        modelTestTransform.rotate(glm::vec3(0.0f, 0.0f, 0.1f));
     }
 }

@@ -29,9 +29,9 @@ class PerformanceMonitor {
     void startGPUTimer();
     void stopGPUTimer();
     void update();
-    void drawBox(const Shader& shader, const glm::mat4& modelMtx = glm::mat4(1.0f)) const;
-    void drawLine(const Shader& shader, const glm::mat4& modelMtx = glm::mat4(1.0f)) const;
-    void drawText(const Shader& shader, const glm::mat4& modelMtx = glm::mat4(1.0f)) const;
+    void drawBox(const Shader& shader, const glm::mat4& modelMtx) const;
+    void drawLine(const Shader& shader, const glm::mat4& modelMtx) const;
+    void drawText(const Shader& shader, const glm::mat4& modelMtx) const;
     
     private:
     unsigned int boxVAO_, boxVBO_, lineVAO_, lineVBO_;

@@ -16,6 +16,7 @@ class Shader;
 #include "Mesh.h"
 #include "ModelRigged.h"
 #include "ModelStatic.h"
+#include "Transformable.h"
 #include <atomic>
 #include <memory>
 #include <random>
@@ -63,6 +64,7 @@ class Simulator {
     static unsigned int viewProjectionMtxUBO;
     static Mesh lightCube, cube1, sphere1, windowQuad, skybox;
     static ModelRigged modelTest;
+    static Transformable modelTestTransform;
     static bool flashlightOn, sunlightOn, lampsOn, test;
     static float sunT, sunSpeed;
     

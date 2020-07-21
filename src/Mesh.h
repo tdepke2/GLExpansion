@@ -31,7 +31,7 @@ class Mesh : public DrawableInterface {
         glm::vec2 tex;    // Texture coords.
         glm::vec3 tan;    // Tangent.
         glm::vec3 bitan;    // Bitangent.
-        glm::uvec4 bone;    // Bone ID.
+        glm::uvec4 bone;    // Bone ID. // May want to change to uint8_t[4] #######################################################################################################
         glm::vec4 weight;    // Bone weight.
         
         VertexBone() {}

@@ -3,6 +3,7 @@
 
 class Shader;
 
+#include "DrawableInterface.h"
 #include "Font.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -12,7 +13,7 @@ class Shader;
 
 using namespace std;
 
-class Text {
+class Text : public DrawableInterface {
     public:
     glm::mat4 modelMtx_;
     
@@ -21,7 +22,7 @@ class Text {
     void setFont(shared_ptr<Font> font);
     const string& getString() const;
     void setString(const string& text);
-    void draw(const Shader& shader, const glm::mat4& modelMtx = glm::mat4(1.0f)) const;
+    void draw(const Shader& shader, const glm::mat4& modelMtx) const;
     
     private:
     shared_ptr<Font> font_;
