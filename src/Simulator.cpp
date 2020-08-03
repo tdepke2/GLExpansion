@@ -21,7 +21,7 @@ glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 unordered_map<string, unsigned int> Simulator::loadedTextures;
 unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::geometrySkinningShader, Simulator::lightingPassShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::textShader, Simulator::shapeShader;
 unique_ptr<Shader> Simulator::postProcessShader, Simulator::bloomShader, Simulator::gaussianBlurShader, Simulator::ssaoShader, Simulator::ssaoBlurShader;
-unique_ptr<Framebuffer> Simulator::geometryFBO, Simulator::renderFBO, Simulator::shadowFBO;
+unique_ptr<Framebuffer> Simulator::geometryFBO, Simulator::renderFBO, Simulator::cascadedShadowFBO[NUM_CASCADED_SHADOWS];
 unique_ptr<Framebuffer> Simulator::bloom1FBO, Simulator::bloom2FBO, Simulator::ssaoFBO, Simulator::ssaoBlurFBO;
 unsigned int Simulator::blackTexture, Simulator::whiteTexture, Simulator::blueTexture, Simulator::cubeDiffuseMap, Simulator::cubeSpecularMap, Simulator::woodTexture, Simulator::skyboxCubemap, Simulator::brickDiffuseMap, Simulator::brickNormalMap, Simulator::ssaoNoiseTexture, Simulator::monitorGridTexture;
 unsigned int Simulator::viewProjectionMtxUBO;
@@ -67,10 +67,6 @@ int Simulator::start() {
         
         geometrySkinningShader->use();
         geometrySkinningShader->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms.size()), boneTransforms.data());
-        
-        modelTestTransform.setScale(glm::vec3(0.5f, 0.5f, 0.5f));
-        modelTestTransform.setPosition(glm::vec3(0.0f, 0.0f, 2.0f));
-        modelTestTransform.setOrigin(glm::vec3(0.0f, 0.0f, -3.0f));
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
@@ -123,21 +119,65 @@ int Simulator::start() {
             }
             glm::vec3 sunPosition = glm::vec3(glm::rotate(glm::mat4(1.0f), sunT, glm::vec3(1.0f, 1.0f, 1.0f)) * glm::vec4(0.0f, 0.0f, 40.0f, 1.0f));
             
-            shadowFBO->bind();    // Render from light source POV for shadows.
-            glViewport(0, 0, shadowFBO->getBufferSize().x, shadowFBO->getBufferSize().y);
-            glClear(GL_DEPTH_BUFFER_BIT);
-            glm::mat4 lightViewMtx = glm::lookAt(sunPosition + camera.position_, camera.position_, glm::vec3(0.0f, 1.0f, 0.0f));
-            glm::mat4 lightProjectionMtx = glm::ortho(-40.0f, 40.0f, -40.0f, 40.0f, 0.1f, 80.0f);
+            
+            float shadowZBounds[NUM_CASCADED_SHADOWS + 1] = {NEAR_PLANE, 33.0f, 66.0f, FAR_PLANE};
+            glm::mat4 shadowProjections[NUM_CASCADED_SHADOWS];
+            
+            glm::vec2 tanHalfFOV(tan(glm::radians(camera.fov_ / 2.0f)) * (static_cast<float>(windowSize.x) / windowSize.y), tan(glm::radians(camera.fov_ / 2.0f)));
+            glm::mat4 lightViewMtx = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), -sunPosition, glm::vec3(0.0f, 1.0f, 0.0f));    // could get into trouble with lookat using fixed vertical ######################################################################
+            glm::mat4 viewToLightSpace = lightViewMtx * glm::inverse(camera.getViewMatrix());
+            
+            for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {    // Calculate an orthographic projection for each of the cascaded shadow volumes.
+                float xNear = shadowZBounds[i] * tanHalfFOV.x;
+                float xFar = shadowZBounds[i + 1] * tanHalfFOV.x;
+                float yNear = shadowZBounds[i] * tanHalfFOV.y;
+                float yFar = shadowZBounds[i + 1] * tanHalfFOV.y;
+                
+                glm::vec4 frustumCorners[8] = {
+                    { xNear,  yNear, -shadowZBounds[i], 1.0f},
+                    {-xNear,  yNear, -shadowZBounds[i], 1.0f},
+                    { xNear, -yNear, -shadowZBounds[i], 1.0f},
+                    {-xNear, -yNear, -shadowZBounds[i], 1.0f},
+                    
+                    { xFar,  yFar, -shadowZBounds[i + 1], 1.0f},
+                    {-xFar,  yFar, -shadowZBounds[i + 1], 1.0f},
+                    { xFar, -yFar, -shadowZBounds[i + 1], 1.0f},
+                    {-xFar, -yFar, -shadowZBounds[i + 1], 1.0f}
+                };
+                
+                glm::vec3 minBound(numeric_limits<float>::max());
+                glm::vec3 maxBound(numeric_limits<float>::lowest());
+                for (unsigned int j = 0; j < 8; ++j) {
+                    frustumCorners[j] = viewToLightSpace * frustumCorners[j];    // Convert the frustum corner to light space.
+                    
+                    minBound.x = min(minBound.x, frustumCorners[j].x);
+                    minBound.y = min(minBound.y, frustumCorners[j].y);
+                    minBound.z = min(minBound.z, frustumCorners[j].z);
+                    
+                    maxBound.x = max(maxBound.x, frustumCorners[j].x);
+                    maxBound.y = max(maxBound.y, frustumCorners[j].y);
+                    maxBound.z = max(maxBound.z, frustumCorners[j].z);
+                }
+                
+                shadowProjections[i] = glm::ortho(minBound.x, maxBound.x, minBound.y, maxBound.y, -maxBound.z - FAR_PLANE, -minBound.z);
+            }
+            
+            glViewport(0, 0, cascadedShadowFBO[0]->getBufferSize().x, cascadedShadowFBO[0]->getBufferSize().y);
             glDisable(GL_CULL_FACE);
-            renderScene(glm::mat4(1.0f), glm::mat4(1.0f), true, lightProjectionMtx * lightViewMtx);
+            for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {    // Render from light source POV for shadows.
+                cascadedShadowFBO[i]->bind();
+                glClear(GL_DEPTH_BUFFER_BIT);
+                renderScene(lightViewMtx, shadowProjections[i], true);
+            }
             glEnable(GL_CULL_FACE);
+            
             
             geometryFBO->bind();    // Render to geometry buffer (geometry pass).
             glViewport(0, 0, geometryFBO->getBufferSize().x, geometryFBO->getBufferSize().y);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glm::mat4 viewMtx = camera.getViewMatrix();
             glm::mat4 projectionMtx = glm::perspective(glm::radians(camera.fov_), static_cast<float>(windowSize.x) / windowSize.y, NEAR_PLANE, FAR_PLANE);
-            renderScene(viewMtx, projectionMtx, false, glm::mat4(1.0f));
+            renderScene(viewMtx, projectionMtx, false);
             
             geometryFBO->bind(GL_READ_FRAMEBUFFER);    // Copy depth buffer over.
             renderFBO->bind(GL_DRAW_FRAMEBUFFER);
@@ -178,12 +218,27 @@ int Simulator::start() {
             glDisable(GL_DEPTH_TEST);
             lightingPassShader->use();
             lightingPassShader->setInt("texPosition", 0);
+            glActiveTexture(GL_TEXTURE0);
+            geometryFBO->bindTexture(0);
             lightingPassShader->setInt("texNormal", 1);
+            glActiveTexture(GL_TEXTURE1);
+            geometryFBO->bindTexture(1);
             lightingPassShader->setInt("texAlbedoSpec", 2);
+            glActiveTexture(GL_TEXTURE2);
+            geometryFBO->bindTexture(2);
             lightingPassShader->setInt("texSSAO", 3);
-            lightingPassShader->setInt("shadowMap", 4);
+            if (config.getSSAO()) {
+                glActiveTexture(GL_TEXTURE3);
+                ssaoBlurFBO->bindTexture(0);
+            }
+            for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {
+                lightingPassShader->setInt("shadowMap[" + to_string(i) + "]", 4 + i);
+                glActiveTexture(GL_TEXTURE4 + i);
+                cascadedShadowFBO[i]->bindTexture(0);
+                lightingPassShader->setMat4("viewToLightSpace[" + to_string(i) + "]", shadowProjections[i] * viewToLightSpace);
+                lightingPassShader->setFloat("shadowZEnds[" + to_string(i) + "]", shadowZBounds[i + 1]);
+            }
             lightingPassShader->setBool("applySSAO", config.getSSAO());
-            lightingPassShader->setMat4("viewToLightSpaceMtx", lightProjectionMtx * lightViewMtx * inverse(viewMtx));
             lightingPassShader->setUnsignedIntArray("lightStates", NUM_LIGHTS, lightStates);
             lightingPassShader->setUnsignedInt("lights[0].type", 0);
             lightingPassShader->setVec3("lights[0].directionViewSpace", viewMtx * glm::vec4(-sunPosition, 0.0f));
@@ -208,18 +263,6 @@ int Simulator::start() {
                 lightingPassShader->setVec3("lights[" + to_string(i + 2) + "].specular", pointLightColors[i]);
                 lightingPassShader->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", glm::vec3(1.0f, 0.09f, 0.032f));
             }
-            glActiveTexture(GL_TEXTURE0);
-            geometryFBO->bindTexture(0);
-            glActiveTexture(GL_TEXTURE1);
-            geometryFBO->bindTexture(1);
-            glActiveTexture(GL_TEXTURE2);
-            geometryFBO->bindTexture(2);
-            if (config.getSSAO()) {
-                glActiveTexture(GL_TEXTURE3);
-                ssaoBlurFBO->bindTexture(0);
-            }
-            glActiveTexture(GL_TEXTURE4);
-            shadowFBO->bindTexture(0);
             windowQuad.drawGeometry();
             glEnable(GL_DEPTH_TEST);
             
@@ -358,7 +401,9 @@ int Simulator::start() {
     
     geometryFBO.reset();
     renderFBO.reset();
-    shadowFBO.reset();
+    for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {
+        cascadedShadowFBO[i].reset();
+    }
     bloom1FBO.reset();
     bloom2FBO.reset();
     ssaoFBO.reset();
@@ -683,7 +728,7 @@ void Simulator::setupShaders() {
     lampShader = make_unique<Shader>("shaders/lamp.v.glsl", "shaders/lamp.f.glsl");
     lampShader->setUniformBlockBinding("ViewProjectionMtx", 0);
     
-    shadowMapShader = make_unique<Shader>("shaders/effects/shadowMap.v.glsl", "shaders/effects/shadowMap.f.glsl");
+    shadowMapShader = make_unique<Shader>("shaders/shadowMap.v.glsl", "shaders/shadowMap.f.glsl");
     
     textShader = make_unique<Shader>("shaders/ui/shape.v.glsl", "shaders/ui/text.f.glsl");
     
@@ -728,12 +773,14 @@ void Simulator::setupBuffers() {
     renderFBO->attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT);    // May want GL_DEPTH_STENCIL_ATTACHMENT, GL_DEPTH24_STENCIL8 in future #######################################################################
     renderFBO->validate();
     
-    shadowFBO = make_unique<Framebuffer>(glm::ivec2(2048, 2048));
-    shadowFBO->attachTexture(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, GL_NEAREST, GL_CLAMP_TO_BORDER, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
-    shadowFBO->bind();
-    glDrawBuffer(GL_NONE);    // Disable color rendering.
-    glReadBuffer(GL_NONE);
-    shadowFBO->validate();
+    for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {
+        cascadedShadowFBO[i] = make_unique<Framebuffer>(glm::ivec2(2048, 2048));
+        cascadedShadowFBO[i]->attachTexture(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_BORDER, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+        cascadedShadowFBO[i]->bind();
+        glDrawBuffer(GL_NONE);    // Disable color rendering.
+        glReadBuffer(GL_NONE);
+        cascadedShadowFBO[i]->validate();
+    }
     
     bloom1FBO = make_unique<Framebuffer>(windowSize);
     bloom1FBO->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
@@ -769,9 +816,11 @@ void Simulator::setupSimulation() {
     lightCube.generateCube(0.2f);
     cube1.generateCube();
     sphere1.generateSphere();
-    //modelTest.loadFile("models/bob_lamp_update/bob_lamp_update.md5mesh");
+    modelTest.loadFile("models/bob_lamp_update/bob_lamp_update.md5mesh");
     //modelTest.loadFile("models/hellknight/hellknight.md5mesh");
-    modelTest.loadFile("models/spaceship/Intergalactic Spaceship_Blender_2.8_Packed textures.dae");
+    //modelTest.loadFile("models/spaceship/Intergalactic Spaceship_Blender_2.8_Packed textures.dae");
+    modelTestTransform.setScale(glm::vec3(0.5f, 0.5f, 0.5f));
+    modelTestTransform.setPosition(glm::vec3(0.0f, -2.9f, 2.0f));
     
     // Instancing example.
     /*planetModel.loadFile("models/planet/planet.obj");
@@ -805,12 +854,12 @@ void Simulator::nextTick(GLFWwindow* window) {
     
 }
 
-void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender, const glm::mat4& lightSpaceMtx) {
+void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender) {
     Shader* shader;
     if (shadowRender) {
         shader = shadowMapShader.get();
         shader->use();
-        shader->setMat4("lightSpaceMtx", lightSpaceMtx);
+        shader->setMat4("lightSpaceMtx", projectionMtx * viewMtx);
     } else {
         glBindBuffer(GL_UNIFORM_BUFFER, viewProjectionMtxUBO);    // Update uniform buffer.
         glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(viewMtx));
@@ -849,6 +898,7 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         modelMtx = glm::rotate(modelMtx, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
         cube1.drawGeometry(*shader, modelMtx);
     }
+    cube1.drawGeometry(*shader, glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, -2.4f, 3.0f)));
     
     cube1.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), camera.position_), glm::vec3(0.4f, 0.4f, 0.4f)));
     
@@ -856,9 +906,9 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
     glBindTexture(GL_TEXTURE_2D, woodTexture);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, woodTexture);
-    cube1.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(15.0f, 0.2f, 15.0f)));
+    cube1.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(150.0f, 0.2f, 150.0f)));
     
-    /*if (!shadowRender) {
+    if (!shadowRender) {
         shader = geometrySkinningShader.get();
         shader->use();
         shader->setInt("texDiffuse", 0);
@@ -866,12 +916,8 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
         shader->setInt("texNormal", 2);
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, blueTexture);
-    }*/
+    }
     
-    //glm::mat4 transform = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 2.0f));
-    //transform = glm::rotate(transform, -glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f));
-    //transform = glm::scale(transform, glm::vec3(0.01f, 0.01f, 0.01f));
-    //transform = glm::scale(transform, glm::vec3(0.5f, 0.5f, 0.5f));
     modelTest.draw(*shader, modelTestTransform.getTransform());
 }
 

@@ -1,9 +1,7 @@
 Additions:
-    * Text class should implement drawable.
     * Add transformable class (used by text and performance monitor).
     * Add ragdoll physics.
     * Add better way to handle animations and transition between them.
-    * Implement CSMs from OGLdev and Microsoft guides.
 
 Fixes:
     * Figure out why DAE/FBX models aren't working (likely a blender issue).

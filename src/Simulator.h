@@ -28,6 +28,7 @@ using namespace std;
 class Simulator {
     public:
     static constexpr float NEAR_PLANE = 0.1f, FAR_PLANE = 100.0f;
+    static constexpr unsigned int NUM_CASCADED_SHADOWS = 3;
     static constexpr int ATTRIBUTE_LOCATION_V_POSITION = 0;
     static constexpr int ATTRIBUTE_LOCATION_V_NORMAL = 1;
     static constexpr int ATTRIBUTE_LOCATION_V_TEX_COORDS = 2;
@@ -58,7 +59,7 @@ class Simulator {
     static unordered_map<string, unsigned int> loadedTextures;
     static unique_ptr<Shader> geometryNormalMapShader, geometrySkinningShader, lightingPassShader, skyboxShader, lampShader, shadowMapShader, textShader, shapeShader;
     static unique_ptr<Shader> postProcessShader, bloomShader, gaussianBlurShader, ssaoShader, ssaoBlurShader;
-    static unique_ptr<Framebuffer> geometryFBO, renderFBO, shadowFBO;
+    static unique_ptr<Framebuffer> geometryFBO, renderFBO, cascadedShadowFBO[NUM_CASCADED_SHADOWS];
     static unique_ptr<Framebuffer> bloom1FBO, bloom2FBO, ssaoFBO, ssaoBlurFBO;
     static unsigned int blackTexture, whiteTexture, blueTexture, cubeDiffuseMap, cubeSpecularMap, woodTexture, skyboxCubemap, brickDiffuseMap, brickNormalMap, ssaoNoiseTexture, monitorGridTexture;
     static unsigned int viewProjectionMtxUBO;
@@ -80,7 +81,7 @@ class Simulator {
     static void setupBuffers();
     static void setupSimulation();
     static void nextTick(GLFWwindow* window);
-    static void renderScene(const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender, const glm::mat4& lightSpaceMtx);
+    static void renderScene(const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender);
     static void processInput(GLFWwindow* window, float deltaTime);
     
     friend class Configuration;
