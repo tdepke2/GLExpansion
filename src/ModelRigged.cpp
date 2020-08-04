@@ -1,5 +1,4 @@
 #include "ModelRigged.h"
-#include "Shader.h"
 #include "Simulator.h"
 #include <cassert>
 #include <iostream>
@@ -96,14 +95,11 @@ void ModelRigged::loadFile(const string& filename) {
     }
 }
 
-void ModelRigged::animate(const Shader& shader, unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) {
+void ModelRigged::animate(unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) {
     boneTransforms.resize(boneOffsetMatrices_.size());
     
     double animationTime = fmod(time * animations_[animationIndex].ticksPerSecond_, animations_[animationIndex].duration_);
     animateNodes(rootNode_, animations_[animationIndex], animationTime, glm::mat4(1.0f), boneTransforms);
-    
-    shader.use();
-    shader.setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms.size()), boneTransforms.data());
 }
 
 ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, unsigned int>& boneMapping) {

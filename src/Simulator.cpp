@@ -14,12 +14,12 @@
 
 atomic<Simulator::State> Simulator::state = {State::Uninitialized};
 mt19937 Simulator::mainRNG;
-Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 14.0f));
 Configuration Simulator::config;
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 unordered_map<string, unsigned int> Simulator::loadedTextures;
-unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::geometrySkinningShader, Simulator::lightingPassShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::textShader, Simulator::shapeShader;
+unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::geometrySkinningShader, Simulator::lightingPassShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::shadowMapSkinningShader, Simulator::textShader, Simulator::shapeShader;
 unique_ptr<Shader> Simulator::postProcessShader, Simulator::bloomShader, Simulator::gaussianBlurShader, Simulator::ssaoShader, Simulator::ssaoBlurShader;
 unique_ptr<Framebuffer> Simulator::geometryFBO, Simulator::renderFBO, Simulator::cascadedShadowFBO[NUM_CASCADED_SHADOWS];
 unique_ptr<Framebuffer> Simulator::bloom1FBO, Simulator::bloom2FBO, Simulator::ssaoFBO, Simulator::ssaoBlurFBO;
@@ -29,7 +29,7 @@ Mesh Simulator::lightCube, Simulator::cube1, Simulator::sphere1, Simulator::wind
 ModelRigged Simulator::modelTest;
 Transformable Simulator::modelTestTransform;
 bool Simulator::flashlightOn = false, Simulator::sunlightOn = true, Simulator::lampsOn = false, Simulator::test;
-float Simulator::sunT = 0.0f, Simulator::sunSpeed = 1.0f;
+float Simulator::sunT = 0.0f, Simulator::sunSpeed = 0.0f;
 
 int Simulator::start() {
     cout << "Initializing setup...\n";
@@ -67,6 +67,8 @@ int Simulator::start() {
         
         geometrySkinningShader->use();
         geometrySkinningShader->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms.size()), boneTransforms.data());
+        shadowMapSkinningShader->use();
+        shadowMapSkinningShader->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms.size()), boneTransforms.data());
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
@@ -96,7 +98,11 @@ int Simulator::start() {
             processInput(window, deltaTime);
             sunT += sunSpeed * deltaTime;
             
-            modelTest.animate(*geometrySkinningShader, 0, currentTime, boneTransforms);
+            modelTest.animate(0, currentTime, boneTransforms);
+            geometrySkinningShader->use();
+            geometrySkinningShader->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms.size()), boneTransforms.data());
+            shadowMapSkinningShader->use();
+            shadowMapSkinningShader->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms.size()), boneTransforms.data());
             
             constexpr int NUM_LIGHTS = 8;
             glm::vec3 pointLightPositions[4] = {
@@ -391,6 +397,7 @@ int Simulator::start() {
     skyboxShader.reset();
     lampShader.reset();
     shadowMapShader.reset();
+    shadowMapSkinningShader.reset();
     textShader.reset();
     shapeShader.reset();
     postProcessShader.reset();
@@ -730,6 +737,8 @@ void Simulator::setupShaders() {
     
     shadowMapShader = make_unique<Shader>("shaders/shadowMap.v.glsl", "shaders/shadowMap.f.glsl");
     
+    shadowMapSkinningShader = make_unique<Shader>("shaders/shadowMapSkinning.v.glsl", "shaders/shadowMap.f.glsl");
+    
     textShader = make_unique<Shader>("shaders/ui/shape.v.glsl", "shaders/ui/text.f.glsl");
     
     shapeShader = make_unique<Shader>("shaders/ui/shape.v.glsl", "shaders/ui/shape.f.glsl");
@@ -908,7 +917,11 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
     glBindTexture(GL_TEXTURE_2D, woodTexture);
     cube1.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(150.0f, 0.2f, 150.0f)));
     
-    if (!shadowRender) {
+    if (shadowRender) {
+        shader = shadowMapSkinningShader.get();
+        shader->use();
+        shader->setMat4("lightSpaceMtx", projectionMtx * viewMtx);
+    } else {
         shader = geometrySkinningShader.get();
         shader->use();
         shader->setInt("texDiffuse", 0);
@@ -919,6 +932,14 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
     }
     
     modelTest.draw(*shader, modelTestTransform.getTransform());
+    for (int i = 0; i < 20; ++i) {
+        modelTest.draw(*shader, glm::translate(modelTestTransform.getTransform(), glm::vec3(i, i, 0.0f)));
+    }
+    for (int i = 0; i < 20; ++i) {
+        modelTest.draw(*shader, glm::translate(modelTestTransform.getTransform(), glm::vec3(-i, i, 0.0f)));
+    }
+    
+    // Before: 
 }
 
 void Simulator::processInput(GLFWwindow* window, float deltaTime) {

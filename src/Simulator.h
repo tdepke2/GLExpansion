@@ -57,7 +57,7 @@ class Simulator {
     static glm::ivec2 windowSize;
     static glm::vec2 lastMousePos;
     static unordered_map<string, unsigned int> loadedTextures;
-    static unique_ptr<Shader> geometryNormalMapShader, geometrySkinningShader, lightingPassShader, skyboxShader, lampShader, shadowMapShader, textShader, shapeShader;
+    static unique_ptr<Shader> geometryNormalMapShader, geometrySkinningShader, lightingPassShader, skyboxShader, lampShader, shadowMapShader, shadowMapSkinningShader, textShader, shapeShader;
     static unique_ptr<Shader> postProcessShader, bloomShader, gaussianBlurShader, ssaoShader, ssaoBlurShader;
     static unique_ptr<Framebuffer> geometryFBO, renderFBO, cascadedShadowFBO[NUM_CASCADED_SHADOWS];
     static unique_ptr<Framebuffer> bloom1FBO, bloom2FBO, ssaoFBO, ssaoBlurFBO;
