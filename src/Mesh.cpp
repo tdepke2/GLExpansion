@@ -8,18 +8,18 @@
 #include <iostream>
 #include <utility>
 
-void Mesh::VertexBone::addBone(unsigned int id, float w) {
+void Mesh::VertexBone::addBone(uint8_t id, float w) {
     if (weight.x == 0.0f) {
-        bone.x = id;
+        bone |= static_cast<uint32_t>(id);
         weight.x = w;
     } else if (weight.y == 0.0f) {
-        bone.y = id;
+        bone |= static_cast<uint32_t>(id) << 8;
         weight.y = w;
     } else if (weight.z == 0.0f) {
-        bone.z = id;
+        bone |= static_cast<uint32_t>(id) << 16;
         weight.z = w;
     } else if (weight.w == 0.0f) {
-        bone.w = id;
+        bone |= static_cast<uint32_t>(id) << 24;
         weight.w = w;
     } else {
         cout << "Warn: Vertex with more than four bone attachments not allowed.\n";
@@ -138,9 +138,9 @@ void Mesh::generateMesh(vector<VertexBone>&& vertices, vector<unsigned int>&& in
     glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_BITANGENT);
     glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_BITANGENT, 3, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 11));
     glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_BONE);
-    glVertexAttribIPointer(Simulator::ATTRIBUTE_LOCATION_V_BONE, 4, GL_UNSIGNED_INT, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 14));
+    glVertexAttribIPointer(Simulator::ATTRIBUTE_LOCATION_V_BONE, 1, GL_UNSIGNED_INT, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 14));
     glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_WEIGHT);
-    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_WEIGHT, 4, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 14 + sizeof(unsigned int) * 4));
+    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_WEIGHT, 4, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 14 + sizeof(unsigned int)));
 }
 
 void Mesh::generateMesh(vector<VertexBone>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures) {

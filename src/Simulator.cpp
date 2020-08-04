@@ -14,7 +14,7 @@
 
 atomic<Simulator::State> Simulator::state = {State::Uninitialized};
 mt19937 Simulator::mainRNG;
-Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 14.0f));
+Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 3.0f));
 Configuration Simulator::config;
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
@@ -29,7 +29,7 @@ Mesh Simulator::lightCube, Simulator::cube1, Simulator::sphere1, Simulator::wind
 ModelRigged Simulator::modelTest;
 Transformable Simulator::modelTestTransform;
 bool Simulator::flashlightOn = false, Simulator::sunlightOn = true, Simulator::lampsOn = false, Simulator::test;
-float Simulator::sunT = 0.0f, Simulator::sunSpeed = 0.0f;
+float Simulator::sunT = 0.0f, Simulator::sunSpeed = 1.0f;
 
 int Simulator::start() {
     cout << "Initializing setup...\n";
@@ -932,14 +932,6 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
     }
     
     modelTest.draw(*shader, modelTestTransform.getTransform());
-    for (int i = 0; i < 20; ++i) {
-        modelTest.draw(*shader, glm::translate(modelTestTransform.getTransform(), glm::vec3(i, i, 0.0f)));
-    }
-    for (int i = 0; i < 20; ++i) {
-        modelTest.draw(*shader, glm::translate(modelTestTransform.getTransform(), glm::vec3(-i, i, 0.0f)));
-    }
-    
-    // Before: 
 }
 
 void Simulator::processInput(GLFWwindow* window, float deltaTime) {

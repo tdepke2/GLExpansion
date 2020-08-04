@@ -14,7 +14,7 @@ layout (location = 1) in vec3 vNormal;
 layout (location = 2) in vec2 vTexCoords;
 layout (location = 3) in vec3 vTangent;
 layout (location = 4) in vec3 vBitangent;
-layout (location = 5) in uvec4 vBone;
+layout (location = 5) in uint vBone;
 layout (location = 6) in vec4 vWeight;
 
 out vec3 fPosition;
@@ -22,10 +22,10 @@ out mat3 fTBNMtx;
 out vec2 fTexCoords;
 
 void main() {
-    mat4 boneMtx = boneTransforms[vBone[0]] * vWeight[0];
-    boneMtx +=     boneTransforms[vBone[1]] * vWeight[1];
-    boneMtx +=     boneTransforms[vBone[2]] * vWeight[2];
-    boneMtx +=     boneTransforms[vBone[3]] * vWeight[3];
+    mat4 boneMtx = boneTransforms[vBone & 0xFFu] * vWeight[0];
+    boneMtx +=     boneTransforms[(vBone >> 8) & 0xFFu] * vWeight[1];
+    boneMtx +=     boneTransforms[(vBone >> 16) & 0xFFu] * vWeight[2];
+    boneMtx +=     boneTransforms[(vBone >> 24) & 0xFFu] * vWeight[3];
     
     fPosition = vec3(viewMtx * modelMtx * boneMtx * vec4(vPosition, 1.0));    // Fragment position in view space.
     mat3 normalMtx = transpose(inverse(mat3(viewMtx * modelMtx * boneMtx)));

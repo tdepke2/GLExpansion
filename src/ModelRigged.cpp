@@ -38,7 +38,7 @@ void ModelRigged::loadFile(const string& filename) {
     meshes_.reserve(scene->mNumMeshes);
     meshTransforms_.reserve(scene->mNumMeshes);
     numNodes_ = 0;
-    unordered_map<string, unsigned int> boneMapping;
+    unordered_map<string, uint8_t> boneMapping;
     globalInverseMtx_ = glm::inverse(castMat4(scene->mRootNode->mTransformation));
     rootNode_ = processNode(nullptr, scene->mRootNode, glm::mat4(1.0f), scene, boneMapping);
     
@@ -102,7 +102,7 @@ void ModelRigged::animate(unsigned int animationIndex, double time, vector<glm::
     animateNodes(rootNode_, animations_[animationIndex], animationTime, glm::mat4(1.0f), boneTransforms);
 }
 
-ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, unsigned int>& boneMapping) {
+ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping) {
     glm::mat4 thisTransformMtx = castMat4(node->mTransformation);
     combinedTransform *= thisTransformMtx;
     Node* newNode = new Node(parent, string(node->mName.C_Str()), numNodes_, thisTransformMtx);
@@ -126,7 +126,7 @@ ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, glm::mat
     return newNode;
 }
 
-Mesh ModelRigged::processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<string, unsigned int>& boneMapping) {
+Mesh ModelRigged::processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping) {
     vector<Mesh::VertexBone> vertices;
     vector<unsigned int> indices;
     vector<Mesh::Texture> textures;
@@ -136,11 +136,11 @@ Mesh ModelRigged::processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<
         if (VERBOSE_OUTPUT_) {
             cout << "      Bone " << mesh->mBones[i]->mName.C_Str() << " has " << mesh->mBones[i]->mNumWeights << " weights.\n";
         }
-        unsigned int boneID;
+        uint8_t boneID;
         string boneName(mesh->mBones[i]->mName.C_Str());
         auto findResult = boneMapping.find(boneName);
         if (findResult == boneMapping.end()) {
-            boneID = static_cast<unsigned int>(boneMapping.size());
+            boneID = static_cast<uint8_t>(boneMapping.size());
             boneMapping[boneName] = boneID;
             boneOffsetMatrices_.push_back(castMat4(mesh->mBones[i]->mOffsetMatrix));
         } else {

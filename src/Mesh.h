@@ -31,12 +31,12 @@ class Mesh : public DrawableInterface {
         glm::vec2 tex;    // Texture coords.
         glm::vec3 tan;    // Tangent.
         glm::vec3 bitan;    // Bitangent.
-        glm::uvec4 bone;    // Bone ID. // May want to change to uint8_t[4] #######################################################################################################
+        uint32_t bone;    // Bone ID.
         glm::vec4 weight;    // Bone weight.
         
         VertexBone() {}
         VertexBone(const glm::vec3& pos, const glm::vec3& norm, const glm::vec2& tex, const glm::vec3& tan, const glm::vec3& bitan) : pos(pos), norm(norm), tex(tex), tan(tan), bitan(bitan), bone(0), weight(0.0f) {}
-        void addBone(unsigned int id, float w);
+        void addBone(uint8_t id, float w);
     };
     
     struct Texture {
