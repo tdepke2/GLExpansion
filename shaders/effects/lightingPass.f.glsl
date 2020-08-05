@@ -11,7 +11,7 @@ uniform sampler2D texNormal;
 uniform sampler2D texAlbedoSpec;
 uniform sampler2D texSSAO;
 uniform bool applySSAO;
-uniform sampler2D shadowMap[NUM_CASCADED_SHADOWS];
+uniform sampler2DShadow shadowMap[NUM_CASCADED_SHADOWS];
 uniform mat4 viewToLightSpace[NUM_CASCADED_SHADOWS];
 uniform float shadowZEnds[NUM_CASCADED_SHADOWS];
 uniform bool lightStates[NUM_LIGHTS];
@@ -33,12 +33,9 @@ in vec2 fTexCoords;
 out vec4 fragColor;
 
 float calculateShadow(vec3 position, vec3 normal, vec3 lightDir) {
-    uint targetIndex = 2u;
-    for (uint i = 0u; i < NUM_CASCADED_SHADOWS; ++i) {
-        if (-position.z <= shadowZEnds[i]) {
-            targetIndex = i;
-            break;
-        }
+    uint targetIndex = 0u;
+    for (uint i = 0u; i < NUM_CASCADED_SHADOWS - 1u; ++i) {
+        targetIndex += (-position.z > shadowZEnds[i]) ? 1u : 0u;
     }
     
     vec4 positionLightSpace = viewToLightSpace[targetIndex] * vec4(position, 1.0);
@@ -48,14 +45,14 @@ float calculateShadow(vec3 position, vec3 normal, vec3 lightDir) {
     if (normalizedDeviceCoords.z > 1.0) {
         brightness = 1.0;
     } else {
-        /*vec2 texelSize = 1.0 / textureSize(shadowMap[targetIndex], 0);    // Apply percentage-closer filtering for softer shadows.
+        vec2 texelSize = 1.0 / textureSize(shadowMap[targetIndex], 0);    // Apply percentage-closer filtering for softer shadows.
         for (int y = -1; y <= 1; ++y) {
             for (int x = -1; x <= 1; ++x) {
-                brightness += normalizedDeviceCoords.z > texture(shadowMap[targetIndex], normalizedDeviceCoords.xy + vec2(x, y) * texelSize).r ? 0.0 : 1.0;
+                brightness += texture(shadowMap[targetIndex], vec3(normalizedDeviceCoords.xy + vec2(x, y) * texelSize, normalizedDeviceCoords.z));
             }
         }
-        brightness /= 9.0;*/
-        brightness = (normalizedDeviceCoords.z > texture(shadowMap[targetIndex], normalizedDeviceCoords.xy).r) ? 0.0 : 1.0;
+        brightness /= 9.0;
+        //brightness = (normalizedDeviceCoords.z > texture(shadowMap[targetIndex], normalizedDeviceCoords.xy).r) ? 0.0 : 1.0;
     }
     return brightness;
 }
@@ -82,18 +79,17 @@ vec3 calculateLight(Light light, vec3 position, vec3 normal, vec3 diffuseColor, 
     } else if (light.type == DIRECTIONAL_LIGHT) {
         lightScalar *= calculateShadow(position, normal, lightDir);
         
-        for (uint i = 0u; i < NUM_CASCADED_SHADOWS; ++i) {
-            if (-position.z <= shadowZEnds[i]) {
-                if (i == 0u) {
-                    tempColor = vec3(1.0, 0.5, 0.5);
-                } else if (i == 1u) {
-                    tempColor = vec3(0.5, 1.0, 0.5);
-                } else if (i == 2u) {
-                    tempColor = vec3(0.5, 0.5, 1.0);
-                }
-                break;
-            }
+        /*uint targetIndex = 0u;
+        for (uint i = 0u; i < NUM_CASCADED_SHADOWS - 1u; ++i) {
+            targetIndex += (-position.z > shadowZEnds[i]) ? 1u : 0u;
         }
+        if (targetIndex == 0u) {
+            tempColor = vec3(1.0, 0.5, 0.5);
+        } else if (targetIndex == 1u) {
+            tempColor = vec3(0.5, 1.0, 0.5);
+        } else if (targetIndex == 2u) {
+            tempColor = vec3(0.5, 0.5, 1.0);
+        }*/
     }
     
     float diffuseScalar = max(dot(normal, lightDir), 0.0);

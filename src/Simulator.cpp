@@ -19,15 +19,16 @@ Configuration Simulator::config;
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
 unordered_map<string, unsigned int> Simulator::loadedTextures;
-unique_ptr<Shader> Simulator::geometryNormalMapShader, Simulator::geometrySkinningShader, Simulator::lightingPassShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::shadowMapSkinningShader, Simulator::textShader, Simulator::shapeShader;
+unique_ptr<Shader> Simulator::geometryShader, Simulator::geometryNormalMapShader, Simulator::geometrySkinningShader, Simulator::lightingPassShader, Simulator::skyboxShader, Simulator::lampShader, Simulator::shadowMapShader, Simulator::shadowMapSkinningShader, Simulator::textShader, Simulator::shapeShader;
 unique_ptr<Shader> Simulator::postProcessShader, Simulator::bloomShader, Simulator::gaussianBlurShader, Simulator::ssaoShader, Simulator::ssaoBlurShader;
 unique_ptr<Framebuffer> Simulator::geometryFBO, Simulator::renderFBO, Simulator::cascadedShadowFBO[NUM_CASCADED_SHADOWS];
 unique_ptr<Framebuffer> Simulator::bloom1FBO, Simulator::bloom2FBO, Simulator::ssaoFBO, Simulator::ssaoBlurFBO;
 unsigned int Simulator::blackTexture, Simulator::whiteTexture, Simulator::blueTexture, Simulator::cubeDiffuseMap, Simulator::cubeSpecularMap, Simulator::woodTexture, Simulator::skyboxCubemap, Simulator::brickDiffuseMap, Simulator::brickNormalMap, Simulator::ssaoNoiseTexture, Simulator::monitorGridTexture;
 unsigned int Simulator::viewProjectionMtxUBO;
 Mesh Simulator::lightCube, Simulator::cube1, Simulator::sphere1, Simulator::windowQuad, Simulator::skybox;
+ModelStatic Simulator::sceneTest;
 ModelRigged Simulator::modelTest;
-Transformable Simulator::modelTestTransform;
+Transformable Simulator::modelTestTransform, Simulator::sceneTestTransform;
 bool Simulator::flashlightOn = false, Simulator::sunlightOn = true, Simulator::lampsOn = false, Simulator::test;
 float Simulator::sunT = 0.0f, Simulator::sunSpeed = 1.0f;
 
@@ -69,6 +70,14 @@ int Simulator::start() {
         geometrySkinningShader->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms.size()), boneTransforms.data());
         shadowMapSkinningShader->use();
         shadowMapSkinningShader->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms.size()), boneTransforms.data());
+        
+        constexpr float SHADOW_BOUND_CORRECTION = 0.8f;
+        float shadowZBounds[NUM_CASCADED_SHADOWS + 1];
+        shadowZBounds[0] = NEAR_PLANE;    // Split points are exponentially distributed with a linear term. https://developer.download.nvidia.com/SDK/10.5/opengl/src/cascaded_shadow_maps/doc/cascaded_shadow_maps.pdf
+        for (unsigned int i = 1; i < NUM_CASCADED_SHADOWS; ++i) {
+            shadowZBounds[i] = SHADOW_BOUND_CORRECTION * NEAR_PLANE * pow(FAR_PLANE / NEAR_PLANE, static_cast<float>(i) / NUM_CASCADED_SHADOWS) + (1.0f - SHADOW_BOUND_CORRECTION) * (NEAR_PLANE + static_cast<float>(i) / NUM_CASCADED_SHADOWS) * (FAR_PLANE - NEAR_PLANE);
+        }
+        shadowZBounds[NUM_CASCADED_SHADOWS] = FAR_PLANE;
         
         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         
@@ -123,12 +132,9 @@ int Simulator::start() {
             for (int i = 0; i < 4; ++i) {
                 lightStates[i + 2] = (lampsOn ? 1u : 0u);
             }
-            glm::vec3 sunPosition = glm::vec3(glm::rotate(glm::mat4(1.0f), sunT, glm::vec3(1.0f, 1.0f, 1.0f)) * glm::vec4(0.0f, 0.0f, 40.0f, 1.0f));
+            glm::vec3 sunPosition = glm::vec3(glm::rotate(glm::mat4(1.0f), sunT, glm::vec3(1.0f, 1.0f, 1.0f)) * glm::vec4(0.0f, 0.0f, FAR_PLANE, 1.0f));
             
-            
-            float shadowZBounds[NUM_CASCADED_SHADOWS + 1] = {NEAR_PLANE, 33.0f, 66.0f, FAR_PLANE};
             glm::mat4 shadowProjections[NUM_CASCADED_SHADOWS];
-            
             glm::vec2 tanHalfFOV(tan(glm::radians(camera.fov_ / 2.0f)) * (static_cast<float>(windowSize.x) / windowSize.y), tan(glm::radians(camera.fov_ / 2.0f)));
             glm::mat4 lightViewMtx = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), -sunPosition, glm::vec3(0.0f, 1.0f, 0.0f));    // could get into trouble with lookat using fixed vertical ######################################################################
             glm::mat4 viewToLightSpace = lightViewMtx * glm::inverse(camera.getViewMatrix());
@@ -280,7 +286,7 @@ int Simulator::start() {
                 }
             }
             lampShader->setVec3("lightColor", glm::vec3(1.0f, 1.0f, 0.0f));
-            lightCube.drawGeometry(*lampShader, glm::translate(glm::mat4(1.0f), sunPosition + camera.position_));
+            lightCube.drawGeometry(*lampShader, glm::scale(glm::translate(glm::mat4(1.0f), sunPosition + camera.position_), glm::vec3(5.0f)));
             
             skyboxShader->use();    // Draw the skybox.
             glDepthFunc(GL_LEQUAL);
@@ -391,6 +397,7 @@ int Simulator::start() {
     }
     
     glDeleteBuffers(1, &viewProjectionMtxUBO);    // Clean up allocated resources.
+    geometryShader.reset();
     geometryNormalMapShader.reset();
     geometrySkinningShader.reset();
     lightingPassShader.reset();
@@ -721,6 +728,9 @@ void Simulator::setupShaders() {
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
     glBindBufferRange(GL_UNIFORM_BUFFER, 0, viewProjectionMtxUBO, 0, 2 * sizeof(glm::mat4));    // Link to binding point 0.
     
+    geometryShader = make_unique<Shader>("shaders/geometry.v.glsl", "shaders/geometry.f.glsl");
+    geometryShader->setUniformBlockBinding("ViewProjectionMtx", 0);
+    
     geometryNormalMapShader = make_unique<Shader>("shaders/geometryNormalMap.v.glsl", "shaders/geometryNormalMap.f.glsl");
     geometryNormalMapShader->setUniformBlockBinding("ViewProjectionMtx", 0);
     
@@ -784,7 +794,10 @@ void Simulator::setupBuffers() {
     
     for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {
         cascadedShadowFBO[i] = make_unique<Framebuffer>(glm::ivec2(2048, 2048));
-        cascadedShadowFBO[i]->attachTexture(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_BORDER, glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+        cascadedShadowFBO[i]->attachTexture(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_FLOAT, GL_LINEAR, GL_CLAMP_TO_EDGE);
+        cascadedShadowFBO[i]->bindTexture(0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
         cascadedShadowFBO[i]->bind();
         glDrawBuffer(GL_NONE);    // Disable color rendering.
         glReadBuffer(GL_NONE);
@@ -825,6 +838,11 @@ void Simulator::setupSimulation() {
     lightCube.generateCube(0.2f);
     cube1.generateCube();
     sphere1.generateSphere();
+    
+    sceneTest.loadFile("models/boot_camp/boot_camp.obj");
+    sceneTestTransform.setScale(glm::vec3(0.05f, 0.05f, 0.05f));
+    sceneTestTransform.setPitchYawRoll(glm::vec3(-glm::pi<float>() / 2.0f, 0.0f, 0.0f));
+    
     modelTest.loadFile("models/bob_lamp_update/bob_lamp_update.md5mesh");
     //modelTest.loadFile("models/hellknight/hellknight.md5mesh");
     //modelTest.loadFile("models/spaceship/Intergalactic Spaceship_Blender_2.8_Packed textures.dae");
@@ -915,7 +933,17 @@ void Simulator::renderScene(const glm::mat4& viewMtx, const glm::mat4& projectio
     glBindTexture(GL_TEXTURE_2D, woodTexture);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, woodTexture);
-    cube1.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(150.0f, 0.2f, 150.0f)));
+    cube1.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(15.0f, 0.2f, 15.0f)));
+    
+    if (!shadowRender) {    // For some reason, lighting does not work properly when geometryNormalMapShader is used with boot_camp.obj, may want to investigate this ###############################################
+        shader = geometryShader.get();
+        shader->use();
+        shader->setInt("texDiffuse", 0);
+        shader->setInt("texSpecular", 1);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, whiteTexture);
+    }
+    sceneTest.draw(*shader, sceneTestTransform.getTransform());
     
     if (shadowRender) {
         shader = shadowMapSkinningShader.get();
