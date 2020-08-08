@@ -14,7 +14,7 @@
 
 atomic<Simulator::State> Simulator::state = {State::Uninitialized};
 mt19937 Simulator::mainRNG;
-Camera Simulator::camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera Simulator::camera(glm::vec3(0.0f, 1.8f, 2.0f));
 Configuration Simulator::config;
 glm::ivec2 Simulator::windowSize(800, 600);
 glm::vec2 Simulator::lastMousePos(windowSize.x / 2.0f, windowSize.y / 2.0f);
@@ -71,9 +71,9 @@ int Simulator::start() {
         shadowMapSkinningShader->use();
         shadowMapSkinningShader->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms.size()), boneTransforms.data());
         
-        constexpr float SHADOW_BOUND_CORRECTION = 0.8f;
+        constexpr float SHADOW_BOUND_CORRECTION = 0.8f;    // Split points are exponentially distributed with a linear term. https://developer.download.nvidia.com/SDK/10.5/opengl/src/cascaded_shadow_maps/doc/cascaded_shadow_maps.pdf
         float shadowZBounds[NUM_CASCADED_SHADOWS + 1];
-        shadowZBounds[0] = NEAR_PLANE;    // Split points are exponentially distributed with a linear term. https://developer.download.nvidia.com/SDK/10.5/opengl/src/cascaded_shadow_maps/doc/cascaded_shadow_maps.pdf
+        shadowZBounds[0] = NEAR_PLANE;
         for (unsigned int i = 1; i < NUM_CASCADED_SHADOWS; ++i) {
             shadowZBounds[i] = SHADOW_BOUND_CORRECTION * NEAR_PLANE * pow(FAR_PLANE / NEAR_PLANE, static_cast<float>(i) / NUM_CASCADED_SHADOWS) + (1.0f - SHADOW_BOUND_CORRECTION) * (NEAR_PLANE + static_cast<float>(i) / NUM_CASCADED_SHADOWS) * (FAR_PLANE - NEAR_PLANE);
         }
@@ -133,10 +133,13 @@ int Simulator::start() {
                 lightStates[i + 2] = (lampsOn ? 1u : 0u);
             }
             glm::vec3 sunPosition = glm::vec3(glm::rotate(glm::mat4(1.0f), sunT, glm::vec3(1.0f, 1.0f, 1.0f)) * glm::vec4(0.0f, 0.0f, FAR_PLANE, 1.0f));
+            if (sunPosition.x == 0.0f && sunPosition.z == 0.0f) {    // Fix edge case when directional light aligns with up vector.
+                sunPosition.x = 0.00001f;
+            }
             
             glm::mat4 shadowProjections[NUM_CASCADED_SHADOWS];
             glm::vec2 tanHalfFOV(tan(glm::radians(camera.fov_ / 2.0f)) * (static_cast<float>(windowSize.x) / windowSize.y), tan(glm::radians(camera.fov_ / 2.0f)));
-            glm::mat4 lightViewMtx = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), -sunPosition, glm::vec3(0.0f, 1.0f, 0.0f));    // could get into trouble with lookat using fixed vertical ######################################################################
+            glm::mat4 lightViewMtx = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), -sunPosition, glm::vec3(0.0f, 1.0f, 0.0f));
             glm::mat4 viewToLightSpace = lightViewMtx * glm::inverse(camera.getViewMatrix());
             
             for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {    // Calculate an orthographic projection for each of the cascaded shadow volumes.
@@ -171,17 +174,18 @@ int Simulator::start() {
                     maxBound.z = max(maxBound.z, frustumCorners[j].z);
                 }
                 
-                shadowProjections[i] = glm::ortho(minBound.x, maxBound.x, minBound.y, maxBound.y, -maxBound.z - FAR_PLANE, -minBound.z);
+                constexpr float NEAR_PLANE_PADDING = FAR_PLANE;    // Extra padding added to near plane to extend the shadow volume behind the camera.
+                shadowProjections[i] = glm::ortho(minBound.x, maxBound.x, minBound.y, maxBound.y, -maxBound.z - NEAR_PLANE_PADDING, -minBound.z);
             }
             
             glViewport(0, 0, cascadedShadowFBO[0]->getBufferSize().x, cascadedShadowFBO[0]->getBufferSize().y);
-            glDisable(GL_CULL_FACE);
-            for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {    // Render from light source POV for shadows.
+            glCullFace(GL_FRONT);
+            for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {    // Render to cascaded shadow maps.
                 cascadedShadowFBO[i]->bind();
                 glClear(GL_DEPTH_BUFFER_BIT);
                 renderScene(lightViewMtx, shadowProjections[i], true);
             }
-            glEnable(GL_CULL_FACE);
+            glCullFace(GL_BACK);
             
             
             geometryFBO->bind();    // Render to geometry buffer (geometry pass).
@@ -840,14 +844,14 @@ void Simulator::setupSimulation() {
     sphere1.generateSphere();
     
     sceneTest.loadFile("models/boot_camp/boot_camp.obj");
-    sceneTestTransform.setScale(glm::vec3(0.05f, 0.05f, 0.05f));
+    sceneTestTransform.setScale(glm::vec3(0.025f, 0.025f, 0.025f));
     sceneTestTransform.setPitchYawRoll(glm::vec3(-glm::pi<float>() / 2.0f, 0.0f, 0.0f));
     
     modelTest.loadFile("models/bob_lamp_update/bob_lamp_update.md5mesh");
     //modelTest.loadFile("models/hellknight/hellknight.md5mesh");
     //modelTest.loadFile("models/spaceship/Intergalactic Spaceship_Blender_2.8_Packed textures.dae");
-    modelTestTransform.setScale(glm::vec3(0.5f, 0.5f, 0.5f));
-    modelTestTransform.setPosition(glm::vec3(0.0f, -2.9f, 2.0f));
+    modelTestTransform.setScale(glm::vec3(0.3f));
+    modelTestTransform.setPosition(glm::vec3(0.0f, 0.0f, 2.0f));
     
     // Instancing example.
     /*planetModel.loadFile("models/planet/planet.obj");
