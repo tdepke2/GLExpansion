@@ -1,5 +1,4 @@
 #include "ModelStatic.h"
-#include "Simulator.h"
 #include <cassert>
 #include <iostream>
 #include <utility>

@@ -4,4 +4,3 @@ Additions:
 
 Fixes:
     * Figure out why DAE/FBX models aren't working (likely a blender issue).
-    * Separate singleton class design out into more modules for better structure.

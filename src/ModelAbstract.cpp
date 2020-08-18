@@ -1,6 +1,6 @@
 #include "ModelAbstract.h"
+#include "Renderer.h"
 #include "Shader.h"
-#include "Simulator.h"
 #include <cassert>
 #include <iostream>
 
@@ -80,7 +80,7 @@ void ModelAbstract::loadMaterialTextures(aiMaterial* material, aiTextureType typ
         if (VERBOSE_OUTPUT_) {
             cout << "      \"" << str.C_Str() << "\"\n";
         }
-        textures.emplace_back(Simulator::loadTexture(directoryPath_ + "/" + string(str.C_Str()), type == aiTextureType_DIFFUSE), index);
+        textures.emplace_back(Renderer::loadTexture(directoryPath_ + "/" + string(str.C_Str()), type == aiTextureType_DIFFUSE), index);
     }
 }
 

@@ -1,5 +1,4 @@
 #include "ModelRigged.h"
-#include "Simulator.h"
 #include <cassert>
 #include <iostream>
 #include <stack>
@@ -95,7 +94,7 @@ void ModelRigged::loadFile(const string& filename) {
     }
 }
 
-void ModelRigged::animate(unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) {
+void ModelRigged::animate(unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) const {
     boneTransforms.resize(boneOffsetMatrices_.size());
     
     double animationTime = fmod(time * animations_[animationIndex].ticksPerSecond_, animations_[animationIndex].duration_);

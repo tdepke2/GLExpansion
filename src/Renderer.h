@@ -1,0 +1,114 @@
+#ifndef RENDERER_H_
+#define RENDERER_H_
+
+class Framebuffer;
+class PerformanceMonitor;
+class Shader;
+class World;
+
+#include <glad/glad.h>    // OpenGL includes.
+#include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#define glCheckError() Renderer::glCheckError_(__FILE__, __LINE__)
+
+#include "Camera.h"
+#include "Configuration.h"
+#include "Event.h"
+#include "Mesh.h"
+#include <atomic>
+#include <memory>
+#include <queue>
+#include <random>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+using namespace std;
+
+class Renderer {
+    public:
+    enum State {
+        Uninitialized, Running, Paused, Exiting
+    };
+    
+    static constexpr float NEAR_PLANE = 0.1f, FAR_PLANE = 100.0f;
+    static constexpr unsigned int NUM_CASCADED_SHADOWS = 3;
+    static constexpr int NUM_LIGHTS = 8;
+    static constexpr int ATTRIBUTE_LOCATION_V_POSITION = 0;
+    static constexpr int ATTRIBUTE_LOCATION_V_NORMAL = 1;
+    static constexpr int ATTRIBUTE_LOCATION_V_TEX_COORDS = 2;
+    static constexpr int ATTRIBUTE_LOCATION_V_TANGENT = 3;
+    static constexpr int ATTRIBUTE_LOCATION_V_BITANGENT = 4;
+    static constexpr int ATTRIBUTE_LOCATION_V_BONE = 5;
+    static constexpr int ATTRIBUTE_LOCATION_V_WEIGHT = 6;
+    static queue<Event> eventQueue;
+    
+    static GLenum glCheckError_(const char* file, int line);    // Error checking, https://learnopengl.com/In-Practice/Debugging
+    static unsigned int loadTexture(const string& filename, bool gammaCorrection, bool flip = true);
+    static unsigned int loadCubemap(const string& filename, bool gammaCorrection, bool flip = false);
+    static unsigned int generateTexture(int r, int g, int b);    // Change to float plox #################################################################
+    Renderer(mt19937* randNumGenerator);
+    ~Renderer();
+    State getState() const;
+    void setState(State state);
+    void beginFrame(const World& world);
+    void drawShadowMaps(const World& world);
+    void geometryPass(const World& world);
+    void applySSAO();
+    void lightingPass();
+    void drawLamps(const World& world);
+    void drawSkybox();
+    void applyBloom();
+    void drawPostProcessing();
+    void drawGUI();
+    void endFrame();
+    
+    private:
+    static unordered_map<string, unsigned int> loadedTextures;
+    atomic<State> state_;
+    mt19937* randNumGenerator_;
+    Camera camera_;
+    Configuration config_;
+    GLFWwindow* window_;
+    glm::ivec2 windowSize_;
+    glm::vec2 lastMousePos_;
+    vector<glm::mat4> boneTransforms_;
+    unique_ptr<PerformanceMonitor> frameMonitor_, ssaoMonitor_, bloomMonitor_;
+    unique_ptr<Shader> geometryShader_, geometryNormalMapShader_, geometrySkinningShader_, lightingPassShader_, skyboxShader_, lampShader_, shadowMapShader_, shadowMapSkinningShader_, textShader_, shapeShader_;
+    unique_ptr<Shader> postProcessShader_, bloomShader_, gaussianBlurShader_, ssaoShader_, ssaoBlurShader_;
+    unique_ptr<Framebuffer> geometryFBO_, renderFBO_, cascadedShadowFBO_[NUM_CASCADED_SHADOWS];
+    unique_ptr<Framebuffer> bloom1FBO_, bloom2FBO_, ssaoFBO_, ssaoBlurFBO_;
+    unsigned int blackTexture_, whiteTexture_, blueTexture_, cubeDiffuseMap_, cubeSpecularMap_, woodTexture_, skyboxCubemap_, brickDiffuseMap_, brickNormalMap_, ssaoNoiseTexture_, monitorGridTexture_;
+    unsigned int viewProjectionMtxUBO_;
+    Mesh windowQuad_, skybox_;
+    float shadowZBounds_[NUM_CASCADED_SHADOWS + 1];
+    bool flashlightOn_, sunlightOn_, lampsOn_;
+    float sunT_, sunSpeed_;
+    double lastTime_, lastFrameTime_;
+    int frameCounter_;
+    glm::vec3 pointLightPositions_[NUM_LIGHTS], pointLightColors_[NUM_LIGHTS];
+    unsigned int lightStates_[NUM_LIGHTS];
+    glm::vec3 sunPosition_;
+    glm::mat4 shadowProjections_[NUM_CASCADED_SHADOWS], viewToLightSpace_;
+    
+    static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
+    static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+    static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+    static void cursorPosCallback(GLFWwindow* window, double xpos, double ypos);
+    static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
+    void setupOpenGL();
+    void setupTextures();
+    void setupShaders();
+    void setupBuffers();
+    void setupRender();
+    void renderScene(const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender);
+    void processInput(float deltaTime);
+    float randomFloat(float min = 0.0f, float max = 1.0f);    // Generates a random float between min (inclusive) and max (exclusive).
+    int randomInt(int min, int max);    // Generates a random integer between min and max inclusive.
+    
+    friend class Configuration;
+};
+
+#endif

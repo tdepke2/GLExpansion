@@ -1,6 +1,6 @@
 #include "Mesh.h"
+#include "Renderer.h"
 #include "Shader.h"
-#include "Simulator.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <cassert>
@@ -99,16 +99,16 @@ void Mesh::generateMesh(vector<Vertex>&& vertices, vector<unsigned int>&& indice
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_.size() * sizeof(unsigned int), indices_.data(), GL_STATIC_DRAW);
     
-    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_POSITION);    // Specify the position and stride for vertices, normals, and tex coords in the array.
-    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_POSITION, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(0));
-    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_NORMAL);
-    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_NORMAL, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(sizeof(float) * 3));
-    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_TEX_COORDS);
-    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_TEX_COORDS, 2, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(sizeof(float) * 6));
-    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_TANGENT);
-    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_TANGENT, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(sizeof(float) * 8));
-    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_BITANGENT);
-    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_BITANGENT, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(sizeof(float) * 11));
+    glEnableVertexAttribArray(Renderer::ATTRIBUTE_LOCATION_V_POSITION);    // Specify the position and stride for vertices, normals, and tex coords in the array.
+    glVertexAttribPointer(Renderer::ATTRIBUTE_LOCATION_V_POSITION, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(0));
+    glEnableVertexAttribArray(Renderer::ATTRIBUTE_LOCATION_V_NORMAL);
+    glVertexAttribPointer(Renderer::ATTRIBUTE_LOCATION_V_NORMAL, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(sizeof(float) * 3));
+    glEnableVertexAttribArray(Renderer::ATTRIBUTE_LOCATION_V_TEX_COORDS);
+    glVertexAttribPointer(Renderer::ATTRIBUTE_LOCATION_V_TEX_COORDS, 2, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(sizeof(float) * 6));
+    glEnableVertexAttribArray(Renderer::ATTRIBUTE_LOCATION_V_TANGENT);
+    glVertexAttribPointer(Renderer::ATTRIBUTE_LOCATION_V_TANGENT, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(sizeof(float) * 8));
+    glEnableVertexAttribArray(Renderer::ATTRIBUTE_LOCATION_V_BITANGENT);
+    glVertexAttribPointer(Renderer::ATTRIBUTE_LOCATION_V_BITANGENT, 3, GL_FLOAT, false, sizeof(Vertex), reinterpret_cast<void*>(sizeof(float) * 11));
 }
 
 void Mesh::generateMesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures) {
@@ -127,20 +127,20 @@ void Mesh::generateMesh(vector<VertexBone>&& vertices, vector<unsigned int>&& in
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(VertexBone), vertices.data(), GL_STATIC_DRAW);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_.size() * sizeof(unsigned int), indices_.data(), GL_STATIC_DRAW);
     
-    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_POSITION);    // Specify the position and stride for vertices, normals, and tex coords in the array.
-    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_POSITION, 3, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(0));
-    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_NORMAL);
-    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_NORMAL, 3, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 3));
-    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_TEX_COORDS);
-    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_TEX_COORDS, 2, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 6));
-    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_TANGENT);
-    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_TANGENT, 3, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 8));
-    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_BITANGENT);
-    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_BITANGENT, 3, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 11));
-    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_BONE);
-    glVertexAttribIPointer(Simulator::ATTRIBUTE_LOCATION_V_BONE, 1, GL_UNSIGNED_INT, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 14));
-    glEnableVertexAttribArray(Simulator::ATTRIBUTE_LOCATION_V_WEIGHT);
-    glVertexAttribPointer(Simulator::ATTRIBUTE_LOCATION_V_WEIGHT, 4, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 14 + sizeof(unsigned int)));
+    glEnableVertexAttribArray(Renderer::ATTRIBUTE_LOCATION_V_POSITION);    // Specify the position and stride for vertices, normals, and tex coords in the array.
+    glVertexAttribPointer(Renderer::ATTRIBUTE_LOCATION_V_POSITION, 3, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(0));
+    glEnableVertexAttribArray(Renderer::ATTRIBUTE_LOCATION_V_NORMAL);
+    glVertexAttribPointer(Renderer::ATTRIBUTE_LOCATION_V_NORMAL, 3, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 3));
+    glEnableVertexAttribArray(Renderer::ATTRIBUTE_LOCATION_V_TEX_COORDS);
+    glVertexAttribPointer(Renderer::ATTRIBUTE_LOCATION_V_TEX_COORDS, 2, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 6));
+    glEnableVertexAttribArray(Renderer::ATTRIBUTE_LOCATION_V_TANGENT);
+    glVertexAttribPointer(Renderer::ATTRIBUTE_LOCATION_V_TANGENT, 3, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 8));
+    glEnableVertexAttribArray(Renderer::ATTRIBUTE_LOCATION_V_BITANGENT);
+    glVertexAttribPointer(Renderer::ATTRIBUTE_LOCATION_V_BITANGENT, 3, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 11));
+    glEnableVertexAttribArray(Renderer::ATTRIBUTE_LOCATION_V_BONE);
+    glVertexAttribIPointer(Renderer::ATTRIBUTE_LOCATION_V_BONE, 1, GL_UNSIGNED_INT, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 14));
+    glEnableVertexAttribArray(Renderer::ATTRIBUTE_LOCATION_V_WEIGHT);
+    glVertexAttribPointer(Renderer::ATTRIBUTE_LOCATION_V_WEIGHT, 4, GL_FLOAT, false, sizeof(VertexBone), reinterpret_cast<void*>(sizeof(float) * 14 + sizeof(unsigned int)));
 }
 
 void Mesh::generateMesh(vector<VertexBone>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures) {

@@ -30,7 +30,7 @@ class ModelRigged : public ModelAbstract {
     ModelRigged(const string& filename);
     ~ModelRigged();
     void loadFile(const string& filename);
-    void animate(unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms);
+    void animate(unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) const;
     
     private:
     Node* processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping);
