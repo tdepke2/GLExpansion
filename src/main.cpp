@@ -18,10 +18,10 @@ int main(int argc, char** argv) {
     mt19937 randNumGenerator;
     randNumGenerator.seed(static_cast<unsigned long>(chrono::high_resolution_clock::now().time_since_epoch().count()));
     Renderer renderer(&randNumGenerator);
-    World world;
-    cout << "Setup complete.\n";
     
     try {
+        World world;
+        cout << "Setup complete.\n";
         while (renderer.getState() != Renderer::Exiting) {
             renderer.beginFrame(world);
             renderer.drawShadowMaps(world);

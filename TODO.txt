@@ -3,4 +3,6 @@ Additions:
     * Add better way to handle animations and transition between them.
 
 Fixes:
+    * Renderer needs a better interface so that you can draw, for example, nothing.
+    * All data about the world including lights should belong in World class.
     * Figure out why DAE/FBX models aren't working (likely a blender issue).
