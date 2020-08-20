@@ -12,8 +12,8 @@
 #include <stdexcept>
 #include <utility>
 
-queue<Event> Renderer::eventQueue;
-unordered_map<string, unsigned int> Renderer::loadedTextures;
+unordered_map<string, unsigned int> Renderer::loadedTextures_;
+queue<Event> Renderer::eventQueue_;
 
 GLenum Renderer::glCheckError_(const char* file, int line) {
     GLenum errorCode;
@@ -34,8 +34,8 @@ GLenum Renderer::glCheckError_(const char* file, int line) {
 
 unsigned int Renderer::loadTexture(const string& filename, bool gammaCorrection, bool flip) {
     string textureName = filename + (gammaCorrection ? "-g" : "") + (flip ? "-f" : "");
-    auto findResult = loadedTextures.find(textureName);
-    if (findResult != loadedTextures.end()) {
+    auto findResult = loadedTextures_.find(textureName);
+    if (findResult != loadedTextures_.end()) {
         return findResult->second;
     }
     
@@ -75,14 +75,14 @@ unsigned int Renderer::loadTexture(const string& filename, bool gammaCorrection,
     }
     stbi_image_free(imageData);
     
-    loadedTextures[textureName] = texHandle;
+    loadedTextures_[textureName] = texHandle;
     return texHandle;
 }
 
 unsigned int Renderer::loadCubemap(const string& filename, bool gammaCorrection, bool flip) {
     string textureName = filename + (gammaCorrection ? "-g" : "") + (flip ? "-f" : "");
-    auto findResult = loadedTextures.find(textureName);
-    if (findResult != loadedTextures.end()) {
+    auto findResult = loadedTextures_.find(textureName);
+    if (findResult != loadedTextures_.end()) {
         return findResult->second;
     }
     
@@ -135,14 +135,14 @@ unsigned int Renderer::loadCubemap(const string& filename, bool gammaCorrection,
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     
-    loadedTextures[textureName] = texHandle;
+    loadedTextures_[textureName] = texHandle;
     return texHandle;
 }
 
 unsigned int Renderer::generateTexture(int r, int g, int b) {
     string textureName = "color " + to_string(r) + " " + to_string(g) + " " + to_string(b);
-    auto findResult = loadedTextures.find(textureName);
-    if (findResult != loadedTextures.end()) {
+    auto findResult = loadedTextures_.find(textureName);
+    if (findResult != loadedTextures_.end()) {
         return findResult->second;
     }
     
@@ -163,23 +163,23 @@ unsigned int Renderer::generateTexture(int r, int g, int b) {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 8, 8, 0, GL_RGB, GL_UNSIGNED_BYTE, imageData);
     glGenerateMipmap(GL_TEXTURE_2D);
     
-    loadedTextures[textureName] = texHandle;
+    loadedTextures_[textureName] = texHandle;
     return texHandle;
 }
 
 Renderer::Renderer(mt19937* randNumGenerator) :// always use this style for uniform init #############################################################
-    state_(Uninitialized),
-    randNumGenerator_(randNumGenerator),
     camera_(glm::vec3(0.0f, 1.8f, 2.0f)),
-    windowSize_(800, 600),
-    lastMousePos_(windowSize_.x / 2.0f, windowSize_.y / 2.0f),
-    boneTransforms_(128),
     flashlightOn_(false),
     sunlightOn_(true),
     lampsOn_(false),
     sunT_(0.0f),
-    sunSpeed_(1.0f) {
+    sunSpeed_(1.0f),
+    state_(Uninitialized),
+    randNumGenerator_(randNumGenerator),
+    windowSize_(800, 600),
+    boneTransforms_(128) {
     
+    lastMousePos_ = glm::vec2(windowSize_.x / 2.0f, windowSize_.y / 2.0f);
     assert(state_ == Uninitialized);
     state_ = Running;
     
@@ -265,6 +265,12 @@ Renderer::State Renderer::getState() const {
 
 void Renderer::setState(State state) {
     state_ = state;
+    if (state == Running) {
+        glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    } else if (state == Paused) {
+        glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        glfwSetCursorPos(window_, windowSize_.x / 2.0f, windowSize_.y / 2.0f);
+    }
 }
 
 void Renderer::beginFrame(const World& world) {
@@ -583,71 +589,33 @@ void Renderer::endFrame() {
     glfwSwapBuffers(window_);
     glfwPollEvents();
     glCheckError();
-    
-    while (!eventQueue.empty()) {    // This doesn't belong here, main should take care of it. ####################################################################################
-        Event e = eventQueue.front();
-        eventQueue.pop();
-        
-        if (e.type == Event::Resize) {
-            windowSize_.x = e.size.width;
-            windowSize_.y = e.size.height;
-            geometryFBO_->setBufferSize(windowSize_);
-            renderFBO_->setBufferSize(windowSize_);
-            bloom1FBO_->setBufferSize(windowSize_);
-            bloom2FBO_->setBufferSize(windowSize_);
-            ssaoFBO_->setBufferSize(windowSize_ / 2);
-            ssaoBlurFBO_->setBufferSize(windowSize_ / 2);
-        } else if (e.type == Event::KeyPress) {
-            if (e.key.code == GLFW_KEY_ESCAPE) {
-                if (state_ == Running) {
-                    state_ = Paused;
-                    glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-                    glfwSetCursorPos(window_, windowSize_.x / 2.0f, windowSize_.y / 2.0f);
-                } else if (state_ == Paused) {
-                    state_ = Running;
-                    glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-                }
-            } else if (e.key.code == GLFW_KEY_UP) {
-                camera_.moveSpeed_ *= 2.0f;
-            } else if (e.key.code == GLFW_KEY_DOWN) {
-                if (camera_.moveSpeed_ > 0.1f) {
-                    camera_.moveSpeed_ /= 2.0f;
-                }
-            } else if (e.key.code == GLFW_KEY_F) {
-                flashlightOn_ = !flashlightOn_;
-            } else if (e.key.code == GLFW_KEY_G) {
-                sunlightOn_ = !sunlightOn_;
-            } else if (e.key.code == GLFW_KEY_H) {
-                lampsOn_ = !lampsOn_;
-            } else if (e.key.code == GLFW_KEY_RIGHT) {
-                sunSpeed_ *= 2.0f;
-            } else if (e.key.code == GLFW_KEY_LEFT) {
-                if (sunSpeed_ > 0.00001f) {
-                    sunSpeed_ /= 2.0f;
-                }
-            } else if (e.key.code == GLFW_KEY_V) {
-                config_.setVsync(!config_.getVsync());
-            } else if (e.key.code == GLFW_KEY_B) {
-                config_.setBloom(!config_.getBloom());
-            } else if (e.key.code == GLFW_KEY_N) {
-                config_.setSSAO(!config_.getSSAO());
-            }
-        } else if (e.type == Event::MouseMove) {
-            if (state_ == Running) {
-                camera_.processMouseMove(static_cast<float>(e.mouseMove.xpos) - lastMousePos_.x, lastMousePos_.y - static_cast<float>(e.mouseMove.ypos));
-            }
-            lastMousePos_.x = static_cast<float>(e.mouseMove.xpos);
-            lastMousePos_.y = static_cast<float>(e.mouseMove.ypos);
-        } else if (e.type == Event::MouseScroll) {
-            if (state_ == Running) {
-                camera_.processMouseScroll(static_cast<float>(e.mouseScroll.xoffset), static_cast<float>(e.mouseScroll.yoffset));
-            }
-        }
+}
+
+bool Renderer::pollEvent(Event& e) {
+    if (eventQueue_.empty()) {
+        return false;
     }
     
-    if (glfwWindowShouldClose(window_)) {
-        state_ = Exiting;
-    }
+    e = eventQueue_.front();
+    eventQueue_.pop();
+    return true;
+}
+
+void Renderer::resizeBuffers(int width, int height) {
+    windowSize_.x = width;
+    windowSize_.y = height;
+    geometryFBO_->setBufferSize(windowSize_);
+    renderFBO_->setBufferSize(windowSize_);
+    bloom1FBO_->setBufferSize(windowSize_);
+    bloom2FBO_->setBufferSize(windowSize_);
+    ssaoFBO_->setBufferSize(windowSize_ / 2);
+    ssaoBlurFBO_->setBufferSize(windowSize_ / 2);
+}
+
+void Renderer::windowCloseCallback(GLFWwindow* window) {
+    Event e;
+    e.type = Event::Close;
+    eventQueue_.push(e);
 }
 
 void Renderer::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
@@ -655,7 +623,7 @@ void Renderer::framebufferSizeCallback(GLFWwindow* window, int width, int height
     e.type = Event::Resize;
     e.size.width = width;
     e.size.height = height;
-    eventQueue.push(e);
+    eventQueue_.push(e);
 }
 
 void Renderer::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -668,7 +636,7 @@ void Renderer::keyCallback(GLFWwindow* window, int key, int scancode, int action
     e.key.code = key;
     e.key.scancode = scancode;
     e.key.mods = mods;
-    eventQueue.push(e);
+    eventQueue_.push(e);
 }
 
 void Renderer::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
@@ -680,7 +648,7 @@ void Renderer::mouseButtonCallback(GLFWwindow* window, int button, int action, i
     }
     e.mouseButton.code = button;
     e.mouseButton.mods = mods;
-    eventQueue.push(e);
+    eventQueue_.push(e);
 }
 
 void Renderer::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
@@ -688,7 +656,7 @@ void Renderer::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
     e.type = Event::MouseMove;
     e.mouseMove.xpos = xpos;
     e.mouseMove.ypos = ypos;
-    eventQueue.push(e);
+    eventQueue_.push(e);
 }
 
 void Renderer::scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
@@ -696,7 +664,7 @@ void Renderer::scrollCallback(GLFWwindow* window, double xoffset, double yoffset
     e.type = Event::MouseScroll;
     e.mouseScroll.xoffset = xoffset;
     e.mouseScroll.yoffset = yoffset;
-    eventQueue.push(e);
+    eventQueue_.push(e);
 }
 
 void Renderer::setupOpenGL() {
@@ -711,11 +679,12 @@ void Renderer::setupOpenGL() {
     }
     glfwMakeContextCurrent(window_);
     
-    glfwSetFramebufferSizeCallback(window_, this->framebufferSizeCallback);    // Set function callbacks.
-    glfwSetKeyCallback(window_, this->keyCallback);
-    glfwSetMouseButtonCallback(window_, this->mouseButtonCallback);
-    glfwSetCursorPosCallback(window_, this->cursorPosCallback);
-    glfwSetScrollCallback(window_, this->scrollCallback);
+    glfwSetWindowCloseCallback(window_, windowCloseCallback);    // Set function callbacks.
+    glfwSetFramebufferSizeCallback(window_, framebufferSizeCallback);
+    glfwSetKeyCallback(window_, keyCallback);
+    glfwSetMouseButtonCallback(window_, mouseButtonCallback);
+    glfwSetCursorPosCallback(window_, cursorPosCallback);
+    glfwSetScrollCallback(window_, scrollCallback);
     
     if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {    // Load all OpenGL function pointers with GLAD.
         throw runtime_error("Failed to initialize GLAD.");

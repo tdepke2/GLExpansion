@@ -1,9 +1,17 @@
+#include "Event.h"
 #include "Renderer.h"
 #include "World.h"
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <chrono>
 #include <iostream>
 
 using namespace std;
+
+void processEvent(Renderer& renderer, World& world, const Event& e);
 
 int main(int argc, char** argv) {
     cout << "Initializing setup...\n";
@@ -26,6 +34,11 @@ int main(int argc, char** argv) {
             renderer.drawPostProcessing();
             renderer.drawGUI();
             renderer.endFrame();
+            
+            Event e;
+            while (renderer.pollEvent(e)) {
+                processEvent(renderer, world, e);
+            }
         }
     } catch (exception& ex) {
         renderer.setState(Renderer::Exiting);
@@ -39,4 +52,54 @@ int main(int argc, char** argv) {
     }
     
     return 0;
+}
+
+void processEvent(Renderer& renderer, World& world, const Event& e) {
+    if (e.type == Event::Close) {
+        renderer.setState(Renderer::Exiting);
+    } else if (e.type == Event::Resize) {
+        renderer.resizeBuffers(e.size.width, e.size.height);
+    } else if (e.type == Event::KeyPress) {
+        if (e.key.code == GLFW_KEY_ESCAPE) {
+            if (renderer.getState() == Renderer::Running) {
+                renderer.setState(Renderer::Paused);
+            } else if (renderer.getState() == Renderer::Paused) {
+                renderer.setState(Renderer::Running);
+            }
+        } else if (e.key.code == GLFW_KEY_UP) {
+            renderer.camera_.moveSpeed_ *= 2.0f;
+        } else if (e.key.code == GLFW_KEY_DOWN) {
+            if (renderer.camera_.moveSpeed_ > 0.1f) {
+                renderer.camera_.moveSpeed_ /= 2.0f;
+            }
+        } else if (e.key.code == GLFW_KEY_F) {
+            renderer.flashlightOn_ = !renderer.flashlightOn_;
+        } else if (e.key.code == GLFW_KEY_G) {
+            renderer.sunlightOn_ = !renderer.sunlightOn_;
+        } else if (e.key.code == GLFW_KEY_H) {
+            renderer.lampsOn_ = !renderer.lampsOn_;
+        } else if (e.key.code == GLFW_KEY_RIGHT) {
+            renderer.sunSpeed_ *= 2.0f;
+        } else if (e.key.code == GLFW_KEY_LEFT) {
+            if (renderer.sunSpeed_ > 0.00001f) {
+                renderer.sunSpeed_ /= 2.0f;
+            }
+        } else if (e.key.code == GLFW_KEY_V) {
+            renderer.config_.setVsync(!renderer.config_.getVsync());
+        } else if (e.key.code == GLFW_KEY_B) {
+            renderer.config_.setBloom(!renderer.config_.getBloom());
+        } else if (e.key.code == GLFW_KEY_N) {
+            renderer.config_.setSSAO(!renderer.config_.getSSAO());
+        }
+    } else if (e.type == Event::MouseMove) {
+        if (renderer.getState() == Renderer::Running) {
+            renderer.camera_.processMouseMove(static_cast<float>(e.mouseMove.xpos) - renderer.lastMousePos_.x, renderer.lastMousePos_.y - static_cast<float>(e.mouseMove.ypos));
+        }
+        renderer.lastMousePos_.x = static_cast<float>(e.mouseMove.xpos);
+        renderer.lastMousePos_.y = static_cast<float>(e.mouseMove.ypos);
+    } else if (e.type == Event::MouseScroll) {
+        if (renderer.getState() == Renderer::Running) {
+            renderer.camera_.processMouseScroll(static_cast<float>(e.mouseScroll.xoffset), static_cast<float>(e.mouseScroll.yoffset));
+        }
+    }
 }

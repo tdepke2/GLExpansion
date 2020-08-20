@@ -6,7 +6,7 @@ using namespace std;
 class Event {
     public:
     enum EventType {
-        Resize, KeyPress, KeyRelease, MouseButtonPress, MouseButtonRelease, MouseMove, MouseScroll
+        Close, Resize, KeyPress, KeyRelease, MouseButtonPress, MouseButtonRelease, MouseMove, MouseScroll
     };
     struct SizeEvent {
         int width;

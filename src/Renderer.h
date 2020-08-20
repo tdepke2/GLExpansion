@@ -43,7 +43,11 @@ class Renderer {
     static constexpr int ATTRIBUTE_LOCATION_V_BITANGENT = 4;
     static constexpr int ATTRIBUTE_LOCATION_V_BONE = 5;
     static constexpr int ATTRIBUTE_LOCATION_V_WEIGHT = 6;
-    static queue<Event> eventQueue;
+    Configuration config_;
+    Camera camera_;
+    glm::vec2 lastMousePos_;
+    bool flashlightOn_, sunlightOn_, lampsOn_;
+    float sunT_, sunSpeed_;
     
     static GLenum glCheckError_(const char* file, int line);    // Error checking, https://learnopengl.com/In-Practice/Debugging
     static unsigned int loadTexture(const string& filename, bool gammaCorrection, bool flip = true);
@@ -64,16 +68,16 @@ class Renderer {
     void drawPostProcessing();
     void drawGUI();
     void endFrame();
+    bool pollEvent(Event& e);
+    void resizeBuffers(int width, int height);
     
     private:
-    static unordered_map<string, unsigned int> loadedTextures;
+    static unordered_map<string, unsigned int> loadedTextures_;
+    static queue<Event> eventQueue_;
     atomic<State> state_;
     mt19937* randNumGenerator_;
-    Camera camera_;
-    Configuration config_;
     GLFWwindow* window_;
     glm::ivec2 windowSize_;
-    glm::vec2 lastMousePos_;
     vector<glm::mat4> boneTransforms_;
     unique_ptr<PerformanceMonitor> frameMonitor_, ssaoMonitor_, bloomMonitor_;
     unique_ptr<Shader> geometryShader_, geometryNormalMapShader_, geometrySkinningShader_, lightingPassShader_, skyboxShader_, lampShader_, shadowMapShader_, shadowMapSkinningShader_, textShader_, shapeShader_;
@@ -84,8 +88,6 @@ class Renderer {
     unsigned int viewProjectionMtxUBO_;
     Mesh windowQuad_, skybox_;
     float shadowZBounds_[NUM_CASCADED_SHADOWS + 1];
-    bool flashlightOn_, sunlightOn_, lampsOn_;
-    float sunT_, sunSpeed_;
     double lastTime_, lastFrameTime_;
     int frameCounter_;
     glm::vec3 pointLightPositions_[NUM_LIGHTS], pointLightColors_[NUM_LIGHTS];
@@ -93,6 +95,7 @@ class Renderer {
     glm::vec3 sunPosition_;
     glm::mat4 shadowProjections_[NUM_CASCADED_SHADOWS], viewToLightSpace_;
     
+    static void windowCloseCallback(GLFWwindow* window);
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
     static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
     static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
