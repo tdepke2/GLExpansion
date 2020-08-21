@@ -80,7 +80,7 @@ class Renderer {
     GLFWwindow* window_;
     glm::ivec2 windowSize_;
     vector<glm::mat4> boneTransforms_;
-    unique_ptr<PerformanceMonitor> frameMonitor_, ssaoMonitor_, bloomMonitor_;
+    unordered_map<const char*, PerformanceMonitor*> performanceMonitors_;
     unique_ptr<Shader> geometryShader_, geometryNormalMapShader_, geometrySkinningShader_, lightingPassShader_, skyboxShader_, lampShader_, shadowMapShader_, shadowMapSkinningShader_, textShader_, shapeShader_;
     unique_ptr<Shader> postProcessShader_, bloomShader_, gaussianBlurShader_, ssaoShader_, ssaoBlurShader_;
     unique_ptr<Framebuffer> geometryFBO_, renderFBO_, cascadedShadowFBO_[NUM_CASCADED_SHADOWS];

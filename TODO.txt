@@ -1,8 +1,12 @@
 Additions:
+    * Add procedural terrain generation.
+    * Add water physics.
+    * Add entities with AI.
     * Add ragdoll physics.
     * Add better way to handle animations and transition between them.
 
 Fixes:
+    * PerformanceMonitor should auto-scale.
     * Renderer needs a better interface so that you can draw, for example, nothing.
     * All data about the world including lights should belong in World class.
     * Add NonCopyable interface for things like Mesh and Shader.

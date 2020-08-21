@@ -198,12 +198,9 @@ Renderer::Renderer(mt19937* randNumGenerator) :// always use this style for unif
     shared_ptr<Font> arialFont = make_shared<Font>();    // why not combine these two, no reason to reset a font. #####################################################################################
     arialFont->loadFont("fonts/arial.ttf", 15);
     
-    frameMonitor_ = make_unique<PerformanceMonitor>("FRAME", arialFont);    // Should probably add these to a container of unordered_map<const char*, PerformanceMonitor> ##########################################################
-    frameMonitor_->modelMtx_ = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-    ssaoMonitor_ = make_unique<PerformanceMonitor>("SSAO", arialFont);
-    ssaoMonitor_->modelMtx_ = glm::translate(glm::mat4(1.0f), glm::vec3(220.0f, 0.0f, 0.0f));
-    bloomMonitor_ = make_unique<PerformanceMonitor>("BLOOM", arialFont);
-    bloomMonitor_->modelMtx_ = glm::translate(glm::mat4(1.0f), glm::vec3(440.0f, 0.0f, 0.0f));
+    performanceMonitors_.emplace(make_pair("FRAME", new PerformanceMonitor("FRAME", arialFont))).first->second->modelMtx_ = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+    performanceMonitors_.emplace(make_pair("SSAO", new PerformanceMonitor("SSAO", arialFont))).first->second->modelMtx_ = glm::translate(glm::mat4(1.0f), glm::vec3(220.0f, 0.0f, 0.0f));
+    performanceMonitors_.emplace(make_pair("BLOOM", new PerformanceMonitor("BLOOM", arialFont))).first->second->modelMtx_ = glm::translate(glm::mat4(1.0f), glm::vec3(440.0f, 0.0f, 0.0f));
     
     for (size_t i = 0; i < boneTransforms_.size(); ++i) {
         boneTransforms_[i] = glm::mat4(1.0f);
@@ -230,6 +227,10 @@ Renderer::Renderer(mt19937* randNumGenerator) :// always use this style for unif
 
 Renderer::~Renderer() {
     instantiated_ = false;
+    
+    for (auto& m : performanceMonitors_) {
+        delete m.second;
+    }
     
     glDeleteBuffers(1, &viewProjectionMtxUBO_);    // Clean up allocated resources.
     geometryShader_.reset();
@@ -282,7 +283,7 @@ void Renderer::beginFrame(const World& world) {
     float deltaTime = static_cast<float>(currentTime - lastTime_);
     lastTime_ = currentTime;
     
-    frameMonitor_->startGPUTimer();
+    performanceMonitors_.at("FRAME")->startGPUTimer();
     
     ++frameCounter_;
     if (currentTime - lastFrameTime_ >= 1.0) {
@@ -393,7 +394,7 @@ void Renderer::geometryPass(const World& world) {
 }
 
 void Renderer::applySSAO() {
-    ssaoMonitor_->startGPUTimer();
+    performanceMonitors_.at("SSAO")->startGPUTimer();
     if (config_.getSSAO()) {
         ssaoFBO_->bind();    // Render SSAO texture.
         glViewport(0, 0, ssaoFBO_->getBufferSize().x, ssaoFBO_->getBufferSize().y);
@@ -420,7 +421,7 @@ void Renderer::applySSAO() {
         ssaoFBO_->bindTexture(0);
         windowQuad_.drawGeometry();
     }
-    ssaoMonitor_->stopGPUTimer();
+    performanceMonitors_.at("SSAO")->stopGPUTimer();
 }
 
 void Renderer::lightingPass() {
@@ -505,7 +506,7 @@ void Renderer::drawSkybox() {
 }
 
 void Renderer::applyBloom() {
-    bloomMonitor_->startGPUTimer();
+    performanceMonitors_.at("BLOOM")->startGPUTimer();
     if (config_.getBloom()) {
         bloom1FBO_->bind();    // Compute bloom texture.
         glViewport(0, 0, bloom1FBO_->getBufferSize().x, bloom1FBO_->getBufferSize().y);
@@ -531,7 +532,7 @@ void Renderer::applyBloom() {
             windowQuad_.drawGeometry();
         }
     }
-    bloomMonitor_->stopGPUTimer();
+    performanceMonitors_.at("BLOOM")->stopGPUTimer();
 }
 
 void Renderer::drawPostProcessing() {
@@ -564,31 +565,31 @@ void Renderer::drawGUI() {
     shapeShader_->setVec4("color", glm::vec4(1.0f, 1.0f, 1.0f, 0.7f));
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, monitorGridTexture_);
-    frameMonitor_->drawBox(*shapeShader_, glm::mat4(1.0f));
-    ssaoMonitor_->drawBox(*shapeShader_, glm::mat4(1.0f));
-    bloomMonitor_->drawBox(*shapeShader_, glm::mat4(1.0f));
+    for (const auto& m : performanceMonitors_) {
+        m.second->drawBox(*shapeShader_, glm::mat4(1.0f));
+    }
     shapeShader_->setVec4("color", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
     glBindTexture(GL_TEXTURE_2D, whiteTexture_);
-    frameMonitor_->drawLine(*shapeShader_, glm::mat4(1.0f));
-    ssaoMonitor_->drawLine(*shapeShader_, glm::mat4(1.0f));
-    bloomMonitor_->drawLine(*shapeShader_, glm::mat4(1.0f));
+    for (const auto& m : performanceMonitors_) {
+        m.second->drawLine(*shapeShader_, glm::mat4(1.0f));
+    }
     textShader_->use();
     textShader_->setMat4("projectionMtx", windowProjectionMtx);
     textShader_->setInt("texFont", 0);
     textShader_->setVec3("color", glm::vec3(0.8f, 0.8f, 0.8f));
-    frameMonitor_->drawText(*textShader_, glm::mat4(1.0f));
-    ssaoMonitor_->drawText(*textShader_, glm::mat4(1.0f));
-    bloomMonitor_->drawText(*textShader_, glm::mat4(1.0f));
+    for (const auto& m : performanceMonitors_) {
+        m.second->drawText(*textShader_, glm::mat4(1.0f));
+    }
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
 }
 
 void Renderer::endFrame() {
-    frameMonitor_->stopGPUTimer();
+    performanceMonitors_.at("FRAME")->stopGPUTimer();
     
-    frameMonitor_->update();    // Monitor update must occur after drawing.
-    ssaoMonitor_->update();
-    bloomMonitor_->update();
+    for (const auto& m : performanceMonitors_) {    // Monitor update must occur after drawing.
+        m.second->update();
+    }
     
     glfwSwapBuffers(window_);
     glfwPollEvents();
