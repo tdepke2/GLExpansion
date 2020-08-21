@@ -72,6 +72,7 @@ class Renderer {
     void resizeBuffers(int width, int height);
     
     private:
+    static bool instantiated_;
     static unordered_map<string, unsigned int> loadedTextures_;
     static queue<Event> eventQueue_;
     atomic<State> state_;

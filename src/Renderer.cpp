@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <utility>
 
+bool Renderer::instantiated_ = false;
 unordered_map<string, unsigned int> Renderer::loadedTextures_;
 queue<Event> Renderer::eventQueue_;
 
@@ -179,8 +180,9 @@ Renderer::Renderer(mt19937* randNumGenerator) :// always use this style for unif
     windowSize_(800, 600),
     boneTransforms_(128) {
     
+    assert(!instantiated_);    // Ensure only one instance of Renderer.
+    instantiated_ = true;
     lastMousePos_ = glm::vec2(windowSize_.x / 2.0f, windowSize_.y / 2.0f);
-    assert(state_ == Uninitialized);
     state_ = Running;
     
     setupOpenGL();
@@ -227,6 +229,8 @@ Renderer::Renderer(mt19937* randNumGenerator) :// always use this style for unif
 }
 
 Renderer::~Renderer() {
+    instantiated_ = false;
+    
     glDeleteBuffers(1, &viewProjectionMtxUBO_);    // Clean up allocated resources.
     geometryShader_.reset();
     geometryNormalMapShader_.reset();
