@@ -17,8 +17,6 @@ class PerformanceMonitor {
     public:
     static constexpr unsigned int NUM_QUERIES_ = 3, NUM_SAMPLES_ = 50;
     static constexpr glm::vec2 BOX_SIZE_ = glm::vec2(200.0f, 100.0f);
-    static constexpr float HEIGHT_SCALE_ = 10.0f;
-    static stack<PerformanceMonitor*> monitorNestStack_;
     glm::mat4 modelMtx_;
     string name_;
     
@@ -34,6 +32,9 @@ class PerformanceMonitor {
     void drawText(const Shader& shader, const glm::mat4& modelMtx) const;
     
     private:
+    static constexpr float INITIAL_SAMPLE_VALUE_ = 1000.0f;
+    static float lastHeightScale_, heightScale_, sampleMax_;
+    static stack<PerformanceMonitor*> monitorNestStack_;
     unsigned int boxVAO_, boxVBO_, lineVAO_, lineVBO_;
     Text text_;
     const PerformanceMonitor* parentMonitor_;

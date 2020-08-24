@@ -2,8 +2,10 @@
 #include "Shader.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <algorithm>
 #include <iostream>
 
+float PerformanceMonitor::lastHeightScale_ = BOX_SIZE_.y / INITIAL_SAMPLE_VALUE_, PerformanceMonitor::heightScale_ = BOX_SIZE_.y / INITIAL_SAMPLE_VALUE_, PerformanceMonitor::sampleMax_ = INITIAL_SAMPLE_VALUE_;
 stack<PerformanceMonitor*> PerformanceMonitor::monitorNestStack_;
 
 PerformanceMonitor::PerformanceMonitor(const string& name, shared_ptr<Font> font) {
@@ -31,11 +33,11 @@ PerformanceMonitor::PerformanceMonitor(const string& name, shared_ptr<Font> font
     glBindVertexArray(lineVAO_);
     glGenBuffers(1, &lineVBO_);
     glBindBuffer(GL_ARRAY_BUFFER, lineVBO_);
-    for (unsigned int i = 0; i < NUM_SAMPLES_; ++i) {
-        samplesScaled_[i] = glm::vec4(static_cast<float>(i) / (NUM_SAMPLES_ - 1) * BOX_SIZE_.x, 0.0f, 0.0f, 0.0f);
+    for (unsigned int i = 0; i < NUM_SAMPLES_; ++i) {    // Start all samples at INITIAL_SAMPLE_VALUE_ ms to fix issues with auto-scaling.
+        samplesScaled_[i] = glm::vec4(static_cast<float>(i) / (NUM_SAMPLES_ - 1) * BOX_SIZE_.x, 1.0f, 0.0f, 0.0f);
     }
-    lastSample_ = 0.0f;
-    sampleAverage_ = 0.0f;
+    lastSample_ = INITIAL_SAMPLE_VALUE_;
+    sampleAverage_ = INITIAL_SAMPLE_VALUE_;
     glBufferData(GL_ARRAY_BUFFER, NUM_SAMPLES_ * sizeof(glm::vec4), samplesScaled_, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, false, sizeof(glm::vec4), 0);
@@ -94,17 +96,29 @@ void PerformanceMonitor::stopGPUTimer() {
     glGetQueryObjectui64v(startQueries_[queryIndex_], GL_QUERY_RESULT, &startTime);
     glGetQueryObjectui64v(stopQueries_[queryIndex_], GL_QUERY_RESULT, &stopTime);
     lastSample_ = (stopTime - startTime) / 1000000.0f;    // Elapsed time in ms.
+    sampleMax_ = max(sampleMax_, lastSample_);
+    
+    if (monitorNestStack_.empty()) {    // Update height scaling if this is the last monitor to stop.
+        lastHeightScale_ = heightScale_;
+        heightScale_ += (BOX_SIZE_.y / sampleMax_ - heightScale_) / 8.0f;
+        sampleMax_ = 0.0f;
+    }
 }
 
 void PerformanceMonitor::update() {
     float sampleSumScaled = 0.0f;    // Update the line graph.
+    float sampleMaxScaled = 0.0f;
+    float scalingRatio = heightScale_ / lastHeightScale_;
     for (unsigned int i = 0; i < NUM_SAMPLES_ - 1; ++i) {
-        samplesScaled_[i].y = samplesScaled_[i + 1].y;
+        samplesScaled_[i].y = samplesScaled_[i + 1].y * scalingRatio;
         sampleSumScaled += samplesScaled_[i].y;
+        sampleMaxScaled = max(sampleMaxScaled, samplesScaled_[i].y);
     }
-    samplesScaled_[NUM_SAMPLES_ - 1].y = lastSample_ * HEIGHT_SCALE_;
+    samplesScaled_[NUM_SAMPLES_ - 1].y = lastSample_ * heightScale_;
     sampleSumScaled += samplesScaled_[NUM_SAMPLES_ - 1].y;
-    sampleAverage_ = sampleSumScaled / HEIGHT_SCALE_ / NUM_SAMPLES_;
+    sampleAverage_ = sampleSumScaled / heightScale_ / NUM_SAMPLES_;
+    sampleMax_ = max(sampleMax_, sampleMaxScaled / heightScale_);
+    
     glBindVertexArray(lineVAO_);
     glBindBuffer(GL_ARRAY_BUFFER, lineVBO_);
     glBufferSubData(GL_ARRAY_BUFFER, 0, NUM_SAMPLES_ * sizeof(glm::vec4), samplesScaled_);
