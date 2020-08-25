@@ -46,8 +46,6 @@ class Renderer {
     Configuration config_;
     Camera camera_;
     glm::vec2 lastMousePos_;
-    bool flashlightOn_, sunlightOn_, lampsOn_;
-    float sunT_, sunSpeed_;
     
     static GLenum glCheckError_(const char* file, int line);    // Error checking, https://learnopengl.com/In-Practice/Debugging
     static unsigned int loadTexture(const string& filename, bool gammaCorrection, bool flip = true);
@@ -57,19 +55,19 @@ class Renderer {
     ~Renderer();
     State getState() const;
     void setState(State state);
-    void beginFrame(const World& world);
+    void beginFrame(const World& world);    // Stages of the rendering pipeline.
     void drawShadowMaps(const World& world);
     void geometryPass(const World& world);
     void applySSAO();
-    void lightingPass();
+    void lightingPass(const World& world);
     void drawLamps(const World& world);
     void drawSkybox();
     void applyBloom();
     void drawPostProcessing();
     void drawGUI();
     void endFrame();
-    bool pollEvent(Event& e);
-    void resizeBuffers(int width, int height);
+    bool pollEvent(Event& e);    // Grab the next event from the event queue.
+    void resizeBuffers(int width, int height);    // Resize the internal render buffers used for drawing to the window.
     
     private:
     static bool instantiated_;
@@ -91,9 +89,6 @@ class Renderer {
     float shadowZBounds_[NUM_CASCADED_SHADOWS + 1];
     double lastTime_, lastFrameTime_;
     int frameCounter_;
-    glm::vec3 pointLightPositions_[NUM_LIGHTS], pointLightColors_[NUM_LIGHTS];
-    unsigned int lightStates_[NUM_LIGHTS];
-    glm::vec3 sunPosition_;
     glm::mat4 shadowProjections_[NUM_CASCADED_SHADOWS], viewToLightSpace_;
     
     static void windowCloseCallback(GLFWwindow* window);

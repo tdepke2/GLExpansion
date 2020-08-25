@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
             renderer.drawShadowMaps(world);
             renderer.geometryPass(world);
             renderer.applySSAO();
-            renderer.lightingPass();
+            renderer.lightingPass(world);
             renderer.drawLamps(world);
             renderer.drawSkybox();
             renderer.applyBloom();
@@ -39,6 +39,8 @@ int main(int argc, char** argv) {
             while (renderer.pollEvent(e)) {
                 processEvent(renderer, world, e);
             }
+            
+            world.nextTick();
         }
     } catch (exception& ex) {
         renderer.setState(Renderer::Exiting);
@@ -73,16 +75,16 @@ void processEvent(Renderer& renderer, World& world, const Event& e) {
                 renderer.camera_.moveSpeed_ /= 2.0f;
             }
         } else if (e.key.code == GLFW_KEY_F) {
-            renderer.flashlightOn_ = !renderer.flashlightOn_;
+            world.flashlightOn_ = !world.flashlightOn_;
         } else if (e.key.code == GLFW_KEY_G) {
-            renderer.sunlightOn_ = !renderer.sunlightOn_;
+            world.sunlightOn_ = !world.sunlightOn_;
         } else if (e.key.code == GLFW_KEY_H) {
-            renderer.lampsOn_ = !renderer.lampsOn_;
+            world.lampsOn_ = !world.lampsOn_;
         } else if (e.key.code == GLFW_KEY_RIGHT) {
-            renderer.sunSpeed_ *= 2.0f;
+            world.sunSpeed_ *= 2.0f;
         } else if (e.key.code == GLFW_KEY_LEFT) {
-            if (renderer.sunSpeed_ > 0.00001f) {
-                renderer.sunSpeed_ /= 2.0f;
+            if (world.sunSpeed_ > 0.00001f) {
+                world.sunSpeed_ /= 2.0f;
             }
         } else if (e.key.code == GLFW_KEY_V) {
             renderer.config_.setVsync(!renderer.config_.getVsync());
