@@ -172,12 +172,11 @@ unsigned int Renderer::generateTexture(int r, int g, int b) {
 Renderer::Renderer(mt19937* randNumGenerator) :// always use this style for uniform init #############################################################
     state_(Uninitialized),
     randNumGenerator_(randNumGenerator),
-    windowSize_(800, 600),
+    windowSize_(INITIAL_WINDOW_SIZE),
     boneTransforms_(128) {
     
     assert(!instantiated_);    // Ensure only one instance of Renderer.
     instantiated_ = true;
-    lastMousePos_ = glm::vec2(windowSize_.x / 2.0f, windowSize_.y / 2.0f);
     state_ = Running;
     
     setupOpenGL();

@@ -34,6 +34,7 @@ class Renderer {
         Uninitialized, Running, Paused, Exiting
     };
     
+    static constexpr glm::ivec2 INITIAL_WINDOW_SIZE = glm::ivec2(800, 600);
     static constexpr float NEAR_PLANE = 0.1f, FAR_PLANE = 100.0f;
     static constexpr unsigned int NUM_CASCADED_SHADOWS = 3;
     static constexpr int NUM_LIGHTS = 8;
@@ -45,7 +46,6 @@ class Renderer {
     static constexpr int ATTRIBUTE_LOCATION_V_BONE = 5;
     static constexpr int ATTRIBUTE_LOCATION_V_WEIGHT = 6;
     Configuration config_;
-    glm::vec2 lastMousePos_;
     
     static GLenum glCheckError_(const char* file, int line);    // Error checking, https://learnopengl.com/In-Practice/Debugging
     static unsigned int loadTexture(const string& filename, bool gammaCorrection, bool flip = true);

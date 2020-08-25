@@ -113,11 +113,13 @@ void processEvent(Renderer& renderer, Camera& camera, World& world, const Event&
             renderer.config_.setSSAO(!renderer.config_.getSSAO());
         }
     } else if (e.type == Event::MouseMove) {
+        static glm::vec2 lastMousePos(Renderer::INITIAL_WINDOW_SIZE.x / 2.0f, Renderer::INITIAL_WINDOW_SIZE.y / 2.0f);
+        
         if (renderer.getState() == Renderer::Running) {
-            camera.processMouseMove(static_cast<float>(e.mouseMove.xpos) - renderer.lastMousePos_.x, renderer.lastMousePos_.y - static_cast<float>(e.mouseMove.ypos));
+            camera.processMouseMove(static_cast<float>(e.mouseMove.xpos) - lastMousePos.x, lastMousePos.y - static_cast<float>(e.mouseMove.ypos));
         }
-        renderer.lastMousePos_.x = static_cast<float>(e.mouseMove.xpos);
-        renderer.lastMousePos_.y = static_cast<float>(e.mouseMove.ypos);
+        lastMousePos.x = static_cast<float>(e.mouseMove.xpos);
+        lastMousePos.y = static_cast<float>(e.mouseMove.ypos);
     } else if (e.type == Event::MouseScroll) {
         if (renderer.getState() == Renderer::Running) {
             camera.processMouseScroll(static_cast<float>(e.mouseScroll.xoffset), static_cast<float>(e.mouseScroll.yoffset));
