@@ -1,6 +1,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include "Camera.h"
 #include "Font.h"
 #include "Framebuffer.h"
 #include "PerformanceMonitor.h"
@@ -169,7 +170,6 @@ unsigned int Renderer::generateTexture(int r, int g, int b) {
 }
 
 Renderer::Renderer(mt19937* randNumGenerator) :// always use this style for uniform init #############################################################
-    camera_(glm::vec3(0.0f, 1.8f, 2.0f)),
     state_(Uninitialized),
     randNumGenerator_(randNumGenerator),
     windowSize_(800, 600),
@@ -273,296 +273,22 @@ void Renderer::setState(State state) {
     }
 }
 
-void Renderer::beginFrame(const World& world) {
-    double currentTime = glfwGetTime();
-    float deltaTime = static_cast<float>(currentTime - lastTime_);
-    lastTime_ = currentTime;
-    
-    performanceMonitors_.at("FRAME")->startGPUTimer();
-    
-    ++frameCounter_;
-    if (currentTime - lastFrameTime_ >= 1.0) {
-        string windowTitle = to_string(frameCounter_) + " FPS (" + to_string(1000.0f / frameCounter_) + " ms/frame)";
-        glfwSetWindowTitle(window_, windowTitle.c_str());
-        frameCounter_ = 0;
-        lastFrameTime_ += 1.0;
-        if (currentTime - lastFrameTime_ >= 1.0) {
-            lastFrameTime_ = currentTime;
-        }
-    }
-    
-    processInput(deltaTime);    // move this into main ######################################################
-    
-    world.modelTest_.animate(0, currentTime, boneTransforms_);
-    geometrySkinningShader_->use();
-    geometrySkinningShader_->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms_.size()), boneTransforms_.data());
-    shadowMapSkinningShader_->use();
-    shadowMapSkinningShader_->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms_.size()), boneTransforms_.data());
+GLFWwindow* Renderer::getWindowHandle() const {
+    return window_;
 }
 
-void Renderer::drawShadowMaps(const World& world) {
-    glm::vec2 tanHalfFOV(tan(glm::radians(camera_.fov_ / 2.0f)) * (static_cast<float>(windowSize_.x) / windowSize_.y), tan(glm::radians(camera_.fov_ / 2.0f)));
-    glm::mat4 lightViewMtx = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), -world.sunPosition_, glm::vec3(0.0f, 1.0f, 0.0f));
-    viewToLightSpace_ = lightViewMtx * glm::inverse(camera_.getViewMatrix());
-    
-    for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {    // Calculate an orthographic projection for each of the cascaded shadow volumes.
-        float xNear = shadowZBounds_[i] * tanHalfFOV.x;
-        float xFar = shadowZBounds_[i + 1] * tanHalfFOV.x;
-        float yNear = shadowZBounds_[i] * tanHalfFOV.y;
-        float yFar = shadowZBounds_[i + 1] * tanHalfFOV.y;
-        
-        glm::vec4 frustumCorners[8] = {
-            { xNear,  yNear, -shadowZBounds_[i], 1.0f},
-            {-xNear,  yNear, -shadowZBounds_[i], 1.0f},
-            { xNear, -yNear, -shadowZBounds_[i], 1.0f},
-            {-xNear, -yNear, -shadowZBounds_[i], 1.0f},
-            
-            { xFar,  yFar, -shadowZBounds_[i + 1], 1.0f},
-            {-xFar,  yFar, -shadowZBounds_[i + 1], 1.0f},
-            { xFar, -yFar, -shadowZBounds_[i + 1], 1.0f},
-            {-xFar, -yFar, -shadowZBounds_[i + 1], 1.0f}
-        };
-        
-        glm::vec3 minBound(numeric_limits<float>::max());
-        glm::vec3 maxBound(numeric_limits<float>::lowest());
-        for (unsigned int j = 0; j < 8; ++j) {
-            frustumCorners[j] = viewToLightSpace_ * frustumCorners[j];    // Convert the frustum corner to light space.
-            
-            minBound.x = min(minBound.x, frustumCorners[j].x);
-            minBound.y = min(minBound.y, frustumCorners[j].y);
-            minBound.z = min(minBound.z, frustumCorners[j].z);
-            
-            maxBound.x = max(maxBound.x, frustumCorners[j].x);
-            maxBound.y = max(maxBound.y, frustumCorners[j].y);
-            maxBound.z = max(maxBound.z, frustumCorners[j].z);
-        }
-        
-        constexpr float NEAR_PLANE_PADDING = FAR_PLANE;    // Extra padding added to near plane to extend the shadow volume behind the camera.
-        shadowProjections_[i] = glm::ortho(minBound.x, maxBound.x, minBound.y, maxBound.y, -maxBound.z - NEAR_PLANE_PADDING, -minBound.z);
-    }
-    
-    glViewport(0, 0, cascadedShadowFBO_[0]->getBufferSize().x, cascadedShadowFBO_[0]->getBufferSize().y);
-    glCullFace(GL_FRONT);
-    for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {    // Render to cascaded shadow maps.
-        cascadedShadowFBO_[i]->bind();
-        glClear(GL_DEPTH_BUFFER_BIT);
-        renderScene(world, lightViewMtx, shadowProjections_[i], true);
-    }
-    glCullFace(GL_BACK);
-}
-
-void Renderer::geometryPass(const World& world) {
-    geometryFBO_->bind();    // Render to geometry buffer (geometry pass).
-    glViewport(0, 0, geometryFBO_->getBufferSize().x, geometryFBO_->getBufferSize().y);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glm::mat4 viewMtx = camera_.getViewMatrix();
-    glm::mat4 projectionMtx = glm::perspective(glm::radians(camera_.fov_), static_cast<float>(windowSize_.x) / windowSize_.y, NEAR_PLANE, FAR_PLANE);
-    renderScene(world, viewMtx, projectionMtx, false);
-    
-    geometryFBO_->bind(GL_READ_FRAMEBUFFER);    // Copy depth buffer over.
-    renderFBO_->bind(GL_DRAW_FRAMEBUFFER);
-    glBlitFramebuffer(0, 0, geometryFBO_->getBufferSize().x, geometryFBO_->getBufferSize().y, 0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-}
-
-void Renderer::applySSAO() {
-    performanceMonitors_.at("SSAO")->startGPUTimer();
-    if (config_.getSSAO()) {
-        ssaoFBO_->bind();    // Render SSAO texture.
-        glViewport(0, 0, ssaoFBO_->getBufferSize().x, ssaoFBO_->getBufferSize().y);
-        glClear(GL_COLOR_BUFFER_BIT);
-        ssaoShader_->use();
-        ssaoShader_->setInt("texPosition", 0);
-        ssaoShader_->setInt("texNormal", 1);
-        ssaoShader_->setInt("texNoise", 2);
-        ssaoShader_->setVec2("noiseScale", glm::vec2(ssaoFBO_->getBufferSize().x / 4.0f, ssaoFBO_->getBufferSize().y / 4.0f));
-        glActiveTexture(GL_TEXTURE0);
-        geometryFBO_->bindTexture(0);
-        glActiveTexture(GL_TEXTURE1);
-        geometryFBO_->bindTexture(1);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, ssaoNoiseTexture_);
-        windowQuad_.drawGeometry();
-        
-        ssaoBlurFBO_->bind();    // Blur SSAO texture.
-        glViewport(0, 0, ssaoBlurFBO_->getBufferSize().x, ssaoBlurFBO_->getBufferSize().y);
-        glClear(GL_COLOR_BUFFER_BIT);
-        ssaoBlurShader_->use();
-        ssaoBlurShader_->setInt("image", 0);
-        glActiveTexture(GL_TEXTURE0);
-        ssaoFBO_->bindTexture(0);
-        windowQuad_.drawGeometry();
-    }
-    performanceMonitors_.at("SSAO")->stopGPUTimer();
-}
-
-void Renderer::lightingPass(const World& world) {
-    renderFBO_->bind();    // Render lighting (lighting pass).
-    glViewport(0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glDisable(GL_DEPTH_TEST);
-    glm::mat4 viewMtx = camera_.getViewMatrix();
-    lightingPassShader_->use();
-    lightingPassShader_->setInt("texPosition", 0);
-    glActiveTexture(GL_TEXTURE0);
-    geometryFBO_->bindTexture(0);
-    lightingPassShader_->setInt("texNormal", 1);
-    glActiveTexture(GL_TEXTURE1);
-    geometryFBO_->bindTexture(1);
-    lightingPassShader_->setInt("texAlbedoSpec", 2);
-    glActiveTexture(GL_TEXTURE2);
-    geometryFBO_->bindTexture(2);
-    lightingPassShader_->setInt("texSSAO", 3);
-    if (config_.getSSAO()) {
-        glActiveTexture(GL_TEXTURE3);
-        ssaoBlurFBO_->bindTexture(0);
-    }
-    for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {
-        lightingPassShader_->setInt("shadowMap[" + to_string(i) + "]", 4 + i);
-        glActiveTexture(GL_TEXTURE4 + i);
-        cascadedShadowFBO_[i]->bindTexture(0);
-        lightingPassShader_->setMat4("viewToLightSpace[" + to_string(i) + "]", shadowProjections_[i] * viewToLightSpace_);
-        lightingPassShader_->setFloat("shadowZEnds[" + to_string(i) + "]", shadowZBounds_[i + 1]);
-    }
-    lightingPassShader_->setBool("applySSAO", config_.getSSAO());
-    lightingPassShader_->setUnsignedIntArray("lightStates", NUM_LIGHTS, world.lightStates_);    // Need a better way to handle passing lights from world to shader #######################################################
-    lightingPassShader_->setUnsignedInt("lights[0].type", 0);
-    lightingPassShader_->setVec3("lights[0].directionViewSpace", viewMtx * glm::vec4(-world.sunPosition_, 0.0f));
-    lightingPassShader_->setVec3("lights[0].ambient", world.sunLight_.ambient);
-    lightingPassShader_->setVec3("lights[0].diffuse", world.sunLight_.diffuse);
-    lightingPassShader_->setVec3("lights[0].specular", world.sunLight_.specular);
-    lightingPassShader_->setUnsignedInt("lights[1].type", 2);
-    lightingPassShader_->setVec3("lights[1].positionViewSpace", viewMtx * glm::vec4(camera_.position_, 1.0f));
-    lightingPassShader_->setVec3("lights[1].directionViewSpace", viewMtx * glm::vec4(camera_.front_, 0.0f));
-    lightingPassShader_->setVec3("lights[1].ambient", world.spotLights_[0].ambient);
-    lightingPassShader_->setVec3("lights[1].diffuse", world.spotLights_[0].diffuse);
-    lightingPassShader_->setVec3("lights[1].specular", world.spotLights_[0].specular);
-    lightingPassShader_->setVec3("lights[1].attenuationVals", world.spotLights_[0].attenuationVals);
-    lightingPassShader_->setVec2("lights[1].cutOff", world.spotLights_[0].cutOff);
-    for (size_t i = 0; i < world.pointLights_.size(); ++i) {
-        lightingPassShader_->setUnsignedInt("lights[" + to_string(i + 2) + "].type", 1);
-        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].positionViewSpace", viewMtx * glm::vec4(world.pointLights_[i].position, 1.0f));
-        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].ambient", world.pointLights_[i].ambient);
-        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].diffuse", world.pointLights_[i].diffuse);
-        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].specular", world.pointLights_[i].specular);
-        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", world.pointLights_[i].attenuationVals);
-    }
-    windowQuad_.drawGeometry();
-    glEnable(GL_DEPTH_TEST);
-}
-
-void Renderer::drawLamps(const World& world) {
-    lampShader_->use();    // Draw lamps.
-    for (size_t i = 0; i < world.pointLights_.size(); ++i) {
-        if (world.lightStates_[i + 2] == 1) {
-            lampShader_->setVec3("lightColor", world.pointLights_[i].specular);
-            world.lightCube_.drawGeometry(*lampShader_, glm::translate(glm::mat4(1.0f), world.pointLights_[i].position));
-        }
-    }
-    lampShader_->setVec3("lightColor", glm::vec3(1.0f, 1.0f, 0.0f));
-    world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), world.sunPosition_ + camera_.position_), glm::vec3(5.0f)));
-}
-
-void Renderer::drawSkybox() {
-    skyboxShader_->use();    // Draw the skybox.
-    glDepthFunc(GL_LEQUAL);
-    glDisable(GL_CULL_FACE);
-    skyboxShader_->setInt("skybox", 0);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxCubemap_);
-    skybox_.drawGeometry();
-    glDepthFunc(GL_LESS);
-    glEnable(GL_CULL_FACE);
-}
-
-void Renderer::applyBloom() {
-    performanceMonitors_.at("BLOOM")->startGPUTimer();
-    if (config_.getBloom()) {
-        bloom1FBO_->bind();    // Compute bloom texture.
-        glViewport(0, 0, bloom1FBO_->getBufferSize().x, bloom1FBO_->getBufferSize().y);
-        glClear(GL_COLOR_BUFFER_BIT);
-        bloomShader_->use();
-        bloomShader_->setInt("image", 0);
-        glActiveTexture(GL_TEXTURE0);
-        renderFBO_->bindTexture(0);
-        windowQuad_.drawGeometry();
-        
-        gaussianBlurShader_->use();    // Apply Gaussian blur to texture.
-        gaussianBlurShader_->setInt("image", 0);
-        glActiveTexture(GL_TEXTURE0);
-        for (unsigned int i = 0; i < 5; ++i) {
-            bloom2FBO_->bind();    // Draw to bloom 2 framebuffer.
-            gaussianBlurShader_->setBool("blurHorizontal", true);
-            bloom1FBO_->bindTexture(0);
-            windowQuad_.drawGeometry();
-            
-            bloom1FBO_->bind();    // Draw to bloom 1 framebuffer.
-            gaussianBlurShader_->setBool("blurHorizontal", false);
-            bloom2FBO_->bindTexture(0);
-            windowQuad_.drawGeometry();
-        }
-    }
-    performanceMonitors_.at("BLOOM")->stopGPUTimer();
-}
-
-void Renderer::drawPostProcessing() {
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);    // Apply post-processing and render to window.
-    glViewport(0, 0, windowSize_.x, windowSize_.y);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glDisable(GL_DEPTH_TEST);
-    postProcessShader_->use();
-    postProcessShader_->setInt("image", 0);
-    postProcessShader_->setInt("bloomBlur", 1);
-    postProcessShader_->setFloat("exposure", 1.0f);
-    postProcessShader_->setBool("applyBloom", config_.getBloom());
-    glActiveTexture(GL_TEXTURE0);
-    renderFBO_->bindTexture(0);
-    if (config_.getBloom()) {
-        glActiveTexture(GL_TEXTURE1);
-        bloom1FBO_->bindTexture(0);
-    }
-    windowQuad_.drawGeometry();
-    glEnable(GL_DEPTH_TEST);
-}
-
-void Renderer::drawGUI() {
-    glEnable(GL_BLEND);    // Render GUI.
-    glDisable(GL_DEPTH_TEST);
-    glm::mat4 windowProjectionMtx = glm::ortho(0.0f, static_cast<float>(windowSize_.x), 0.0f, static_cast<float>(windowSize_.y));
-    shapeShader_->use();
-    textShader_->setMat4("projectionMtx", windowProjectionMtx);
-    shapeShader_->setInt("tex", 0);
-    shapeShader_->setVec4("color", glm::vec4(1.0f, 1.0f, 1.0f, 0.7f));
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, monitorGridTexture_);
-    for (const auto& m : performanceMonitors_) {
-        m.second->drawBox(*shapeShader_, glm::mat4(1.0f));
-    }
-    shapeShader_->setVec4("color", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
-    glBindTexture(GL_TEXTURE_2D, whiteTexture_);
-    for (const auto& m : performanceMonitors_) {
-        m.second->drawLine(*shapeShader_, glm::mat4(1.0f));
-    }
-    textShader_->use();
-    textShader_->setMat4("projectionMtx", windowProjectionMtx);
-    textShader_->setInt("texFont", 0);
-    textShader_->setVec3("color", glm::vec3(0.8f, 0.8f, 0.8f));
-    for (const auto& m : performanceMonitors_) {
-        m.second->drawText(*textShader_, glm::mat4(1.0f));
-    }
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-}
-
-void Renderer::endFrame() {
-    performanceMonitors_.at("FRAME")->stopGPUTimer();
-    
-    for (const auto& m : performanceMonitors_) {    // Monitor update must occur after drawing.
-        m.second->update();
-    }
-    
-    glfwSwapBuffers(window_);
-    glfwPollEvents();
-    glCheckError();
+void Renderer::drawWorld(const Camera& camera, const World& world) {
+    beginFrame(world);
+    drawShadowMaps(camera, world);
+    geometryPass(camera, world);
+    applySSAO();
+    lightingPass(camera, world);
+    drawLamps(camera, world);
+    drawSkybox();
+    applyBloom();
+    drawPostProcessing();
+    drawGUI();
+    endFrame();
 }
 
 bool Renderer::pollEvent(Event& e) {
@@ -844,7 +570,297 @@ void Renderer::setupRender() {
     delete[] rockTransforms;*/
 }
 
-void Renderer::renderScene(const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender) {
+void Renderer::beginFrame(const World& world) {
+    double currentTime = glfwGetTime();
+    float deltaTime = static_cast<float>(currentTime - lastTime_);
+    lastTime_ = currentTime;
+    
+    performanceMonitors_.at("FRAME")->startGPUTimer();
+    
+    ++frameCounter_;
+    if (currentTime - lastFrameTime_ >= 1.0) {
+        string windowTitle = to_string(frameCounter_) + " FPS (" + to_string(1000.0f / frameCounter_) + " ms/frame)";
+        glfwSetWindowTitle(window_, windowTitle.c_str());
+        frameCounter_ = 0;
+        lastFrameTime_ += 1.0;
+        if (currentTime - lastFrameTime_ >= 1.0) {
+            lastFrameTime_ = currentTime;
+        }
+    }
+    
+    world.modelTest_.animate(0, currentTime, boneTransforms_);
+    geometrySkinningShader_->use();
+    geometrySkinningShader_->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms_.size()), boneTransforms_.data());
+    shadowMapSkinningShader_->use();
+    shadowMapSkinningShader_->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms_.size()), boneTransforms_.data());
+}
+
+void Renderer::drawShadowMaps(const Camera& camera, const World& world) {
+    glm::vec2 tanHalfFOV(tan(glm::radians(camera.fov_ / 2.0f)) * (static_cast<float>(windowSize_.x) / windowSize_.y), tan(glm::radians(camera.fov_ / 2.0f)));
+    glm::mat4 lightViewMtx = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), -world.sunPosition_, glm::vec3(0.0f, 1.0f, 0.0f));
+    viewToLightSpace_ = lightViewMtx * glm::inverse(camera.getViewMatrix());
+    
+    for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {    // Calculate an orthographic projection for each of the cascaded shadow volumes.
+        float xNear = shadowZBounds_[i] * tanHalfFOV.x;
+        float xFar = shadowZBounds_[i + 1] * tanHalfFOV.x;
+        float yNear = shadowZBounds_[i] * tanHalfFOV.y;
+        float yFar = shadowZBounds_[i + 1] * tanHalfFOV.y;
+        
+        glm::vec4 frustumCorners[8] = {
+            { xNear,  yNear, -shadowZBounds_[i], 1.0f},
+            {-xNear,  yNear, -shadowZBounds_[i], 1.0f},
+            { xNear, -yNear, -shadowZBounds_[i], 1.0f},
+            {-xNear, -yNear, -shadowZBounds_[i], 1.0f},
+            
+            { xFar,  yFar, -shadowZBounds_[i + 1], 1.0f},
+            {-xFar,  yFar, -shadowZBounds_[i + 1], 1.0f},
+            { xFar, -yFar, -shadowZBounds_[i + 1], 1.0f},
+            {-xFar, -yFar, -shadowZBounds_[i + 1], 1.0f}
+        };
+        
+        glm::vec3 minBound(numeric_limits<float>::max());
+        glm::vec3 maxBound(numeric_limits<float>::lowest());
+        for (unsigned int j = 0; j < 8; ++j) {
+            frustumCorners[j] = viewToLightSpace_ * frustumCorners[j];    // Convert the frustum corner to light space.
+            
+            minBound.x = min(minBound.x, frustumCorners[j].x);
+            minBound.y = min(minBound.y, frustumCorners[j].y);
+            minBound.z = min(minBound.z, frustumCorners[j].z);
+            
+            maxBound.x = max(maxBound.x, frustumCorners[j].x);
+            maxBound.y = max(maxBound.y, frustumCorners[j].y);
+            maxBound.z = max(maxBound.z, frustumCorners[j].z);
+        }
+        
+        constexpr float NEAR_PLANE_PADDING = FAR_PLANE;    // Extra padding added to near plane to extend the shadow volume behind the camera.
+        shadowProjections_[i] = glm::ortho(minBound.x, maxBound.x, minBound.y, maxBound.y, -maxBound.z - NEAR_PLANE_PADDING, -minBound.z);
+    }
+    
+    glViewport(0, 0, cascadedShadowFBO_[0]->getBufferSize().x, cascadedShadowFBO_[0]->getBufferSize().y);
+    glCullFace(GL_FRONT);
+    for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {    // Render to cascaded shadow maps.
+        cascadedShadowFBO_[i]->bind();
+        glClear(GL_DEPTH_BUFFER_BIT);
+        renderScene(camera, world, lightViewMtx, shadowProjections_[i], true);
+    }
+    glCullFace(GL_BACK);
+}
+
+void Renderer::geometryPass(const Camera& camera, const World& world) {
+    geometryFBO_->bind();    // Render to geometry buffer (geometry pass).
+    glViewport(0, 0, geometryFBO_->getBufferSize().x, geometryFBO_->getBufferSize().y);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glm::mat4 viewMtx = camera.getViewMatrix();
+    glm::mat4 projectionMtx = glm::perspective(glm::radians(camera.fov_), static_cast<float>(windowSize_.x) / windowSize_.y, NEAR_PLANE, FAR_PLANE);
+    renderScene(camera, world, viewMtx, projectionMtx, false);
+    
+    geometryFBO_->bind(GL_READ_FRAMEBUFFER);    // Copy depth buffer over.
+    renderFBO_->bind(GL_DRAW_FRAMEBUFFER);
+    glBlitFramebuffer(0, 0, geometryFBO_->getBufferSize().x, geometryFBO_->getBufferSize().y, 0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+}
+
+void Renderer::applySSAO() {
+    performanceMonitors_.at("SSAO")->startGPUTimer();
+    if (config_.getSSAO()) {
+        ssaoFBO_->bind();    // Render SSAO texture.
+        glViewport(0, 0, ssaoFBO_->getBufferSize().x, ssaoFBO_->getBufferSize().y);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ssaoShader_->use();
+        ssaoShader_->setInt("texPosition", 0);
+        ssaoShader_->setInt("texNormal", 1);
+        ssaoShader_->setInt("texNoise", 2);
+        ssaoShader_->setVec2("noiseScale", glm::vec2(ssaoFBO_->getBufferSize().x / 4.0f, ssaoFBO_->getBufferSize().y / 4.0f));
+        glActiveTexture(GL_TEXTURE0);
+        geometryFBO_->bindTexture(0);
+        glActiveTexture(GL_TEXTURE1);
+        geometryFBO_->bindTexture(1);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, ssaoNoiseTexture_);
+        windowQuad_.drawGeometry();
+        
+        ssaoBlurFBO_->bind();    // Blur SSAO texture.
+        glViewport(0, 0, ssaoBlurFBO_->getBufferSize().x, ssaoBlurFBO_->getBufferSize().y);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ssaoBlurShader_->use();
+        ssaoBlurShader_->setInt("image", 0);
+        glActiveTexture(GL_TEXTURE0);
+        ssaoFBO_->bindTexture(0);
+        windowQuad_.drawGeometry();
+    }
+    performanceMonitors_.at("SSAO")->stopGPUTimer();
+}
+
+void Renderer::lightingPass(const Camera& camera, const World& world) {
+    renderFBO_->bind();    // Render lighting (lighting pass).
+    glViewport(0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glDisable(GL_DEPTH_TEST);
+    glm::mat4 viewMtx = camera.getViewMatrix();
+    lightingPassShader_->use();
+    lightingPassShader_->setInt("texPosition", 0);
+    glActiveTexture(GL_TEXTURE0);
+    geometryFBO_->bindTexture(0);
+    lightingPassShader_->setInt("texNormal", 1);
+    glActiveTexture(GL_TEXTURE1);
+    geometryFBO_->bindTexture(1);
+    lightingPassShader_->setInt("texAlbedoSpec", 2);
+    glActiveTexture(GL_TEXTURE2);
+    geometryFBO_->bindTexture(2);
+    lightingPassShader_->setInt("texSSAO", 3);
+    if (config_.getSSAO()) {
+        glActiveTexture(GL_TEXTURE3);
+        ssaoBlurFBO_->bindTexture(0);
+    }
+    for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {
+        lightingPassShader_->setInt("shadowMap[" + to_string(i) + "]", 4 + i);
+        glActiveTexture(GL_TEXTURE4 + i);
+        cascadedShadowFBO_[i]->bindTexture(0);
+        lightingPassShader_->setMat4("viewToLightSpace[" + to_string(i) + "]", shadowProjections_[i] * viewToLightSpace_);
+        lightingPassShader_->setFloat("shadowZEnds[" + to_string(i) + "]", shadowZBounds_[i + 1]);
+    }
+    lightingPassShader_->setBool("applySSAO", config_.getSSAO());
+    lightingPassShader_->setUnsignedIntArray("lightStates", NUM_LIGHTS, world.lightStates_);    // Need a better way to handle passing lights from world to shader #######################################################
+    lightingPassShader_->setUnsignedInt("lights[0].type", 0);
+    lightingPassShader_->setVec3("lights[0].directionViewSpace", viewMtx * glm::vec4(-world.sunPosition_, 0.0f));
+    lightingPassShader_->setVec3("lights[0].ambient", world.sunLight_.ambient);
+    lightingPassShader_->setVec3("lights[0].diffuse", world.sunLight_.diffuse);
+    lightingPassShader_->setVec3("lights[0].specular", world.sunLight_.specular);
+    lightingPassShader_->setUnsignedInt("lights[1].type", 2);
+    lightingPassShader_->setVec3("lights[1].positionViewSpace", viewMtx * glm::vec4(camera.position_, 1.0f));
+    lightingPassShader_->setVec3("lights[1].directionViewSpace", viewMtx * glm::vec4(camera.front_, 0.0f));
+    lightingPassShader_->setVec3("lights[1].ambient", world.spotLights_[0].ambient);
+    lightingPassShader_->setVec3("lights[1].diffuse", world.spotLights_[0].diffuse);
+    lightingPassShader_->setVec3("lights[1].specular", world.spotLights_[0].specular);
+    lightingPassShader_->setVec3("lights[1].attenuationVals", world.spotLights_[0].attenuationVals);
+    lightingPassShader_->setVec2("lights[1].cutOff", world.spotLights_[0].cutOff);
+    for (size_t i = 0; i < world.pointLights_.size(); ++i) {
+        lightingPassShader_->setUnsignedInt("lights[" + to_string(i + 2) + "].type", 1);
+        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].positionViewSpace", viewMtx * glm::vec4(world.pointLights_[i].position, 1.0f));
+        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].ambient", world.pointLights_[i].ambient);
+        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].diffuse", world.pointLights_[i].diffuse);
+        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].specular", world.pointLights_[i].specular);
+        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", world.pointLights_[i].attenuationVals);
+    }
+    windowQuad_.drawGeometry();
+    glEnable(GL_DEPTH_TEST);
+}
+
+void Renderer::drawLamps(const Camera& camera, const World& world) {
+    lampShader_->use();    // Draw lamps.
+    for (size_t i = 0; i < world.pointLights_.size(); ++i) {
+        if (world.lightStates_[i + 2] == 1) {
+            lampShader_->setVec3("lightColor", world.pointLights_[i].specular);
+            world.lightCube_.drawGeometry(*lampShader_, glm::translate(glm::mat4(1.0f), world.pointLights_[i].position));
+        }
+    }
+    lampShader_->setVec3("lightColor", glm::vec3(1.0f, 1.0f, 0.0f));
+    world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), world.sunPosition_ + camera.position_), glm::vec3(5.0f)));
+}
+
+void Renderer::drawSkybox() {
+    skyboxShader_->use();    // Draw the skybox.
+    glDepthFunc(GL_LEQUAL);
+    glDisable(GL_CULL_FACE);
+    skyboxShader_->setInt("skybox", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxCubemap_);
+    skybox_.drawGeometry();
+    glDepthFunc(GL_LESS);
+    glEnable(GL_CULL_FACE);
+}
+
+void Renderer::applyBloom() {
+    performanceMonitors_.at("BLOOM")->startGPUTimer();
+    if (config_.getBloom()) {
+        bloom1FBO_->bind();    // Compute bloom texture.
+        glViewport(0, 0, bloom1FBO_->getBufferSize().x, bloom1FBO_->getBufferSize().y);
+        glClear(GL_COLOR_BUFFER_BIT);
+        bloomShader_->use();
+        bloomShader_->setInt("image", 0);
+        glActiveTexture(GL_TEXTURE0);
+        renderFBO_->bindTexture(0);
+        windowQuad_.drawGeometry();
+        
+        gaussianBlurShader_->use();    // Apply Gaussian blur to texture.
+        gaussianBlurShader_->setInt("image", 0);
+        glActiveTexture(GL_TEXTURE0);
+        for (unsigned int i = 0; i < 5; ++i) {
+            bloom2FBO_->bind();    // Draw to bloom 2 framebuffer.
+            gaussianBlurShader_->setBool("blurHorizontal", true);
+            bloom1FBO_->bindTexture(0);
+            windowQuad_.drawGeometry();
+            
+            bloom1FBO_->bind();    // Draw to bloom 1 framebuffer.
+            gaussianBlurShader_->setBool("blurHorizontal", false);
+            bloom2FBO_->bindTexture(0);
+            windowQuad_.drawGeometry();
+        }
+    }
+    performanceMonitors_.at("BLOOM")->stopGPUTimer();
+}
+
+void Renderer::drawPostProcessing() {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);    // Apply post-processing and render to window.
+    glViewport(0, 0, windowSize_.x, windowSize_.y);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glDisable(GL_DEPTH_TEST);
+    postProcessShader_->use();
+    postProcessShader_->setInt("image", 0);
+    postProcessShader_->setInt("bloomBlur", 1);
+    postProcessShader_->setFloat("exposure", 1.0f);
+    postProcessShader_->setBool("applyBloom", config_.getBloom());
+    glActiveTexture(GL_TEXTURE0);
+    renderFBO_->bindTexture(0);
+    if (config_.getBloom()) {
+        glActiveTexture(GL_TEXTURE1);
+        bloom1FBO_->bindTexture(0);
+    }
+    windowQuad_.drawGeometry();
+    glEnable(GL_DEPTH_TEST);
+}
+
+void Renderer::drawGUI() {
+    glEnable(GL_BLEND);    // Render GUI.
+    glDisable(GL_DEPTH_TEST);
+    glm::mat4 windowProjectionMtx = glm::ortho(0.0f, static_cast<float>(windowSize_.x), 0.0f, static_cast<float>(windowSize_.y));
+    shapeShader_->use();
+    textShader_->setMat4("projectionMtx", windowProjectionMtx);
+    shapeShader_->setInt("tex", 0);
+    shapeShader_->setVec4("color", glm::vec4(1.0f, 1.0f, 1.0f, 0.7f));
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, monitorGridTexture_);
+    for (const auto& m : performanceMonitors_) {
+        m.second->drawBox(*shapeShader_, glm::mat4(1.0f));
+    }
+    shapeShader_->setVec4("color", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+    glBindTexture(GL_TEXTURE_2D, whiteTexture_);
+    for (const auto& m : performanceMonitors_) {
+        m.second->drawLine(*shapeShader_, glm::mat4(1.0f));
+    }
+    textShader_->use();
+    textShader_->setMat4("projectionMtx", windowProjectionMtx);
+    textShader_->setInt("texFont", 0);
+    textShader_->setVec3("color", glm::vec3(0.8f, 0.8f, 0.8f));
+    for (const auto& m : performanceMonitors_) {
+        m.second->drawText(*textShader_, glm::mat4(1.0f));
+    }
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+}
+
+void Renderer::endFrame() {
+    performanceMonitors_.at("FRAME")->stopGPUTimer();
+    
+    for (const auto& m : performanceMonitors_) {    // Monitor update must occur after drawing.
+        m.second->update();
+    }
+    
+    glfwSwapBuffers(window_);
+    glfwPollEvents();
+    glCheckError();
+}
+
+void Renderer::renderScene(const Camera& camera, const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender) {
     Shader* shader;
     if (shadowRender) {
         shader = shadowMapShader_.get();
@@ -890,7 +906,7 @@ void Renderer::renderScene(const World& world, const glm::mat4& viewMtx, const g
     }
     world.cube1_.drawGeometry(*shader, glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, -2.4f, 3.0f)));
     
-    world.cube1_.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), camera_.position_), glm::vec3(0.4f, 0.4f, 0.4f)));
+    world.cube1_.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), camera.position_), glm::vec3(0.4f, 0.4f, 0.4f)));
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, woodTexture_);
@@ -923,31 +939,6 @@ void Renderer::renderScene(const World& world, const glm::mat4& viewMtx, const g
     }
     
     world.modelTest_.draw(*shader, world.modelTestTransform_.getTransform());
-}
-
-void Renderer::processInput(float deltaTime) {
-    glm::vec3 moveDirection(0.0f, 0.0f, 0.0f);
-    if (glfwGetKey(window_, GLFW_KEY_W) == GLFW_PRESS) {
-        moveDirection.z -= 1.0f;
-    }
-    if (glfwGetKey(window_, GLFW_KEY_S) == GLFW_PRESS) {
-        moveDirection.z += 1.0f;
-    }
-    if (glfwGetKey(window_, GLFW_KEY_A) == GLFW_PRESS) {
-        moveDirection.x -= 1.0f;
-    }
-    if (glfwGetKey(window_, GLFW_KEY_D) == GLFW_PRESS) {
-        moveDirection.x += 1.0f;
-    }
-    if (glfwGetKey(window_, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
-        moveDirection.y -= 1.0f;
-    }
-    if (glfwGetKey(window_, GLFW_KEY_SPACE) == GLFW_PRESS) {
-        moveDirection.y += 1.0f;
-    }
-    if (moveDirection != glm::vec3(0.0f, 0.0f, 0.0f)) {
-        camera_.processKeyboard(glm::normalize(moveDirection), deltaTime);
-    }
 }
 
 float Renderer::randomFloat(float min, float max) {

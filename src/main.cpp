@@ -1,3 +1,4 @@
+#include "Camera.h"
 #include "Event.h"
 #include "Renderer.h"
 #include "World.h"
@@ -11,7 +12,8 @@
 
 using namespace std;
 
-void processEvent(Renderer& renderer, World& world, const Event& e);
+void processInput(Renderer& renderer, Camera& camera, World& world);
+void processEvent(Renderer& renderer, Camera& camera, World& world, const Event& e);
 
 int main(int argc, char** argv) {
     cout << "Initializing setup...\n";
@@ -20,24 +22,16 @@ int main(int argc, char** argv) {
     Renderer renderer(&randNumGenerator);
     
     try {
+        Camera camera(glm::vec3(0.0f, 1.8f, 2.0f));
         World world;
         cout << "Setup complete.\n";
         while (renderer.getState() != Renderer::Exiting) {
-            renderer.beginFrame(world);
-            renderer.drawShadowMaps(world);
-            renderer.geometryPass(world);
-            renderer.applySSAO();
-            renderer.lightingPass(world);
-            renderer.drawLamps(world);
-            renderer.drawSkybox();
-            renderer.applyBloom();
-            renderer.drawPostProcessing();
-            renderer.drawGUI();
-            renderer.endFrame();
+            renderer.drawWorld(camera, world);
             
+            processInput(renderer, camera, world);
             Event e;
             while (renderer.pollEvent(e)) {
-                processEvent(renderer, world, e);
+                processEvent(renderer, camera, world, e);
             }
             
             world.nextTick();
@@ -56,7 +50,32 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-void processEvent(Renderer& renderer, World& world, const Event& e) {
+void processInput(Renderer& renderer, Camera& camera, World& world) {
+    glm::vec3 moveDirection(0.0f, 0.0f, 0.0f);
+    if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_W) == GLFW_PRESS) {
+        moveDirection.z -= 1.0f;
+    }
+    if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_S) == GLFW_PRESS) {
+        moveDirection.z += 1.0f;
+    }
+    if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_A) == GLFW_PRESS) {
+        moveDirection.x -= 1.0f;
+    }
+    if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_D) == GLFW_PRESS) {
+        moveDirection.x += 1.0f;
+    }
+    if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
+        moveDirection.y -= 1.0f;
+    }
+    if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_SPACE) == GLFW_PRESS) {
+        moveDirection.y += 1.0f;
+    }
+    if (moveDirection != glm::vec3(0.0f, 0.0f, 0.0f)) {
+        camera.processKeyboard(glm::normalize(moveDirection));
+    }
+}
+
+void processEvent(Renderer& renderer, Camera& camera, World& world, const Event& e) {
     if (e.type == Event::Close) {
         renderer.setState(Renderer::Exiting);
     } else if (e.type == Event::Resize) {
@@ -69,10 +88,10 @@ void processEvent(Renderer& renderer, World& world, const Event& e) {
                 renderer.setState(Renderer::Running);
             }
         } else if (e.key.code == GLFW_KEY_UP) {
-            renderer.camera_.moveSpeed_ *= 2.0f;
+            camera.moveSpeed_ *= 2.0f;
         } else if (e.key.code == GLFW_KEY_DOWN) {
-            if (renderer.camera_.moveSpeed_ > 0.1f) {
-                renderer.camera_.moveSpeed_ /= 2.0f;
+            if (camera.moveSpeed_ > 0.1f) {
+                camera.moveSpeed_ /= 2.0f;
             }
         } else if (e.key.code == GLFW_KEY_F) {
             world.flashlightOn_ = !world.flashlightOn_;
@@ -95,13 +114,13 @@ void processEvent(Renderer& renderer, World& world, const Event& e) {
         }
     } else if (e.type == Event::MouseMove) {
         if (renderer.getState() == Renderer::Running) {
-            renderer.camera_.processMouseMove(static_cast<float>(e.mouseMove.xpos) - renderer.lastMousePos_.x, renderer.lastMousePos_.y - static_cast<float>(e.mouseMove.ypos));
+            camera.processMouseMove(static_cast<float>(e.mouseMove.xpos) - renderer.lastMousePos_.x, renderer.lastMousePos_.y - static_cast<float>(e.mouseMove.ypos));
         }
         renderer.lastMousePos_.x = static_cast<float>(e.mouseMove.xpos);
         renderer.lastMousePos_.y = static_cast<float>(e.mouseMove.ypos);
     } else if (e.type == Event::MouseScroll) {
         if (renderer.getState() == Renderer::Running) {
-            renderer.camera_.processMouseScroll(static_cast<float>(e.mouseScroll.xoffset), static_cast<float>(e.mouseScroll.yoffset));
+            camera.processMouseScroll(static_cast<float>(e.mouseScroll.xoffset), static_cast<float>(e.mouseScroll.yoffset));
         }
     }
 }

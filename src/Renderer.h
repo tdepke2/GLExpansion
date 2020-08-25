@@ -1,6 +1,7 @@
 #ifndef RENDERER_H_
 #define RENDERER_H_
 
+class Camera;
 class Framebuffer;
 class PerformanceMonitor;
 class Shader;
@@ -44,7 +45,6 @@ class Renderer {
     static constexpr int ATTRIBUTE_LOCATION_V_BONE = 5;
     static constexpr int ATTRIBUTE_LOCATION_V_WEIGHT = 6;
     Configuration config_;
-    Camera camera_;
     glm::vec2 lastMousePos_;
     
     static GLenum glCheckError_(const char* file, int line);    // Error checking, https://learnopengl.com/In-Practice/Debugging
@@ -55,17 +55,8 @@ class Renderer {
     ~Renderer();
     State getState() const;
     void setState(State state);
-    void beginFrame(const World& world);    // Stages of the rendering pipeline.
-    void drawShadowMaps(const World& world);
-    void geometryPass(const World& world);
-    void applySSAO();
-    void lightingPass(const World& world);
-    void drawLamps(const World& world);
-    void drawSkybox();
-    void applyBloom();
-    void drawPostProcessing();
-    void drawGUI();
-    void endFrame();
+    GLFWwindow* getWindowHandle() const;
+    void drawWorld(const Camera& camera, const World& world);    // Applies each stage of the rendering pipeline to draw the scene.
     bool pollEvent(Event& e);    // Grab the next event from the event queue.
     void resizeBuffers(int width, int height);    // Resize the internal render buffers used for drawing to the window.
     
@@ -102,7 +93,18 @@ class Renderer {
     void setupShaders();
     void setupBuffers();
     void setupRender();
-    void renderScene(const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender);
+    void beginFrame(const World& world);    // Stages of the rendering pipeline.
+    void drawShadowMaps(const Camera& camera, const World& world);
+    void geometryPass(const Camera& camera, const World& world);
+    void applySSAO();
+    void lightingPass(const Camera& camera, const World& world);
+    void drawLamps(const Camera& camera, const World& world);
+    void drawSkybox();
+    void applyBloom();
+    void drawPostProcessing();
+    void drawGUI();
+    void endFrame();
+    void renderScene(const Camera& camera, const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender);
     void processInput(float deltaTime);
     float randomFloat(float min = 0.0f, float max = 1.0f);    // Generates a random float between min (inclusive) and max (exclusive).
     int randomInt(int min, int max);    // Generates a random integer between min and max inclusive.
