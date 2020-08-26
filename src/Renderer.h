@@ -14,7 +14,6 @@ class World;
 #include <glm/gtc/type_ptr.hpp>
 #define glCheckError() Renderer::glCheckError_(__FILE__, __LINE__)
 
-#include "Camera.h"
 #include "Configuration.h"
 #include "Event.h"
 #include "Mesh.h"
@@ -50,7 +49,7 @@ class Renderer {
     static GLenum glCheckError_(const char* file, int line);    // Error checking, https://learnopengl.com/In-Practice/Debugging
     static unsigned int loadTexture(const string& filename, bool gammaCorrection, bool flip = true);
     static unsigned int loadCubemap(const string& filename, bool gammaCorrection, bool flip = false);
-    static unsigned int generateTexture(int r, int g, int b);    // Change to float plox #################################################################
+    static unsigned int generateTexture(float r, float g, float b, float a = 1.0f);
     Renderer(mt19937* randNumGenerator);
     ~Renderer();
     State getState() const;

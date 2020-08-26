@@ -7,8 +7,9 @@
 #include <iostream>
 #include <stdexcept>
 
-Font::Font() {
+Font::Font(const string& filename, unsigned int fontSize) {
     bitmapHandle_ = 0;
+    loadFont(filename, fontSize);
 }
 
 Font::~Font() {

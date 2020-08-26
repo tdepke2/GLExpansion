@@ -17,7 +17,7 @@ class Font {
         unsigned int advance;    // Offset to advance to next glyph.
     };
     
-    Font();
+    Font(const string& filename, unsigned int fontSize);
     ~Font();
     unsigned int getBitmapHandle() const;
     const glm::uvec2& getBitmapSize() const;

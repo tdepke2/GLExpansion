@@ -141,8 +141,8 @@ unsigned int Renderer::loadCubemap(const string& filename, bool gammaCorrection,
     return texHandle;
 }
 
-unsigned int Renderer::generateTexture(int r, int g, int b) {
-    string textureName = "color " + to_string(r) + " " + to_string(g) + " " + to_string(b);
+unsigned int Renderer::generateTexture(float r, float g, float b, float a) {
+    string textureName = "color " + to_string(r) + " " + to_string(g) + " " + to_string(b) + " " + to_string(a);
     auto findResult = loadedTextures_.find(textureName);
     if (findResult != loadedTextures_.end()) {
         return findResult->second;
@@ -156,13 +156,12 @@ unsigned int Renderer::generateTexture(int r, int g, int b) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    GLubyte* imageData = new GLubyte[8 * 8 * 3];
-    for (int i = 0; i < 8 * 8 * 3; i += 3) {
-        imageData[i] = static_cast<GLubyte>(r);
-        imageData[i + 1] = static_cast<GLubyte>(g);
-        imageData[i + 2] = static_cast<GLubyte>(b);
+    vector<glm::vec4> imageData;
+    imageData.reserve(8 * 8);
+    for (size_t i = 0; i < 8 * 8; ++i) {
+        imageData.emplace_back(r, g, b, a);
     }
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 8, 8, 0, GL_RGB, GL_UNSIGNED_BYTE, imageData);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 8, 8, 0, GL_RGBA, GL_FLOAT, imageData.data());
     glGenerateMipmap(GL_TEXTURE_2D);
     
     loadedTextures_[textureName] = texHandle;
@@ -189,8 +188,7 @@ Renderer::Renderer(mt19937* randNumGenerator) :// always use this style for unif
     config_.setBloom(true);
     config_.setSSAO(true);
     
-    shared_ptr<Font> arialFont = make_shared<Font>();    // why not combine these two, no reason to reset a font. #####################################################################################
-    arialFont->loadFont("fonts/arial.ttf", 15);
+    shared_ptr<Font> arialFont = make_shared<Font>("fonts/arial.ttf", 15);
     
     performanceMonitors_.emplace(make_pair("FRAME", new PerformanceMonitor("FRAME", arialFont))).first->second->modelMtx_ = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
     performanceMonitors_.emplace(make_pair("SSAO", new PerformanceMonitor("SSAO", arialFont))).first->second->modelMtx_ = glm::translate(glm::mat4(1.0f), glm::vec3(220.0f, 0.0f, 0.0f));
@@ -403,9 +401,9 @@ void Renderer::setupOpenGL() {
 }
 
 void Renderer::setupTextures() {
-    blackTexture_ = generateTexture(0, 0, 0);
-    whiteTexture_ = generateTexture(255, 255, 255);
-    blueTexture_ = generateTexture(127, 127, 255);
+    blackTexture_ = generateTexture(0.0f, 0.0f, 0.0f);
+    whiteTexture_ = generateTexture(1.0f, 1.0f, 1.0f);
+    blueTexture_ = generateTexture(0.5f, 0.5f, 1.0f);
     cubeDiffuseMap_ = loadTexture("textures/container2.png", true);
     cubeSpecularMap_ = loadTexture("textures/container2_specular.png", false);
     woodTexture_ = loadTexture("textures/wood.png", true);
