@@ -1,6 +1,6 @@
 #version 330 core
 
-const uint NUM_LIGHTS = 8u;
+const uint NUM_LIGHTS = 64u;
 const uint DIRECTIONAL_LIGHT = 0u;
 const uint POINT_LIGHT = 1u;
 const uint SPOT_LIGHT = 2u;

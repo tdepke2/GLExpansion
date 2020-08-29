@@ -390,6 +390,7 @@ void Renderer::setupOpenGL() {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glDisable(GL_BLEND);
+    glBlendEquation(GL_FUNC_ADD);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_CULL_FACE);
     glFrontFace(GL_CCW);
@@ -486,7 +487,7 @@ void Renderer::setupBuffers() {
     geometryFBO_ = make_unique<Framebuffer>(windowSize_);
     geometryFBO_->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Position color buffer.
     geometryFBO_->attachTexture(GL_COLOR_ATTACHMENT1, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Normal color buffer.
-    geometryFBO_->attachTexture(GL_COLOR_ATTACHMENT2, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Albedo and specular color buffer.
+    geometryFBO_->attachTexture(GL_COLOR_ATTACHMENT2, GL_RGBA16F, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Albedo and specular color buffer.
     geometryFBO_->attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT);
     geometryFBO_->setDrawBuffers({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2});
     geometryFBO_->validate();
@@ -536,6 +537,8 @@ void Renderer::setupRender() {
         0, 1, 2, 2, 3, 0
     };
     windowQuad_.generateMesh(move(windowQuadVertices), move(windowQuadIndices));
+    
+    sphere_.generateSphere(1.0f, 16, 8);
     
     skybox_.generateCube(2.0f);
     
@@ -750,8 +753,24 @@ void Renderer::drawLamps(const Camera& camera, const World& world) {
             world.lightCube_.drawGeometry(*lampShader_, glm::translate(glm::mat4(1.0f), world.pointLights_[i].position));
         }
     }
-    lampShader_->setVec3("lightColor", glm::vec3(1.0f, 1.0f, 0.0f));
-    world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), world.sunPosition_ + camera.position_), glm::vec3(5.0f)));
+    if (world.sunlightOn_) {
+        lampShader_->setVec3("lightColor", glm::vec3(1.0f, 1.0f, 0.0f));    // Draw the sun.
+        world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), world.sunPosition_ + camera.position_), glm::vec3(5.0f)));
+    }
+    
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+    //glDepthMask(false);
+    // draw light volumes for testing (wip).
+    lampShader_->setVec3("lightColor", glm::vec3(0.5f, 0.5f, 0.5f));
+    for (size_t i = 0; i < world.pointLights_.size(); ++i) {
+        if (world.lightStates_[i + 2] == 1) {
+            sphere_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), world.pointLights_[i].position), glm::vec3(calcLightRadius(world.pointLights_[i].specular, world.pointLights_[i].attenuationVals))));    // specular here should be just the light color. ######################################################
+        }
+    }
+    glDisable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    //glDepthMask(true);
 }
 
 void Renderer::drawSkybox() {
@@ -946,4 +965,9 @@ float Renderer::randomFloat(float min, float max) {
 int Renderer::randomInt(int min, int max) {
     uniform_int_distribution<int> minMaxRange(min, max);
     return minMaxRange(*randNumGenerator_);
+}
+
+float Renderer::calcLightRadius(const glm::vec3& lightColor, const glm::vec3& attenuation) const {
+    float intensityMax = max(max(lightColor.r, lightColor.g), lightColor.b);    // Equation derived from https://learnopengl.com/Advanced-Lighting/Deferred-Shading
+    return (-attenuation.y + sqrt(attenuation.y * attenuation.y - 4.0f * attenuation.z * (attenuation.x - (256.0f / 5.0f) * intensityMax))) / (2.0f * attenuation.z);
 }
