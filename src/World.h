@@ -8,6 +8,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <vector>
 
 using namespace std;
 
@@ -18,8 +19,9 @@ struct DirectionalLight {
 
 struct PointLight {
     glm::vec3 position;
-    glm::vec3 ambient, diffuse, specular;
-    glm::vec3 attenuationVals;
+    glm::vec3 color;
+    glm::vec3 phongVals;
+    glm::vec3 attenuation;
 };
 
 struct SpotLight {
@@ -32,7 +34,12 @@ struct SpotLight {
 
 class World {
     public:
-    Mesh lightCube_, cube1_, sphere1_;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_TRANSLATION = 5;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_COLOR = 6;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_PHONG_VALS = 7;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_ATTENUATION = 8;
+    
+    Mesh lightCube_, lightSphere_, cube1_, sphere1_;
     ModelStatic sceneTest_;
     ModelRigged modelTest_;
     Transformable sceneTestTransform_, modelTestTransform_;

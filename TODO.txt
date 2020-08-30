@@ -1,4 +1,5 @@
 Additions:
+    * Need a logger class for easier debugging, it should accept a message and type (graphics, physics, audio, etc).
     * Add procedural terrain generation.
     * Add water physics.
     * Add entities with AI.
@@ -6,6 +7,8 @@ Additions:
     * Add better way to handle animations and transition between them.
 
 Fixes:
+    * Need a better way to render models so that gl calls are minimized.
+        - Possibly a scene graph with dirty flag optimization, or other method to group draw calls by shader/materials.
     * Renderer needs a better interface so that you can draw, for example, nothing.
     * Add NonCopyable interface for things like Mesh and Shader.
     * Figure out why DAE/FBX models aren't working (likely a blender issue).

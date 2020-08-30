@@ -88,6 +88,10 @@ Mesh& Mesh::operator=(Mesh&& mesh) {
     return *this;
 }
 
+void Mesh::bindVAO() const {
+    glBindVertexArray(vertexArrayHandle_);
+}
+
 void Mesh::generateMesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices) {
     vertexPositions_.reserve(vertices.size());
     for (const Vertex& v : vertices) {
@@ -247,7 +251,7 @@ void Mesh::generateSphere(float radius, int numSectors, int numStacks) {
     generateMesh(move(vertices), move(indices));
 }
 
-void Mesh::applyInstanceBuffer(unsigned int startIndex) const {
+void Mesh::applyMat4InstanceBuffer(unsigned int startIndex) const {
     glBindVertexArray(vertexArrayHandle_);
     glEnableVertexAttribArray(startIndex);
     glVertexAttribPointer(startIndex, 4, GL_FLOAT, false, 4 * sizeof(glm::vec4), reinterpret_cast<void*>(0));
@@ -282,15 +286,15 @@ void Mesh::drawGeometry(const Shader& shader, const glm::mat4& modelMtx) const {
     glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices_.size()), GL_UNSIGNED_INT, 0);
 }
 
-void Mesh::drawInstanced(const Shader& shader, unsigned int count) const {
+void Mesh::drawInstanced(unsigned int count) const {
     for (const Texture& t : textures_) {
         glActiveTexture(GL_TEXTURE0 + t.index);
         glBindTexture(GL_TEXTURE_2D, t.handle);
     }
-    drawGeometryInstanced(shader, count);
+    drawGeometryInstanced(count);
 }
 
-void Mesh::drawGeometryInstanced(const Shader& shader, unsigned int count) const {
+void Mesh::drawGeometryInstanced(unsigned int count) const {
     glBindVertexArray(vertexArrayHandle_);
     glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(indices_.size()), GL_UNSIGNED_INT, 0, count);
 }

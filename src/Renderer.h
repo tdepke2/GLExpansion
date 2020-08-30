@@ -37,13 +37,13 @@ class Renderer {
     static constexpr float NEAR_PLANE = 0.1f, FAR_PLANE = 100.0f;
     static constexpr unsigned int NUM_CASCADED_SHADOWS = 3;
     static constexpr unsigned int NUM_LIGHTS = 64;
-    static constexpr int ATTRIBUTE_LOCATION_V_POSITION = 0;
-    static constexpr int ATTRIBUTE_LOCATION_V_NORMAL = 1;
-    static constexpr int ATTRIBUTE_LOCATION_V_TEX_COORDS = 2;
-    static constexpr int ATTRIBUTE_LOCATION_V_TANGENT = 3;
-    static constexpr int ATTRIBUTE_LOCATION_V_BITANGENT = 4;
-    static constexpr int ATTRIBUTE_LOCATION_V_BONE = 5;
-    static constexpr int ATTRIBUTE_LOCATION_V_WEIGHT = 6;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_POSITION = 0;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_NORMAL = 1;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_TEX_COORDS = 2;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_TANGENT = 3;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_BITANGENT = 4;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_BONE = 5;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_WEIGHT = 6;
     Configuration config_;
     
     static GLenum glCheckError_(const char* file, int line);    // Error checking, https://learnopengl.com/In-Practice/Debugging
@@ -75,7 +75,7 @@ class Renderer {
     unique_ptr<Framebuffer> bloom1FBO_, bloom2FBO_, ssaoFBO_, ssaoBlurFBO_;
     unsigned int blackTexture_, whiteTexture_, blueTexture_, cubeDiffuseMap_, cubeSpecularMap_, woodTexture_, skyboxCubemap_, brickDiffuseMap_, brickNormalMap_, ssaoNoiseTexture_, monitorGridTexture_;
     unsigned int viewProjectionMtxUBO_;
-    Mesh windowQuad_, sphere_, skybox_;
+    Mesh windowQuad_, skybox_;
     float shadowZBounds_[NUM_CASCADED_SHADOWS + 1];
     double lastTime_, lastFrameTime_;
     int frameCounter_;

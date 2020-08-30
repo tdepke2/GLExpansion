@@ -538,36 +538,7 @@ void Renderer::setupRender() {
     };
     windowQuad_.generateMesh(move(windowQuadVertices), move(windowQuadIndices));
     
-    sphere_.generateSphere(1.0f, 16, 8);
-    
     skybox_.generateCube(2.0f);
-    
-    // Instancing example.
-    /*planetModel.loadFile("models/planet/planet.obj");
-    rockModel.loadFile("models/rock/rock.obj");
-    
-    constexpr int NUM_ROCKS = 1000;
-    glm::mat4* rockTransforms = new glm::mat4[NUM_ROCKS];
-    constexpr float RADIUS = 50.0f, OFFSET = 2.5f;
-    for (int i = 0; i < NUM_ROCKS; ++i) {
-        glm::mat4 modelMtx(1.0f);
-        float angle = static_cast<float>(i) / NUM_ROCKS * 360.0f;
-        float x = sin(angle) * RADIUS + (randomInt(0, static_cast<int>(2 * OFFSET * 100 - 1)) / 100.0f - OFFSET);
-        float y = (randomInt(0, static_cast<int>(2 * OFFSET * 100 - 1)) / 100.0f - OFFSET) * 0.4f;
-        float z = cos(angle) * RADIUS + randomInt(0, static_cast<int>(2 * OFFSET * 100 - 1)) / 100.0f - OFFSET;
-        modelMtx = glm::translate(modelMtx, glm::vec3(x, y, z));
-        modelMtx = glm::scale(modelMtx, glm::vec3(randomInt(0, 19) / 100.0f + 0.05f));
-        modelMtx = glm::rotate(modelMtx, randomFloat(0.0f, 360.0f), glm::vec3(0.4f, 0.6f, 0.8f));
-        
-        rockTransforms[i] = modelMtx;
-    }
-    
-    unsigned int instanceBuffer;
-    glGenBuffers(1, &instanceBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, instanceBuffer);
-    glBufferData(GL_ARRAY_BUFFER, NUM_ROCKS * sizeof(glm::mat4), &rockTransforms[0], GL_STATIC_DRAW);
-    rockModel.applyInstanceBuffer(3);
-    delete[] rockTransforms;*/
 }
 
 void Renderer::beginFrame(const World& world) {
@@ -736,10 +707,10 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
     for (size_t i = 0; i < world.pointLights_.size(); ++i) {
         lightingPassShader_->setUnsignedInt("lights[" + to_string(i + 2) + "].type", 1);
         lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].positionViewSpace", viewMtx * glm::vec4(world.pointLights_[i].position, 1.0f));
-        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].ambient", world.pointLights_[i].ambient);
-        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].diffuse", world.pointLights_[i].diffuse);
-        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].specular", world.pointLights_[i].specular);
-        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", world.pointLights_[i].attenuationVals);
+        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].ambient", world.pointLights_[i].color * world.pointLights_[i].phongVals.x);
+        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].diffuse", world.pointLights_[i].color * world.pointLights_[i].phongVals.y);
+        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].specular", world.pointLights_[i].color * world.pointLights_[i].phongVals.z);
+        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", world.pointLights_[i].attenuation);
     }
     windowQuad_.drawGeometry();
     glEnable(GL_DEPTH_TEST);
@@ -747,18 +718,19 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
 
 void Renderer::drawLamps(const Camera& camera, const World& world) {
     lampShader_->use();    // Draw lamps.
-    for (size_t i = 0; i < world.pointLights_.size(); ++i) {
-        if (world.lightStates_[i + 2] == 1) {
-            lampShader_->setVec3("lightColor", world.pointLights_[i].specular);
-            world.lightCube_.drawGeometry(*lampShader_, glm::translate(glm::mat4(1.0f), world.pointLights_[i].position));
+    //for (size_t i = 0; i < world.pointLights_.size(); ++i) {
+        if (world.lightStates_[2] == 1) {
+            //lampShader_->setVec3("lightColor", glm::vec3(1.0f, 0.0f, 0.0f));
+            world.lightCube_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
+            world.lightSphere_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
         }
-    }
-    if (world.sunlightOn_) {
+    //}
+    /*if (world.sunlightOn_) {
         lampShader_->setVec3("lightColor", glm::vec3(1.0f, 1.0f, 0.0f));    // Draw the sun.
         world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), world.sunPosition_ + camera.position_), glm::vec3(5.0f)));
-    }
+    }*/
     
-    glEnable(GL_BLEND);
+    /*glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE);
     //glDepthMask(false);
     // draw light volumes for testing (wip).
@@ -769,7 +741,7 @@ void Renderer::drawLamps(const Camera& camera, const World& world) {
         }
     }
     glDisable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);*/
     //glDepthMask(true);
 }
 

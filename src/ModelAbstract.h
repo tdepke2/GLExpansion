@@ -31,8 +31,8 @@ class ModelAbstract : public DrawableInterface {
     virtual void draw(const Shader& shader, const glm::mat4& modelMtx) const;
     virtual void drawGeometry() const;
     virtual void drawGeometry(const Shader& shader, const glm::mat4& modelMtx) const;
-    virtual void drawInstanced(const Shader& shader, unsigned int count) const;
-    virtual void drawGeometryInstanced(const Shader& shader, unsigned int count) const;
+    virtual void drawInstanced(unsigned int count) const;
+    virtual void drawGeometryInstanced(unsigned int count) const;
     
     protected:
     static inline glm::vec3 castVec3(const aiVector3D& v) { return glm::vec3(v.x, v.y, v.z); }

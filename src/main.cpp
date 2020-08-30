@@ -90,7 +90,7 @@ void processEvent(Renderer& renderer, Camera& camera, World& world, const Event&
         } else if (e.key.code == GLFW_KEY_UP) {
             camera.moveSpeed_ *= 2.0f;
         } else if (e.key.code == GLFW_KEY_DOWN) {
-            if (camera.moveSpeed_ > 0.1f) {
+            if (camera.moveSpeed_ > 0.001f) {
                 camera.moveSpeed_ /= 2.0f;
             }
         } else if (e.key.code == GLFW_KEY_F) {

@@ -1,4 +1,6 @@
 #include "World.h"
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
 #include <random>
 
 World::World() :
@@ -9,6 +11,7 @@ World::World() :
     sunSpeed_(0.016f) {
     
     lightCube_.generateCube(0.2f);
+    lightSphere_.generateSphere(1.0f, 16, 8);
     cube1_.generateCube();
     sphere1_.generateSphere();
     
@@ -28,28 +31,24 @@ World::World() :
     
     pointLights_.resize(4);
     pointLights_[0].position = glm::vec3(0.7f, 0.2f, 2.0f);
-    pointLights_[0].ambient = glm::vec3(5.0f, 5.0f, 5.0f) * 0.05f;
-    pointLights_[0].diffuse = glm::vec3(5.0f, 5.0f, 5.0f) * 0.8f;
-    pointLights_[0].specular = glm::vec3(5.0f, 5.0f, 5.0f);
-    pointLights_[0].attenuationVals = glm::vec3(1.0f, 0.7f, 1.8f);
+    pointLights_[0].color = glm::vec3(5.0f, 5.0f, 5.0f);
+    pointLights_[0].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
+    pointLights_[0].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
     
     pointLights_[1].position = glm::vec3(2.3f, -3.3f, -4.0f);
-    pointLights_[1].ambient = glm::vec3(10.0f, 0.0f, 0.0f) * 0.05f;
-    pointLights_[1].diffuse = glm::vec3(10.0f, 0.0f, 0.0f) * 0.8f;
-    pointLights_[1].specular = glm::vec3(10.0f, 0.0f, 0.0f);
-    pointLights_[1].attenuationVals = glm::vec3(1.0f, 0.7f, 1.8f);
+    pointLights_[1].color = glm::vec3(10.0f, 0.0f, 0.0f);
+    pointLights_[1].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
+    pointLights_[1].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
     
     pointLights_[2].position = glm::vec3(-4.0f, 2.0f, -12.0f);
-    pointLights_[2].ambient = glm::vec3(0.0f, 0.0f, 15.0f) * 0.05f;
-    pointLights_[2].diffuse = glm::vec3(0.0f, 0.0f, 15.0f) * 0.8f;
-    pointLights_[2].specular = glm::vec3(0.0f, 0.0f, 15.0f);
-    pointLights_[2].attenuationVals = glm::vec3(1.0f, 0.7f, 1.8f);
+    pointLights_[2].color = glm::vec3(0.0f, 0.0f, 15.0f);
+    pointLights_[2].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
+    pointLights_[2].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
     
     pointLights_[3].position = glm::vec3(0.0f, 0.0f, -3.0f);
-    pointLights_[3].ambient = glm::vec3(0.0f, 5.0f, 0.0f) * 0.05f;
-    pointLights_[3].diffuse = glm::vec3(0.0f, 5.0f, 0.0f) * 0.8f;
-    pointLights_[3].specular = glm::vec3(0.0f, 5.0f, 0.0f);
-    pointLights_[3].attenuationVals = glm::vec3(1.0f, 0.7f, 1.8f);
+    pointLights_[3].color = glm::vec3(0.0f, 5.0f, 0.0f);
+    pointLights_[3].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
+    pointLights_[3].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
     
     mt19937 rng;
     rng.seed(1);
@@ -59,12 +58,42 @@ World::World() :
     pointLights_.resize(Renderer::NUM_LIGHTS - 2);
     for (size_t i = 4; i < pointLights_.size(); ++i) {
         pointLights_[i].position = glm::vec3(randRange(rng), randRange(rng), randRange(rng));
-        glm::vec3 color(randColor(rng), randColor(rng), randColor(rng));
-        pointLights_[i].ambient = color * 0.05f;
-        pointLights_[i].diffuse = color * 0.8f;
-        pointLights_[i].specular = color;
-        pointLights_[i].attenuationVals = glm::vec3(1.0f, 0.7f, 1.8f);
+        pointLights_[i].color = glm::vec3(randColor(rng), randColor(rng), randColor(rng));
+        pointLights_[i].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
+        pointLights_[i].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
     }
+    
+    unsigned int instanceBuffer;
+    glGenBuffers(1, &instanceBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, instanceBuffer);
+    glBufferData(GL_ARRAY_BUFFER, pointLights_.size() * sizeof(PointLight), pointLights_.data(), GL_STATIC_DRAW);
+    lightCube_.bindVAO();
+    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_TRANSLATION);
+    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_TRANSLATION, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(0));
+    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_TRANSLATION, 1);
+    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_COLOR);
+    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_COLOR, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(float) * 3));
+    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_COLOR, 1);
+    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_PHONG_VALS);
+    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_PHONG_VALS, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(float) * 6));
+    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_PHONG_VALS, 1);
+    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_ATTENUATION);
+    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_ATTENUATION, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(float) * 9));
+    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_ATTENUATION, 1);
+    
+    lightSphere_.bindVAO();
+    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_TRANSLATION);
+    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_TRANSLATION, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(0));
+    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_TRANSLATION, 1);
+    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_COLOR);
+    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_COLOR, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(float) * 3));
+    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_COLOR, 1);
+    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_PHONG_VALS);
+    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_PHONG_VALS, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(float) * 6));
+    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_PHONG_VALS, 1);
+    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_ATTENUATION);
+    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_ATTENUATION, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(float) * 9));
+    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_ATTENUATION, 1);
     
     spotLights_.resize(1);
     spotLights_[0].ambient = glm::vec3(1.0f, 1.0f, 1.0f) * 0.0f;

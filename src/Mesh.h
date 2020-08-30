@@ -61,18 +61,19 @@ class Mesh : public DrawableInterface {
     Mesh& operator=(const Mesh& mesh) = delete;
     Mesh(Mesh&& mesh);
     Mesh& operator=(Mesh&& mesh);
-    void generateMesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices);
+    void bindVAO() const;
+    void generateMesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices);    // Sets up the mesh buffers and vertex array given the Vertex data.
     void generateMesh(vector<Vertex>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures);
-    void generateMesh(vector<VertexBone>&& vertices, vector<unsigned int>&& indices);
+    void generateMesh(vector<VertexBone>&& vertices, vector<unsigned int>&& indices);     // Sets up the mesh buffers and vertex array given the VertexBone data.
     void generateMesh(vector<VertexBone>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures);
     void generateCube(float sideLength = 1.0f);
     void generateSphere(float radius = 1.0f, int numSectors = 32, int numStacks = 16);
-    void applyInstanceBuffer(unsigned int startIndex) const;
+    void applyMat4InstanceBuffer(unsigned int startIndex) const;    // Binds the vertex array and sets attributes for the currently bound buffer (buffer should contain mat4 data). This uses attributes startIndex to startIndex + 3.
     void draw(const Shader& shader, const glm::mat4& modelMtx) const;
     void drawGeometry() const;
     void drawGeometry(const Shader& shader, const glm::mat4& modelMtx) const;
-    void drawInstanced(const Shader& shader, unsigned int count) const;
-    void drawGeometryInstanced(const Shader& shader, unsigned int count) const;
+    void drawInstanced(unsigned int count) const;
+    void drawGeometryInstanced(unsigned int count) const;
     
     private:
     unsigned int vertexArrayHandle_, vertexBufferHandle_, elementBufferHandle_;

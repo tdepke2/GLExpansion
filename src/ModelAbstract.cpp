@@ -32,15 +32,15 @@ void ModelAbstract::drawGeometry(const Shader& shader, const glm::mat4& modelMtx
     }
 }
 
-void ModelAbstract::drawInstanced(const Shader& shader, unsigned int count) const {
+void ModelAbstract::drawInstanced(unsigned int count) const {
     for (const Mesh& m : meshes_) {
-        m.drawInstanced(shader, count);
+        m.drawInstanced(count);
     }
 }
 
-void ModelAbstract::drawGeometryInstanced(const Shader& shader, unsigned int count) const {
+void ModelAbstract::drawGeometryInstanced(unsigned int count) const {
     for (const Mesh& m : meshes_) {
-        m.drawGeometryInstanced(shader, count);
+        m.drawGeometryInstanced(count);
     }
 }
 
