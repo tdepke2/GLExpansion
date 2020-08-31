@@ -251,19 +251,19 @@ void Mesh::generateSphere(float radius, int numSectors, int numStacks) {
     generateMesh(move(vertices), move(indices));
 }
 
-void Mesh::applyMat4InstanceBuffer(unsigned int startIndex) const {
+void Mesh::applyMat4InstanceBuffer(unsigned int startIndex, unsigned int stride, size_t offset) const {
     glBindVertexArray(vertexArrayHandle_);
     glEnableVertexAttribArray(startIndex);
-    glVertexAttribPointer(startIndex, 4, GL_FLOAT, false, 4 * sizeof(glm::vec4), reinterpret_cast<void*>(0));
+    glVertexAttribPointer(startIndex, 4, GL_FLOAT, false, stride, reinterpret_cast<void*>(offset));
     glVertexAttribDivisor(startIndex, 1);
     glEnableVertexAttribArray(startIndex + 1);
-    glVertexAttribPointer(startIndex + 1, 4, GL_FLOAT, false, 4 * sizeof(glm::vec4), reinterpret_cast<void*>(1 * sizeof(glm::vec4)));
+    glVertexAttribPointer(startIndex + 1, 4, GL_FLOAT, false, stride, reinterpret_cast<void*>(offset + 1 * sizeof(glm::vec4)));
     glVertexAttribDivisor(startIndex + 1, 1);
     glEnableVertexAttribArray(startIndex + 2);
-    glVertexAttribPointer(startIndex + 2, 4, GL_FLOAT, false, 4 * sizeof(glm::vec4), reinterpret_cast<void*>(2 * sizeof(glm::vec4)));
+    glVertexAttribPointer(startIndex + 2, 4, GL_FLOAT, false, stride, reinterpret_cast<void*>(offset + 2 * sizeof(glm::vec4)));
     glVertexAttribDivisor(startIndex + 2, 1);
     glEnableVertexAttribArray(startIndex + 3);
-    glVertexAttribPointer(startIndex + 3, 4, GL_FLOAT, false, 4 * sizeof(glm::vec4), reinterpret_cast<void*>(3 * sizeof(glm::vec4)));
+    glVertexAttribPointer(startIndex + 3, 4, GL_FLOAT, false, stride, reinterpret_cast<void*>(offset + 3 * sizeof(glm::vec4)));
     glVertexAttribDivisor(startIndex + 3, 1);
 }
 

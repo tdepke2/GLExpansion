@@ -30,25 +30,25 @@ World::World() :
     sunLight_.specular = glm::vec3(1.0f, 1.0f, 1.0f) * 0.5f;
     
     pointLights_.resize(4);
-    pointLights_[0].position = glm::vec3(0.7f, 0.2f, 2.0f);
     pointLights_[0].color = glm::vec3(5.0f, 5.0f, 5.0f);
     pointLights_[0].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
     pointLights_[0].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
+    pointLights_[0].modelMtx = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.7f, 0.2f, 2.0f)), glm::vec3(calcLightRadius(pointLights_[0].color, pointLights_[0].attenuation)));
     
-    pointLights_[1].position = glm::vec3(2.3f, -3.3f, -4.0f);
     pointLights_[1].color = glm::vec3(10.0f, 0.0f, 0.0f);
     pointLights_[1].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
     pointLights_[1].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
+    pointLights_[1].modelMtx = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(2.3f, -3.3f, -4.0f)), glm::vec3(calcLightRadius(pointLights_[1].color, pointLights_[1].attenuation)));
     
-    pointLights_[2].position = glm::vec3(-4.0f, 2.0f, -12.0f);
     pointLights_[2].color = glm::vec3(0.0f, 0.0f, 15.0f);
     pointLights_[2].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
     pointLights_[2].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
+    pointLights_[2].modelMtx = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(-4.0f, 2.0f, -12.0f)), glm::vec3(calcLightRadius(pointLights_[2].color, pointLights_[2].attenuation)));
     
-    pointLights_[3].position = glm::vec3(0.0f, 0.0f, -3.0f);
     pointLights_[3].color = glm::vec3(0.0f, 5.0f, 0.0f);
     pointLights_[3].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
     pointLights_[3].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
+    pointLights_[3].modelMtx = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f)), glm::vec3(calcLightRadius(pointLights_[3].color, pointLights_[3].attenuation)));
     
     mt19937 rng;
     rng.seed(1);
@@ -57,42 +57,27 @@ World::World() :
     
     pointLights_.resize(Renderer::NUM_LIGHTS - 2);
     for (size_t i = 4; i < pointLights_.size(); ++i) {
-        pointLights_[i].position = glm::vec3(randRange(rng), randRange(rng), randRange(rng));
+        glm::vec3 position(randRange(rng), randRange(rng), randRange(rng));
         pointLights_[i].color = glm::vec3(randColor(rng), randColor(rng), randColor(rng));
         pointLights_[i].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
         pointLights_[i].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
+        pointLights_[i].modelMtx = glm::scale(glm::translate(glm::mat4(1.0f), position), glm::vec3(calcLightRadius(pointLights_[i].color, pointLights_[i].attenuation)));
     }
     
     unsigned int instanceBuffer;
     glGenBuffers(1, &instanceBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, instanceBuffer);
     glBufferData(GL_ARRAY_BUFFER, pointLights_.size() * sizeof(PointLight), pointLights_.data(), GL_STATIC_DRAW);
-    lightCube_.bindVAO();
-    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_TRANSLATION);
-    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_TRANSLATION, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(0));
-    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_TRANSLATION, 1);
-    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_COLOR);
-    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_COLOR, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(float) * 3));
-    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_COLOR, 1);
-    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_PHONG_VALS);
-    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_PHONG_VALS, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(float) * 6));
-    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_PHONG_VALS, 1);
-    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_ATTENUATION);
-    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_ATTENUATION, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(float) * 9));
-    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_ATTENUATION, 1);
-    
     lightSphere_.bindVAO();
-    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_TRANSLATION);
-    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_TRANSLATION, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(0));
-    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_TRANSLATION, 1);
+    lightSphere_.applyMat4InstanceBuffer(ATTRIBUTE_LOCATION_V_MODEL_MTX, sizeof(PointLight), 0);
     glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_COLOR);
-    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_COLOR, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(float) * 3));
+    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_COLOR, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(glm::mat4)));
     glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_COLOR, 1);
     glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_PHONG_VALS);
-    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_PHONG_VALS, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(float) * 6));
+    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_PHONG_VALS, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(glm::mat4) + sizeof(float) * 3));
     glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_PHONG_VALS, 1);
     glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_ATTENUATION);
-    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_ATTENUATION, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(float) * 9));
+    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_ATTENUATION, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(glm::mat4) + sizeof(float) * 6));
     glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_ATTENUATION, 1);
     
     spotLights_.resize(1);
@@ -122,4 +107,9 @@ void World::nextTick() {
     if (sunPosition_.x == 0.0f && sunPosition_.z == 0.0f) {    // Fix edge case when directional light aligns with up vector.
         sunPosition_.x = 0.00001f;
     }
+}
+
+float World::calcLightRadius(const glm::vec3& color, const glm::vec3& attenuation) const {
+    float intensityMax = max(max(color.r, color.g), color.b);    // Equation derived from https://learnopengl.com/Advanced-Lighting/Deferred-Shading
+    return (-attenuation.y + sqrt(attenuation.y * attenuation.y - 4.0f * attenuation.z * (attenuation.x - (256.0f / 5.0f) * intensityMax))) / (2.0f * attenuation.z);
 }

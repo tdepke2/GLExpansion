@@ -42,7 +42,7 @@ unsigned int Renderer::loadTexture(const string& filename, bool gammaCorrection,
     }
     
     stbi_set_flip_vertically_on_load(flip);
-    cout << "Loading texture \"" << textureName << "\".\n";
+    //cout << "Loading texture \"" << textureName << "\".\n";
     unsigned int texHandle;
     glGenTextures(1, &texHandle);
     glBindTexture(GL_TEXTURE_2D, texHandle);
@@ -91,7 +91,7 @@ unsigned int Renderer::loadCubemap(const string& filename, bool gammaCorrection,
     stbi_set_flip_vertically_on_load(flip);    // For skybox cubemap, textures are not flipped to match the specifications of a cubemap.
     string prefix = filename.substr(0, filename.find('.'));
     string postfix = filename.substr(filename.find('.'));
-    cout << "Loading cubemap \"" << textureName << "\".\n";
+    //cout << "Loading cubemap \"" << textureName << "\".\n";
     unsigned int texHandle;
     glGenTextures(1, &texHandle);
     glBindTexture(GL_TEXTURE_CUBE_MAP, texHandle);
@@ -106,7 +106,7 @@ unsigned int Renderer::loadCubemap(const string& filename, bool gammaCorrection,
         } else {
             faceFilename += "z" + postfix;
         }
-        cout << "  Face " << i << ": \"" << faceFilename << "\".\n";
+        //cout << "  Face " << i << ": \"" << faceFilename << "\".\n";
         
         unsigned char* imageData = stbi_load(faceFilename.c_str(), &width, &height, &numChannels, 0);
         GLenum internalFormat, format;
@@ -148,7 +148,7 @@ unsigned int Renderer::generateTexture(float r, float g, float b, float a) {
         return findResult->second;
     }
     
-    cout << "Generating texture \"" << textureName << "\".\n";
+    //cout << "Generating texture \"" << textureName << "\".\n";
     unsigned int texHandle;
     glGenTextures(1, &texHandle);
     glBindTexture(GL_TEXTURE_2D, texHandle);
@@ -229,17 +229,18 @@ Renderer::~Renderer() {
     geometryNormalMapShader_.reset();
     geometrySkinningShader_.reset();
     lightingPassShader_.reset();
+    pointLightShader_.reset();
     skyboxShader_.reset();
     lampShader_.reset();
     shadowMapShader_.reset();
     shadowMapSkinningShader_.reset();
-    textShader_.reset();
-    shapeShader_.reset();
     postProcessShader_.reset();
     bloomShader_.reset();
     gaussianBlurShader_.reset();
     ssaoShader_.reset();
     ssaoBlurShader_.reset();
+    textShader_.reset();
+    shapeShader_.reset();
     
     geometryFBO_.reset();
     renderFBO_.reset();
@@ -444,6 +445,9 @@ void Renderer::setupShaders() {
     
     lightingPassShader_ = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/lightingPass.f.glsl");
     
+    pointLightShader_ = make_unique<Shader>("shaders/effects/pointLight.v.glsl", "shaders/effects/pointLight.f.glsl");
+    pointLightShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
+    
     skyboxShader_ = make_unique<Shader>("shaders/skybox.v.glsl", "shaders/skybox.f.glsl");
     skyboxShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
     
@@ -453,10 +457,6 @@ void Renderer::setupShaders() {
     shadowMapShader_ = make_unique<Shader>("shaders/shadowMap.v.glsl", "shaders/shadowMap.f.glsl");
     
     shadowMapSkinningShader_ = make_unique<Shader>("shaders/shadowMapSkinning.v.glsl", "shaders/shadowMap.f.glsl");
-    
-    textShader_ = make_unique<Shader>("shaders/ui/shape.v.glsl", "shaders/ui/text.f.glsl");
-    
-    shapeShader_ = make_unique<Shader>("shaders/ui/shape.v.glsl", "shaders/ui/shape.f.glsl");
     
     postProcessShader_ = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/postProcess.f.glsl");
     
@@ -481,6 +481,10 @@ void Renderer::setupShaders() {
     }
     
     ssaoBlurShader_ = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/ssaoBlur.f.glsl");
+    
+    textShader_ = make_unique<Shader>("shaders/ui/shape.v.glsl", "shaders/ui/text.f.glsl");
+    
+    shapeShader_ = make_unique<Shader>("shaders/ui/shape.v.glsl", "shaders/ui/shape.f.glsl");
 }
 
 void Renderer::setupBuffers() {
@@ -662,58 +666,79 @@ void Renderer::applySSAO() {
 }
 
 void Renderer::lightingPass(const Camera& camera, const World& world) {
-    renderFBO_->bind();    // Render lighting (lighting pass).
-    glViewport(0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glDisable(GL_DEPTH_TEST);
-    glm::mat4 viewMtx = camera.getViewMatrix();
-    lightingPassShader_->use();
-    lightingPassShader_->setInt("texPosition", 0);
-    glActiveTexture(GL_TEXTURE0);
-    geometryFBO_->bindTexture(0);
-    lightingPassShader_->setInt("texNormal", 1);
-    glActiveTexture(GL_TEXTURE1);
-    geometryFBO_->bindTexture(1);
-    lightingPassShader_->setInt("texAlbedoSpec", 2);
-    glActiveTexture(GL_TEXTURE2);
-    geometryFBO_->bindTexture(2);
-    lightingPassShader_->setInt("texSSAO", 3);
-    if (config_.getSSAO()) {
-        glActiveTexture(GL_TEXTURE3);
-        ssaoBlurFBO_->bindTexture(0);
+    if (world.lightStates_[2] == 0) {
+        renderFBO_->bind();    // Render lighting (lighting pass).
+        glViewport(0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
+        glm::mat4 viewMtx = camera.getViewMatrix();
+        lightingPassShader_->use();
+        lightingPassShader_->setInt("texPosition", 0);
+        glActiveTexture(GL_TEXTURE0);
+        geometryFBO_->bindTexture(0);
+        lightingPassShader_->setInt("texNormal", 1);
+        glActiveTexture(GL_TEXTURE1);
+        geometryFBO_->bindTexture(1);
+        lightingPassShader_->setInt("texAlbedoSpec", 2);
+        glActiveTexture(GL_TEXTURE2);
+        geometryFBO_->bindTexture(2);
+        lightingPassShader_->setInt("texSSAO", 3);
+        if (config_.getSSAO()) {
+            glActiveTexture(GL_TEXTURE3);
+            ssaoBlurFBO_->bindTexture(0);
+        }
+        for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {
+            lightingPassShader_->setInt("shadowMap[" + to_string(i) + "]", 4 + i);
+            glActiveTexture(GL_TEXTURE4 + i);
+            cascadedShadowFBO_[i]->bindTexture(0);
+            lightingPassShader_->setMat4("viewToLightSpace[" + to_string(i) + "]", shadowProjections_[i] * viewToLightSpace_);
+            lightingPassShader_->setFloat("shadowZEnds[" + to_string(i) + "]", shadowZBounds_[i + 1]);
+        }
+        lightingPassShader_->setBool("applySSAO", config_.getSSAO());
+        lightingPassShader_->setUnsignedIntArray("lightStates", NUM_LIGHTS, world.lightStates_);    // Need a better way to handle passing lights from world to shader #######################################################
+        lightingPassShader_->setUnsignedInt("lights[0].type", 0);
+        lightingPassShader_->setVec3("lights[0].directionViewSpace", viewMtx * glm::vec4(-world.sunPosition_, 0.0f));
+        lightingPassShader_->setVec3("lights[0].ambient", world.sunLight_.ambient);
+        lightingPassShader_->setVec3("lights[0].diffuse", world.sunLight_.diffuse);
+        lightingPassShader_->setVec3("lights[0].specular", world.sunLight_.specular);
+        lightingPassShader_->setUnsignedInt("lights[1].type", 2);
+        lightingPassShader_->setVec3("lights[1].positionViewSpace", viewMtx * glm::vec4(camera.position_, 1.0f));
+        lightingPassShader_->setVec3("lights[1].directionViewSpace", viewMtx * glm::vec4(camera.front_, 0.0f));
+        lightingPassShader_->setVec3("lights[1].ambient", world.spotLights_[0].ambient);
+        lightingPassShader_->setVec3("lights[1].diffuse", world.spotLights_[0].diffuse);
+        lightingPassShader_->setVec3("lights[1].specular", world.spotLights_[0].specular);
+        lightingPassShader_->setVec3("lights[1].attenuationVals", world.spotLights_[0].attenuationVals);
+        lightingPassShader_->setVec2("lights[1].cutOff", world.spotLights_[0].cutOff);
+        for (size_t i = 0; i < world.pointLights_.size(); ++i) {
+            lightingPassShader_->setUnsignedInt("lights[" + to_string(i + 2) + "].type", 1);
+            lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].positionViewSpace", viewMtx * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+            lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].ambient", world.pointLights_[i].color * world.pointLights_[i].phongVals.x);
+            lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].diffuse", world.pointLights_[i].color * world.pointLights_[i].phongVals.y);
+            lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].specular", world.pointLights_[i].color * world.pointLights_[i].phongVals.z);
+            lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", world.pointLights_[i].attenuation);
+        }
+        windowQuad_.drawGeometry();
+        glEnable(GL_DEPTH_TEST);
+    } else {
+        renderFBO_->bind();    // Render lighting (lighting pass).
+        glViewport(0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDepthMask(false);
+        glm::mat4 viewMtx = camera.getViewMatrix();
+        pointLightShader_->use();
+        pointLightShader_->setInt("texPosition", 0);
+        glActiveTexture(GL_TEXTURE0);
+        geometryFBO_->bindTexture(0);
+        pointLightShader_->setInt("texNormal", 1);
+        glActiveTexture(GL_TEXTURE1);
+        geometryFBO_->bindTexture(1);
+        pointLightShader_->setInt("texAlbedoSpec", 2);
+        glActiveTexture(GL_TEXTURE2);
+        geometryFBO_->bindTexture(2);
+        pointLightShader_->setVec2("renderSize", renderFBO_->getBufferSize());
+        world.lightSphere_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
+        glDepthMask(true);
     }
-    for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {
-        lightingPassShader_->setInt("shadowMap[" + to_string(i) + "]", 4 + i);
-        glActiveTexture(GL_TEXTURE4 + i);
-        cascadedShadowFBO_[i]->bindTexture(0);
-        lightingPassShader_->setMat4("viewToLightSpace[" + to_string(i) + "]", shadowProjections_[i] * viewToLightSpace_);
-        lightingPassShader_->setFloat("shadowZEnds[" + to_string(i) + "]", shadowZBounds_[i + 1]);
-    }
-    lightingPassShader_->setBool("applySSAO", config_.getSSAO());
-    lightingPassShader_->setUnsignedIntArray("lightStates", NUM_LIGHTS, world.lightStates_);    // Need a better way to handle passing lights from world to shader #######################################################
-    lightingPassShader_->setUnsignedInt("lights[0].type", 0);
-    lightingPassShader_->setVec3("lights[0].directionViewSpace", viewMtx * glm::vec4(-world.sunPosition_, 0.0f));
-    lightingPassShader_->setVec3("lights[0].ambient", world.sunLight_.ambient);
-    lightingPassShader_->setVec3("lights[0].diffuse", world.sunLight_.diffuse);
-    lightingPassShader_->setVec3("lights[0].specular", world.sunLight_.specular);
-    lightingPassShader_->setUnsignedInt("lights[1].type", 2);
-    lightingPassShader_->setVec3("lights[1].positionViewSpace", viewMtx * glm::vec4(camera.position_, 1.0f));
-    lightingPassShader_->setVec3("lights[1].directionViewSpace", viewMtx * glm::vec4(camera.front_, 0.0f));
-    lightingPassShader_->setVec3("lights[1].ambient", world.spotLights_[0].ambient);
-    lightingPassShader_->setVec3("lights[1].diffuse", world.spotLights_[0].diffuse);
-    lightingPassShader_->setVec3("lights[1].specular", world.spotLights_[0].specular);
-    lightingPassShader_->setVec3("lights[1].attenuationVals", world.spotLights_[0].attenuationVals);
-    lightingPassShader_->setVec2("lights[1].cutOff", world.spotLights_[0].cutOff);
-    for (size_t i = 0; i < world.pointLights_.size(); ++i) {
-        lightingPassShader_->setUnsignedInt("lights[" + to_string(i + 2) + "].type", 1);
-        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].positionViewSpace", viewMtx * glm::vec4(world.pointLights_[i].position, 1.0f));
-        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].ambient", world.pointLights_[i].color * world.pointLights_[i].phongVals.x);
-        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].diffuse", world.pointLights_[i].color * world.pointLights_[i].phongVals.y);
-        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].specular", world.pointLights_[i].color * world.pointLights_[i].phongVals.z);
-        lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", world.pointLights_[i].attenuation);
-    }
-    windowQuad_.drawGeometry();
-    glEnable(GL_DEPTH_TEST);
 }
 
 void Renderer::drawLamps(const Camera& camera, const World& world) {
@@ -721,8 +746,7 @@ void Renderer::drawLamps(const Camera& camera, const World& world) {
     //for (size_t i = 0; i < world.pointLights_.size(); ++i) {
         if (world.lightStates_[2] == 1) {
             //lampShader_->setVec3("lightColor", glm::vec3(1.0f, 0.0f, 0.0f));
-            world.lightCube_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
-            world.lightSphere_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
+            //world.lightCube_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
         }
     //}
     /*if (world.sunlightOn_) {
@@ -937,9 +961,4 @@ float Renderer::randomFloat(float min, float max) {
 int Renderer::randomInt(int min, int max) {
     uniform_int_distribution<int> minMaxRange(min, max);
     return minMaxRange(*randNumGenerator_);
-}
-
-float Renderer::calcLightRadius(const glm::vec3& lightColor, const glm::vec3& attenuation) const {
-    float intensityMax = max(max(lightColor.r, lightColor.g), lightColor.b);    // Equation derived from https://learnopengl.com/Advanced-Lighting/Deferred-Shading
-    return (-attenuation.y + sqrt(attenuation.y * attenuation.y - 4.0f * attenuation.z * (attenuation.x - (256.0f / 5.0f) * intensityMax))) / (2.0f * attenuation.z);
 }

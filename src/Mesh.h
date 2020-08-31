@@ -68,7 +68,7 @@ class Mesh : public DrawableInterface {
     void generateMesh(vector<VertexBone>&& vertices, vector<unsigned int>&& indices, vector<Texture>&& textures);
     void generateCube(float sideLength = 1.0f);
     void generateSphere(float radius = 1.0f, int numSectors = 32, int numStacks = 16);
-    void applyMat4InstanceBuffer(unsigned int startIndex) const;    // Binds the vertex array and sets attributes for the currently bound buffer (buffer should contain mat4 data). This uses attributes startIndex to startIndex + 3.
+    void applyMat4InstanceBuffer(unsigned int startIndex, unsigned int stride, size_t offset) const;    // Binds the vertex array and sets attributes for the currently bound buffer (buffer should contain mat4 data). This uses attributes startIndex to startIndex + 3.
     void draw(const Shader& shader, const glm::mat4& modelMtx) const;
     void drawGeometry() const;
     void drawGeometry(const Shader& shader, const glm::mat4& modelMtx) const;

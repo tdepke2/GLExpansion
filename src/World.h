@@ -18,7 +18,7 @@ struct DirectionalLight {
 };
 
 struct PointLight {
-    glm::vec3 position;
+    glm::mat4 modelMtx;
     glm::vec3 color;
     glm::vec3 phongVals;
     glm::vec3 attenuation;
@@ -34,10 +34,10 @@ struct SpotLight {
 
 class World {
     public:
-    static constexpr unsigned int ATTRIBUTE_LOCATION_V_TRANSLATION = 5;
-    static constexpr unsigned int ATTRIBUTE_LOCATION_V_COLOR = 6;
-    static constexpr unsigned int ATTRIBUTE_LOCATION_V_PHONG_VALS = 7;
-    static constexpr unsigned int ATTRIBUTE_LOCATION_V_ATTENUATION = 8;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_MODEL_MTX = 5;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_COLOR = 9;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_PHONG_VALS = 10;
+    static constexpr unsigned int ATTRIBUTE_LOCATION_V_ATTENUATION = 11;
     
     Mesh lightCube_, lightSphere_, cube1_, sphere1_;
     ModelStatic sceneTest_;
@@ -56,7 +56,7 @@ class World {
     void nextTick();
     
     private:
-    
+    float calcLightRadius(const glm::vec3& color, const glm::vec3& attenuation) const;    // Determine the maximum bounds of a light source given the color and attenuation factors.
 };
 
 #endif

@@ -69,8 +69,9 @@ class Renderer {
     glm::ivec2 windowSize_;
     vector<glm::mat4> boneTransforms_;
     unordered_map<const char*, PerformanceMonitor*> performanceMonitors_;
-    unique_ptr<Shader> geometryShader_, geometryNormalMapShader_, geometrySkinningShader_, lightingPassShader_, skyboxShader_, lampShader_, shadowMapShader_, shadowMapSkinningShader_, textShader_, shapeShader_;
+    unique_ptr<Shader> geometryShader_, geometryNormalMapShader_, geometrySkinningShader_, lightingPassShader_, pointLightShader_, skyboxShader_, lampShader_, shadowMapShader_, shadowMapSkinningShader_;
     unique_ptr<Shader> postProcessShader_, bloomShader_, gaussianBlurShader_, ssaoShader_, ssaoBlurShader_;
+    unique_ptr<Shader> textShader_, shapeShader_;
     unique_ptr<Framebuffer> geometryFBO_, renderFBO_, cascadedShadowFBO_[NUM_CASCADED_SHADOWS];
     unique_ptr<Framebuffer> bloom1FBO_, bloom2FBO_, ssaoFBO_, ssaoBlurFBO_;
     unsigned int blackTexture_, whiteTexture_, blueTexture_, cubeDiffuseMap_, cubeSpecularMap_, woodTexture_, skyboxCubemap_, brickDiffuseMap_, brickNormalMap_, ssaoNoiseTexture_, monitorGridTexture_;
@@ -107,7 +108,6 @@ class Renderer {
     void processInput(float deltaTime);
     float randomFloat(float min = 0.0f, float max = 1.0f);    // Generates a random float between min (inclusive) and max (exclusive).
     int randomInt(int min, int max);    // Generates a random integer between min and max inclusive.
-    float calcLightRadius(const glm::vec3& lightColor, const glm::vec3& attenuation) const;    // Determine the maximum bounds of a light source given the color and attenuation factors.
     
     friend class Configuration;
 };
