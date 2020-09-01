@@ -14,8 +14,8 @@ out vec4 fragColor;
 
 vec3 calculateLight(vec3 position, vec3 normal, vec3 diffuseColor, float specularColor, float ambientOcclusion, vec3 viewDir) {    // Computes the color of a fragment with one light source. All positions/directions in view space.
     vec3 lightDir = normalize(fLightPositionVS - position);
-    float distanceToCamera = length(fLightPositionVS - position);
-    float lightScalar = 1.0 / (fAttenuation.x + fAttenuation.y * distanceToCamera + fAttenuation.z * distanceToCamera * distanceToCamera);
+    float distanceFragToLight = length(fLightPositionVS - position);
+    float lightScalar = 1.0 / (fAttenuation.x + fAttenuation.y * distanceFragToLight + fAttenuation.z * distanceFragToLight * distanceFragToLight);
     
     vec3 ambient = fColor * fPhongVals.x * diffuseColor * lightScalar * ambientOcclusion;
     

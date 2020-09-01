@@ -68,6 +68,19 @@ World::World() :
     glGenBuffers(1, &instanceBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, instanceBuffer);
     glBufferData(GL_ARRAY_BUFFER, pointLights_.size() * sizeof(PointLight), pointLights_.data(), GL_STATIC_DRAW);
+    
+    lightCube_.bindVAO();
+    lightCube_.applyMat4InstanceBuffer(ATTRIBUTE_LOCATION_V_MODEL_MTX, sizeof(PointLight), 0);
+    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_COLOR);
+    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_COLOR, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(glm::mat4)));
+    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_COLOR, 1);
+    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_PHONG_VALS);
+    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_PHONG_VALS, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(glm::mat4) + sizeof(float) * 3));
+    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_PHONG_VALS, 1);
+    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_ATTENUATION);
+    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_ATTENUATION, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(glm::mat4) + sizeof(float) * 6));
+    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_ATTENUATION, 1);
+    
     lightSphere_.bindVAO();
     lightSphere_.applyMat4InstanceBuffer(ATTRIBUTE_LOCATION_V_MODEL_MTX, sizeof(PointLight), 0);
     glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_COLOR);

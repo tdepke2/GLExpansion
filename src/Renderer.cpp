@@ -571,6 +571,8 @@ void Renderer::beginFrame(const World& world) {
 }
 
 void Renderer::drawShadowMaps(const Camera& camera, const World& world) {
+    glCullFace(GL_FRONT);
+    
     glm::vec2 tanHalfFOV(tan(glm::radians(camera.fov_ / 2.0f)) * (static_cast<float>(windowSize_.x) / windowSize_.y), tan(glm::radians(camera.fov_ / 2.0f)));
     glm::mat4 lightViewMtx = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), -world.sunPosition_, glm::vec3(0.0f, 1.0f, 0.0f));
     viewToLightSpace_ = lightViewMtx * glm::inverse(camera.getViewMatrix());
@@ -612,12 +614,12 @@ void Renderer::drawShadowMaps(const Camera& camera, const World& world) {
     }
     
     glViewport(0, 0, cascadedShadowFBO_[0]->getBufferSize().x, cascadedShadowFBO_[0]->getBufferSize().y);
-    glCullFace(GL_FRONT);
     for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {    // Render to cascaded shadow maps.
         cascadedShadowFBO_[i]->bind();
         glClear(GL_DEPTH_BUFFER_BIT);
         renderScene(camera, world, lightViewMtx, shadowProjections_[i], true);
     }
+    
     glCullFace(GL_BACK);
 }
 
@@ -636,6 +638,8 @@ void Renderer::geometryPass(const Camera& camera, const World& world) {
 
 void Renderer::applySSAO() {
     performanceMonitors_.at("SSAO")->startGPUTimer();
+    glDisable(GL_DEPTH_TEST);
+    
     if (config_.getSSAO()) {
         ssaoFBO_->bind();    // Render SSAO texture.
         glViewport(0, 0, ssaoFBO_->getBufferSize().x, ssaoFBO_->getBufferSize().y);
@@ -666,11 +670,10 @@ void Renderer::applySSAO() {
 }
 
 void Renderer::lightingPass(const Camera& camera, const World& world) {
-    if (world.lightStates_[2] == 0) {
+    if (glfwGetKey(window_, GLFW_KEY_LEFT_SHIFT) != GLFW_PRESS) {
         renderFBO_->bind();    // Render lighting (lighting pass).
         glViewport(0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y);
         glClear(GL_COLOR_BUFFER_BIT);
-        glDisable(GL_DEPTH_TEST);
         glm::mat4 viewMtx = camera.getViewMatrix();
         lightingPassShader_->use();
         lightingPassShader_->setInt("texPosition", 0);
@@ -711,19 +714,24 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
         lightingPassShader_->setVec2("lights[1].cutOff", world.spotLights_[0].cutOff);
         for (size_t i = 0; i < world.pointLights_.size(); ++i) {
             lightingPassShader_->setUnsignedInt("lights[" + to_string(i + 2) + "].type", 1);
-            lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].positionViewSpace", viewMtx * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+            lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].positionViewSpace", viewMtx * glm::vec4(glm::vec3(world.pointLights_[i].modelMtx[3]), 1.0f));
             lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].ambient", world.pointLights_[i].color * world.pointLights_[i].phongVals.x);
             lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].diffuse", world.pointLights_[i].color * world.pointLights_[i].phongVals.y);
             lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].specular", world.pointLights_[i].color * world.pointLights_[i].phongVals.z);
             lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", world.pointLights_[i].attenuation);
         }
         windowQuad_.drawGeometry();
+        
         glEnable(GL_DEPTH_TEST);
     } else {
+        glEnable(GL_DEPTH_TEST);
+        glDepthMask(false);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE, GL_ONE);
+        
         renderFBO_->bind();    // Render lighting (lighting pass).
         glViewport(0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y);
         glClear(GL_COLOR_BUFFER_BIT);
-        glDepthMask(false);
         glm::mat4 viewMtx = camera.getViewMatrix();
         pointLightShader_->use();
         pointLightShader_->setInt("texPosition", 0);
@@ -737,6 +745,9 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
         geometryFBO_->bindTexture(2);
         pointLightShader_->setVec2("renderSize", renderFBO_->getBufferSize());
         world.lightSphere_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
+        
+        glDisable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDepthMask(true);
     }
 }
@@ -746,7 +757,7 @@ void Renderer::drawLamps(const Camera& camera, const World& world) {
     //for (size_t i = 0; i < world.pointLights_.size(); ++i) {
         if (world.lightStates_[2] == 1) {
             //lampShader_->setVec3("lightColor", glm::vec3(1.0f, 0.0f, 0.0f));
-            //world.lightCube_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
+            world.lightCube_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
         }
     //}
     /*if (world.sunlightOn_) {
@@ -770,19 +781,23 @@ void Renderer::drawLamps(const Camera& camera, const World& world) {
 }
 
 void Renderer::drawSkybox() {
-    skyboxShader_->use();    // Draw the skybox.
     glDepthFunc(GL_LEQUAL);
     glDisable(GL_CULL_FACE);
+    
+    skyboxShader_->use();    // Draw the skybox.
     skyboxShader_->setInt("skybox", 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxCubemap_);
     skybox_.drawGeometry();
+    
     glDepthFunc(GL_LESS);
     glEnable(GL_CULL_FACE);
 }
 
 void Renderer::applyBloom() {
     performanceMonitors_.at("BLOOM")->startGPUTimer();
+    glDisable(GL_DEPTH_TEST);
+    
     if (config_.getBloom()) {
         bloom1FBO_->bind();    // Compute bloom texture.
         glViewport(0, 0, bloom1FBO_->getBufferSize().x, bloom1FBO_->getBufferSize().y);
@@ -795,7 +810,6 @@ void Renderer::applyBloom() {
         
         gaussianBlurShader_->use();    // Apply Gaussian blur to texture.
         gaussianBlurShader_->setInt("image", 0);
-        glActiveTexture(GL_TEXTURE0);
         for (unsigned int i = 0; i < 5; ++i) {
             bloom2FBO_->bind();    // Draw to bloom 2 framebuffer.
             gaussianBlurShader_->setBool("blurHorizontal", true);
@@ -815,7 +829,6 @@ void Renderer::drawPostProcessing() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);    // Apply post-processing and render to window.
     glViewport(0, 0, windowSize_.x, windowSize_.y);
     glClear(GL_COLOR_BUFFER_BIT);
-    glDisable(GL_DEPTH_TEST);
     postProcessShader_->use();
     postProcessShader_->setInt("image", 0);
     postProcessShader_->setInt("bloomBlur", 1);
@@ -828,14 +841,13 @@ void Renderer::drawPostProcessing() {
         bloom1FBO_->bindTexture(0);
     }
     windowQuad_.drawGeometry();
-    glEnable(GL_DEPTH_TEST);
 }
 
 void Renderer::drawGUI() {
-    glEnable(GL_BLEND);    // Render GUI.
-    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    
+    shapeShader_->use();    // Render GUI.
     glm::mat4 windowProjectionMtx = glm::ortho(0.0f, static_cast<float>(windowSize_.x), 0.0f, static_cast<float>(windowSize_.y));
-    shapeShader_->use();
     textShader_->setMat4("projectionMtx", windowProjectionMtx);
     shapeShader_->setInt("tex", 0);
     shapeShader_->setVec4("color", glm::vec4(1.0f, 1.0f, 1.0f, 0.7f));
@@ -856,6 +868,7 @@ void Renderer::drawGUI() {
     for (const auto& m : performanceMonitors_) {
         m.second->drawText(*textShader_, glm::mat4(1.0f));
     }
+    
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
 }

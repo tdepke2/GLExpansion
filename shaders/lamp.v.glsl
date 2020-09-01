@@ -6,14 +6,12 @@ layout (std140) uniform ViewProjectionMtx {
 };
 
 layout (location = 0) in vec3 vPosition;
-layout (location = 5) in vec3 vTranslation;
-layout (location = 6) in vec3 vColor;
-layout (location = 7) in vec3 vPhongVals;
-layout (location = 8) in vec3 vAttenuation;
+layout (location = 5) in mat4 vModelMtx;
+layout (location = 9) in vec3 vColor;
 
 out vec3 fColor;
 
 void main() {
     fColor = vColor;
-    gl_Position = projectionMtx * viewMtx * vec4(vPosition + vTranslation, 1.0);
+    gl_Position = projectionMtx * viewMtx * vec4(vPosition + vModelMtx[3].xyz, 1.0);
 }
