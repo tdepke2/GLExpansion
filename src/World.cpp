@@ -10,7 +10,7 @@ World::World() :
     sunT_(0.0f),
     sunSpeed_(0.016f) {
     
-    lightCube_.generateCube(0.2f);
+    lightCube_.generateCube(0.05f);
     lightSphere_.generateSphere(1.0f, 16, 8);
     cube1_.generateCube();
     sphere1_.generateSphere();
@@ -63,35 +63,6 @@ World::World() :
         pointLights_[i].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
         pointLights_[i].modelMtx = glm::scale(glm::translate(glm::mat4(1.0f), position), glm::vec3(calcLightRadius(pointLights_[i].color, pointLights_[i].attenuation)));
     }
-    
-    unsigned int instanceBuffer;
-    glGenBuffers(1, &instanceBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, instanceBuffer);
-    glBufferData(GL_ARRAY_BUFFER, pointLights_.size() * sizeof(PointLight), pointLights_.data(), GL_STATIC_DRAW);
-    
-    lightCube_.bindVAO();
-    lightCube_.applyMat4InstanceBuffer(ATTRIBUTE_LOCATION_V_MODEL_MTX, sizeof(PointLight), 0);
-    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_COLOR);
-    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_COLOR, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(glm::mat4)));
-    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_COLOR, 1);
-    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_PHONG_VALS);
-    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_PHONG_VALS, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(glm::mat4) + sizeof(float) * 3));
-    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_PHONG_VALS, 1);
-    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_ATTENUATION);
-    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_ATTENUATION, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(glm::mat4) + sizeof(float) * 6));
-    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_ATTENUATION, 1);
-    
-    lightSphere_.bindVAO();
-    lightSphere_.applyMat4InstanceBuffer(ATTRIBUTE_LOCATION_V_MODEL_MTX, sizeof(PointLight), 0);
-    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_COLOR);
-    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_COLOR, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(glm::mat4)));
-    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_COLOR, 1);
-    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_PHONG_VALS);
-    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_PHONG_VALS, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(glm::mat4) + sizeof(float) * 3));
-    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_PHONG_VALS, 1);
-    glEnableVertexAttribArray(ATTRIBUTE_LOCATION_V_ATTENUATION);
-    glVertexAttribPointer(ATTRIBUTE_LOCATION_V_ATTENUATION, 3, GL_FLOAT, false, sizeof(PointLight), reinterpret_cast<void*>(sizeof(glm::mat4) + sizeof(float) * 6));
-    glVertexAttribDivisor(ATTRIBUTE_LOCATION_V_ATTENUATION, 1);
     
     spotLights_.resize(1);
     spotLights_[0].ambient = glm::vec3(1.0f, 1.0f, 1.0f) * 0.0f;

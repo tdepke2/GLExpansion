@@ -229,6 +229,7 @@ Renderer::~Renderer() {
     geometryNormalMapShader_.reset();
     geometrySkinningShader_.reset();
     lightingPassShader_.reset();
+    nullLightShader_.reset();
     pointLightShader_.reset();
     skyboxShader_.reset();
     lampShader_.reset();
@@ -445,7 +446,10 @@ void Renderer::setupShaders() {
     
     lightingPassShader_ = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/lightingPass.f.glsl");
     
-    pointLightShader_ = make_unique<Shader>("shaders/effects/pointLight.v.glsl", "shaders/effects/pointLight.f.glsl");
+    nullLightShader_ = make_unique<Shader>("shaders/nullLight.v.glsl", "shaders/nullLight.f.glsl");
+    nullLightShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
+    
+    pointLightShader_ = make_unique<Shader>("shaders/pointLight.v.glsl", "shaders/pointLight.f.glsl");
     pointLightShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
     
     skyboxShader_ = make_unique<Shader>("shaders/skybox.v.glsl", "shaders/skybox.f.glsl");
@@ -492,18 +496,18 @@ void Renderer::setupBuffers() {
     geometryFBO_->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Position color buffer.
     geometryFBO_->attachTexture(GL_COLOR_ATTACHMENT1, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Normal color buffer.
     geometryFBO_->attachTexture(GL_COLOR_ATTACHMENT2, GL_RGBA16F, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Albedo and specular color buffer.
-    geometryFBO_->attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT);
+    geometryFBO_->attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT24);
     geometryFBO_->setDrawBuffers({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2});
     geometryFBO_->validate();
     
     renderFBO_ = make_unique<Framebuffer>(windowSize_);
     renderFBO_->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);
-    renderFBO_->attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT);    // May want GL_DEPTH_STENCIL_ATTACHMENT, GL_DEPTH24_STENCIL8 in future #######################################################################
+    renderFBO_->attachRenderbuffer(GL_DEPTH_STENCIL_ATTACHMENT, GL_DEPTH24_STENCIL8);
     renderFBO_->validate();
     
     for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {
         cascadedShadowFBO_[i] = make_unique<Framebuffer>(glm::ivec2(2048, 2048));
-        cascadedShadowFBO_[i]->attachTexture(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_FLOAT, GL_LINEAR, GL_CLAMP_TO_EDGE);
+        cascadedShadowFBO_[i]->attachTexture(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT, GL_FLOAT, GL_LINEAR, GL_CLAMP_TO_EDGE);
         cascadedShadowFBO_[i]->bindTexture(0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
@@ -725,14 +729,16 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
         glEnable(GL_DEPTH_TEST);
     } else {
         glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_GREATER);
         glDepthMask(false);
+        glEnable(GL_STENCIL_TEST);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
         glEnable(GL_BLEND);
         glBlendFunc(GL_ONE, GL_ONE);
         
         renderFBO_->bind();    // Render lighting (lighting pass).
         glViewport(0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y);
         glClear(GL_COLOR_BUFFER_BIT);
-        glm::mat4 viewMtx = camera.getViewMatrix();
         pointLightShader_->use();
         pointLightShader_->setInt("texPosition", 0);
         glActiveTexture(GL_TEXTURE0);
@@ -744,40 +750,47 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
         glActiveTexture(GL_TEXTURE2);
         geometryFBO_->bindTexture(2);
         pointLightShader_->setVec2("renderSize", renderFBO_->getBufferSize());
-        world.lightSphere_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
+        //world.lightSphere_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
+        for (size_t i = 0; i < world.pointLights_.size(); ++i) {
+            if (world.lightStates_[2] == 1) {
+                glClear(GL_STENCIL_BUFFER_BIT);
+                nullLightShader_->use();
+                nullLightShader_->setMat4("modelMtx", world.pointLights_[i].modelMtx);
+                glStencilFunc(GL_ALWAYS, 1, 0xFF);
+                world.lightSphere_.drawGeometry();
+                
+                pointLightShader_->use();
+                pointLightShader_->setMat4("modelMtx", world.pointLights_[i].modelMtx);
+                pointLightShader_->setVec3("color", world.pointLights_[i].color);
+                pointLightShader_->setVec3("phongVals", world.pointLights_[i].phongVals);
+                pointLightShader_->setVec3("attenuation", world.pointLights_[i].attenuation);
+                glCullFace(GL_FRONT);
+                glStencilFunc(GL_EQUAL, 0, 0xFF);
+                world.lightSphere_.drawGeometry();
+                glCullFace(GL_BACK);
+            }
+        }
         
+        glDepthFunc(GL_LESS);
+        glDepthMask(true);
+        glDisable(GL_STENCIL_TEST);
         glDisable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDepthMask(true);
     }
 }
 
 void Renderer::drawLamps(const Camera& camera, const World& world) {
     lampShader_->use();    // Draw lamps.
-    //for (size_t i = 0; i < world.pointLights_.size(); ++i) {
-        if (world.lightStates_[2] == 1) {
-            //lampShader_->setVec3("lightColor", glm::vec3(1.0f, 0.0f, 0.0f));
-            world.lightCube_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
-        }
-    //}
-    /*if (world.sunlightOn_) {
-        lampShader_->setVec3("lightColor", glm::vec3(1.0f, 1.0f, 0.0f));    // Draw the sun.
-        world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), world.sunPosition_ + camera.position_), glm::vec3(5.0f)));
-    }*/
-    
-    /*glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
-    //glDepthMask(false);
-    // draw light volumes for testing (wip).
-    lampShader_->setVec3("lightColor", glm::vec3(0.5f, 0.5f, 0.5f));
     for (size_t i = 0; i < world.pointLights_.size(); ++i) {
-        if (world.lightStates_[i + 2] == 1) {
-            sphere_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), world.pointLights_[i].position), glm::vec3(calcLightRadius(world.pointLights_[i].specular, world.pointLights_[i].attenuationVals))));    // specular here should be just the light color. ######################################################
+        if (world.lightStates_[2] == 1) {
+            lampShader_->setVec3("color", world.pointLights_[i].color);
+            world.lightCube_.drawGeometry(*lampShader_, world.pointLights_[i].modelMtx);
         }
     }
-    glDisable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);*/
-    //glDepthMask(true);
+    if (world.sunlightOn_) {
+        lampShader_->setVec3("color", glm::vec3(1.0f, 1.0f, 0.0f));    // Draw the sun.
+        world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), world.sunPosition_ + camera.position_), glm::vec3(50.0f)));
+    }
 }
 
 void Renderer::drawSkybox() {
