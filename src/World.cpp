@@ -25,9 +25,8 @@ World::World() :
     modelTestTransform_.setScale(glm::vec3(0.3f));
     modelTestTransform_.setPosition(glm::vec3(0.0f, 0.0f, 2.0f));
     
-    sunLight_.ambient = glm::vec3(1.0f, 1.0f, 1.0f) * 0.05f;
-    sunLight_.diffuse = glm::vec3(1.0f, 1.0f, 1.0f) * 0.4f;
-    sunLight_.specular = glm::vec3(1.0f, 1.0f, 1.0f) * 0.5f;
+    sunLight_.color = glm::vec3(1.0f, 1.0f, 1.0f);
+    sunLight_.phongVals =  glm::vec3(0.05f, 0.4f, 0.5f);
     
     pointLights_.resize(4);
     pointLights_[0].color = glm::vec3(5.0f, 5.0f, 5.0f);
@@ -48,7 +47,7 @@ World::World() :
     pointLights_[3].color = glm::vec3(0.0f, 5.0f, 0.0f);
     pointLights_[3].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
     pointLights_[3].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
-    pointLights_[3].modelMtx = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f)), glm::vec3(calcLightRadius(pointLights_[3].color, pointLights_[3].attenuation)));
+    pointLights_[3].modelMtx = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.1f, -3.0f)), glm::vec3(calcLightRadius(pointLights_[3].color, pointLights_[3].attenuation)));
     
     mt19937 rng;
     rng.seed(1);
@@ -65,10 +64,9 @@ World::World() :
     }
     
     spotLights_.resize(1);
-    spotLights_[0].ambient = glm::vec3(1.0f, 1.0f, 1.0f) * 0.0f;
-    spotLights_[0].diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
-    spotLights_[0].specular = glm::vec3(1.0f, 1.0f, 1.0f);
-    spotLights_[0].attenuationVals = glm::vec3(1.0f, 0.09f, 0.032f);
+    spotLights_[0].color = glm::vec3(1.0f, 1.0f, 1.0f);
+    spotLights_[0].phongVals = glm::vec3(0.0f, 1.0f, 1.0f);
+    spotLights_[0].attenuation = glm::vec3(1.0f, 0.09f, 0.032f);
     spotLights_[0].cutOff = glm::vec2(glm::cos(glm::radians(12.5f)), glm::cos(glm::radians(17.5f)));
 }
 

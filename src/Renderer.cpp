@@ -229,12 +229,15 @@ Renderer::~Renderer() {
     geometryNormalMapShader_.reset();
     geometrySkinningShader_.reset();
     lightingPassShader_.reset();
-    nullLightShader_.reset();
-    pointLightShader_.reset();
     skyboxShader_.reset();
     lampShader_.reset();
     shadowMapShader_.reset();
     shadowMapSkinningShader_.reset();
+    
+    nullLightShader_.reset();
+    directionalLightShader_.reset();
+    pointLightShader_.reset();
+    spotLightShader_.reset();
     postProcessShader_.reset();
     bloomShader_.reset();
     gaussianBlurShader_.reset();
@@ -446,12 +449,6 @@ void Renderer::setupShaders() {
     
     lightingPassShader_ = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/lightingPass.f.glsl");
     
-    nullLightShader_ = make_unique<Shader>("shaders/nullLight.v.glsl", "shaders/nullLight.f.glsl");
-    nullLightShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
-    
-    pointLightShader_ = make_unique<Shader>("shaders/pointLight.v.glsl", "shaders/pointLight.f.glsl");
-    pointLightShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
-    
     skyboxShader_ = make_unique<Shader>("shaders/skybox.v.glsl", "shaders/skybox.f.glsl");
     skyboxShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
     
@@ -461,6 +458,17 @@ void Renderer::setupShaders() {
     shadowMapShader_ = make_unique<Shader>("shaders/shadowMap.v.glsl", "shaders/shadowMap.f.glsl");
     
     shadowMapSkinningShader_ = make_unique<Shader>("shaders/shadowMapSkinning.v.glsl", "shaders/shadowMap.f.glsl");
+    
+    nullLightShader_ = make_unique<Shader>("shaders/effects/nullLight.v.glsl", "shaders/effects/nullLight.f.glsl");
+    nullLightShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
+    
+    directionalLightShader_ = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/directionalLight.f.glsl");
+    
+    pointLightShader_ = make_unique<Shader>("shaders/effects/pointLight.v.glsl", "shaders/effects/pointLight.f.glsl");
+    pointLightShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
+    
+    spotLightShader_ = make_unique<Shader>("shaders/effects/spotLight.v.glsl", "shaders/effects/spotLight.f.glsl");
+    spotLightShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
     
     postProcessShader_ = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/postProcess.f.glsl");
     
@@ -705,16 +713,16 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
         lightingPassShader_->setUnsignedIntArray("lightStates", NUM_LIGHTS, world.lightStates_);    // Need a better way to handle passing lights from world to shader #######################################################
         lightingPassShader_->setUnsignedInt("lights[0].type", 0);
         lightingPassShader_->setVec3("lights[0].directionViewSpace", viewMtx * glm::vec4(-world.sunPosition_, 0.0f));
-        lightingPassShader_->setVec3("lights[0].ambient", world.sunLight_.ambient);
-        lightingPassShader_->setVec3("lights[0].diffuse", world.sunLight_.diffuse);
-        lightingPassShader_->setVec3("lights[0].specular", world.sunLight_.specular);
+        lightingPassShader_->setVec3("lights[0].ambient", world.sunLight_.color * world.sunLight_.phongVals.x);
+        lightingPassShader_->setVec3("lights[0].diffuse", world.sunLight_.color * world.sunLight_.phongVals.y);
+        lightingPassShader_->setVec3("lights[0].specular", world.sunLight_.color * world.sunLight_.phongVals.z);
         lightingPassShader_->setUnsignedInt("lights[1].type", 2);
         lightingPassShader_->setVec3("lights[1].positionViewSpace", viewMtx * glm::vec4(camera.position_, 1.0f));
         lightingPassShader_->setVec3("lights[1].directionViewSpace", viewMtx * glm::vec4(camera.front_, 0.0f));
-        lightingPassShader_->setVec3("lights[1].ambient", world.spotLights_[0].ambient);
-        lightingPassShader_->setVec3("lights[1].diffuse", world.spotLights_[0].diffuse);
-        lightingPassShader_->setVec3("lights[1].specular", world.spotLights_[0].specular);
-        lightingPassShader_->setVec3("lights[1].attenuationVals", world.spotLights_[0].attenuationVals);
+        lightingPassShader_->setVec3("lights[1].ambient", world.spotLights_[0].color * world.spotLights_[0].phongVals.x);
+        lightingPassShader_->setVec3("lights[1].diffuse", world.spotLights_[0].color * world.spotLights_[0].phongVals.y);
+        lightingPassShader_->setVec3("lights[1].specular", world.spotLights_[0].color * world.spotLights_[0].phongVals.z);
+        lightingPassShader_->setVec3("lights[1].attenuationVals", world.spotLights_[0].attenuation);
         lightingPassShader_->setVec2("lights[1].cutOff", world.spotLights_[0].cutOff);
         for (size_t i = 0; i < world.pointLights_.size(); ++i) {
             lightingPassShader_->setUnsignedInt("lights[" + to_string(i + 2) + "].type", 1);
@@ -728,17 +736,51 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
         
         glEnable(GL_DEPTH_TEST);
     } else {
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_GREATER);
-        glDepthMask(false);
-        glEnable(GL_STENCIL_TEST);
-        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
         glEnable(GL_BLEND);
         glBlendFunc(GL_ONE, GL_ONE);
         
         renderFBO_->bind();    // Render lighting (lighting pass).
         glViewport(0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y);
         glClear(GL_COLOR_BUFFER_BIT);
+        glm::mat4 viewMtx = camera.getViewMatrix();
+        
+        if (world.sunlightOn_) {
+            directionalLightShader_->use();
+            directionalLightShader_->setInt("texPosition", 0);
+            glActiveTexture(GL_TEXTURE0);
+            geometryFBO_->bindTexture(0);
+            directionalLightShader_->setInt("texNormal", 1);
+            glActiveTexture(GL_TEXTURE1);
+            geometryFBO_->bindTexture(1);
+            directionalLightShader_->setInt("texAlbedoSpec", 2);
+            glActiveTexture(GL_TEXTURE2);
+            geometryFBO_->bindTexture(2);
+            directionalLightShader_->setInt("texSSAO", 3);
+            if (config_.getSSAO()) {
+                glActiveTexture(GL_TEXTURE3);
+                ssaoBlurFBO_->bindTexture(0);
+            }
+            directionalLightShader_->setBool("applySSAO", config_.getSSAO());
+            for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {
+                directionalLightShader_->setInt("shadowMap[" + to_string(i) + "]", 4 + i);
+                glActiveTexture(GL_TEXTURE4 + i);
+                cascadedShadowFBO_[i]->bindTexture(0);
+                directionalLightShader_->setMat4("viewToLightSpace[" + to_string(i) + "]", shadowProjections_[i] * viewToLightSpace_);
+                directionalLightShader_->setFloat("shadowZEnds[" + to_string(i) + "]", shadowZBounds_[i + 1]);
+            }
+            directionalLightShader_->setVec3("lightDirectionVS", viewMtx * glm::vec4(-world.sunPosition_, 0.0f));
+            directionalLightShader_->setVec3("color", world.sunLight_.color);
+            directionalLightShader_->setVec3("phongVals", world.sunLight_.phongVals);
+            
+            windowQuad_.drawGeometry();
+        }
+        
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_GREATER);
+        glDepthMask(false);
+        glEnable(GL_STENCIL_TEST);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        
         pointLightShader_->use();
         pointLightShader_->setInt("texPosition", 0);
         glActiveTexture(GL_TEXTURE0);
@@ -749,6 +791,12 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
         pointLightShader_->setInt("texAlbedoSpec", 2);
         glActiveTexture(GL_TEXTURE2);
         geometryFBO_->bindTexture(2);
+        pointLightShader_->setInt("texSSAO", 3);
+        if (config_.getSSAO()) {
+            glActiveTexture(GL_TEXTURE3);
+            ssaoBlurFBO_->bindTexture(0);
+        }
+        pointLightShader_->setBool("applySSAO", config_.getSSAO());
         pointLightShader_->setVec2("renderSize", renderFBO_->getBufferSize());
         //world.lightSphere_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
         for (size_t i = 0; i < world.pointLights_.size(); ++i) {
@@ -770,6 +818,8 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
                 glCullFace(GL_BACK);
             }
         }
+        
+        //spotLightShader_;
         
         glDepthFunc(GL_LESS);
         glDepthMask(true);

@@ -14,7 +14,8 @@ using namespace std;
 
 struct DirectionalLight {
     glm::vec3 direction;
-    glm::vec3 ambient, diffuse, specular;
+    glm::vec3 color;
+    glm::vec3 phongVals;
 };
 
 struct PointLight {
@@ -25,10 +26,10 @@ struct PointLight {
 };
 
 struct SpotLight {
-    glm::vec3 position;
-    glm::vec3 direction;
-    glm::vec3 ambient, diffuse, specular;
-    glm::vec3 attenuationVals;
+    glm::mat4 modelMtx;
+    glm::vec3 color;
+    glm::vec3 phongVals;
+    glm::vec3 attenuation;
     glm::vec2 cutOff;
 };
 
@@ -39,7 +40,7 @@ class World {
     static constexpr unsigned int ATTRIBUTE_LOCATION_V_PHONG_VALS = 10;
     static constexpr unsigned int ATTRIBUTE_LOCATION_V_ATTENUATION = 11;
     
-    Mesh lightCube_, lightSphere_, cube1_, sphere1_;
+    Mesh lightCube_, lightSphere_, lightCone_, cube1_, sphere1_;
     ModelStatic sceneTest_;
     ModelRigged modelTest_;
     Transformable sceneTestTransform_, modelTestTransform_;
