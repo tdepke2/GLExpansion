@@ -203,7 +203,7 @@ void Mesh::generateCube(float sideLength) {
 void Mesh::generateSphere(float radius, int numSectors, int numStacks) {
     assert(numSectors >= 4 && numStacks >= 2);
     
-    vector<Vertex> vertices;    // http://www.songho.ca/opengl/gl_sphere.html#sphere
+    vector<Vertex> vertices;    // Based on implementation from http://www.songho.ca/opengl/gl_sphere.html#sphere
     vertices.reserve((numSectors + 1) * (numStacks + 1));
     float sectorStep = 2.0f * glm::pi<float>() / numSectors;
     float stackStep = glm::pi<float>() / numStacks;
@@ -228,8 +228,8 @@ void Mesh::generateSphere(float radius, int numSectors, int numStacks) {
     vector<unsigned int> indices;
     indices.reserve(numSectors * (numStacks - 1) * 6);
     for (int i = 0; i < numStacks; ++i) {
-        int index1 = i * (numSectors + 1);    // Index of current stack.
-        int index2 = index1 + numSectors + 1;    // Index of next stack.
+        unsigned int index1 = i * (numSectors + 1);    // Index of current stack.
+        unsigned int index2 = index1 + numSectors + 1;    // Index of next stack.
         
         for (int j = 0; j < numSectors; ++j) {
             if (i != 0) {    // Skip first stacks.
@@ -245,6 +245,119 @@ void Mesh::generateSphere(float radius, int numSectors, int numStacks) {
             }
             ++index1;
             ++index2;
+        }
+    }
+    
+    generateMesh(move(vertices), move(indices));
+}
+
+void Mesh::generateCylinder(float radiusBase, float radiusTop, float height, int numSectors, int numStacks) {
+    assert(numSectors >= 3 && numStacks >= 1);
+    
+    vector<Vertex> vertices;
+    vertices.reserve((numSectors + 1) * (numStacks + 1) + (radiusTop != 0.0f ? numSectors + 1 : 0) + (radiusBase != 0.0f ? numSectors + 1 : 0));
+    float sectorStep = 2.0f * glm::pi<float>() / numSectors;
+    float zAngle = atan2(radiusBase - radiusTop, height);
+    glm::vec3 position, normal, tangent, bitangent;
+    for (int i = 0; i <= numStacks; ++i) {    // Add side vertices from top-to-bottom.
+        position.z = height * 0.5f - static_cast<float>(i) / numStacks * height;
+        normal.z = sin(zAngle);
+        float r = radiusTop + static_cast<float>(i) / numStacks * (radiusBase - radiusTop);    // Lerp radiusBase and radiusTop to get radius of this slice.
+        
+        for (int j = 0; j <= numSectors; ++j) {
+            float sectorAngle = j * sectorStep;    // Go from 0 to 2PI.
+            
+            position.x = r * cos(sectorAngle);
+            position.y = r * sin(sectorAngle);
+            normal.x = cos(sectorAngle) * cos(zAngle);
+            normal.y = sin(sectorAngle) * cos(zAngle);
+            tangent = glm::vec3(-sin(sectorAngle), cos(sectorAngle), 0.0f);
+            bitangent = glm::normalize(glm::cross(normal, tangent));
+            vertices.emplace_back(position, normal, glm::vec2(static_cast<float>(j) / numSectors, 1.0f - static_cast<float>(i) / numStacks), tangent, bitangent);
+        }
+    }
+    
+    unsigned int topVerticesStart = static_cast<unsigned int>(vertices.size());
+    if (radiusTop != 0.0f) {
+        position = glm::vec3(0.0f, 0.0f, height * 0.5f);    // Add top vertices.
+        normal = glm::vec3(0.0f, 0.0f, 1.0f);
+        tangent = glm::vec3(1.0f, 0.0f, 0.0f);
+        bitangent = glm::normalize(glm::cross(normal, tangent));
+        vertices.emplace_back(position, normal, glm::vec2(0.5f, 0.5f), tangent, bitangent);
+        for (int i = 0; i < numSectors; ++i) {
+            float sectorAngle = i * sectorStep;    // Go from 0 to 2PI.
+            
+            position = glm::vec3(cos(sectorAngle) * radiusTop, sin(sectorAngle) * radiusTop, height * 0.5f);
+            normal = glm::vec3(0.0f, 0.0f, 1.0f);
+            tangent = glm::vec3(1.0f, 0.0f, 0.0f);
+            bitangent = glm::normalize(glm::cross(normal, tangent));
+            vertices.emplace_back(position, normal, glm::vec2(cos(sectorAngle) * 0.5f + 0.5f, sin(sectorAngle) * 0.5f + 0.5f), tangent, bitangent);
+        }
+    }
+    
+    unsigned int baseVerticesStart = static_cast<unsigned int>(vertices.size());
+    if (radiusBase != 0.0f) {
+        position = glm::vec3(0.0f, 0.0f, -height * 0.5f);    // Add base vertices.
+        normal = glm::vec3(0.0f, 0.0f, -1.0f);
+        tangent = glm::vec3(-1.0f, 0.0f, 0.0f);
+        bitangent = glm::normalize(glm::cross(normal, tangent));
+        vertices.emplace_back(position, normal, glm::vec2(0.5f, 0.5f), tangent, bitangent);
+        for (int i = 0; i < numSectors; ++i) {
+            float sectorAngle = i * sectorStep;    // Go from 0 to 2PI.
+            
+            position = glm::vec3(cos(sectorAngle) * radiusBase, sin(sectorAngle) * radiusBase, -height * 0.5f);
+            normal = glm::vec3(0.0f, 0.0f, -1.0f);
+            tangent = glm::vec3(-1.0f, 0.0f, 0.0f);
+            bitangent = glm::normalize(glm::cross(normal, tangent));
+            vertices.emplace_back(position, normal, glm::vec2(-cos(sectorAngle) * 0.5f + 0.5f, sin(sectorAngle) * 0.5f + 0.5f), tangent, bitangent);
+        }
+    }
+    
+    vector<unsigned int> indices;
+    indices.reserve(numSectors * numStacks * 6 + (radiusTop != 0.0f ? numSectors * 3 : 0) + (radiusBase != 0.0f ? numSectors * 3 : 0));
+    for (int i = 0; i < numStacks; ++i) {    // Add side indices.
+        unsigned int index1 = i * (numSectors + 1);    // Index of current stack.
+        unsigned int index2 = index1 + numSectors + 1;    // Index of next stack.
+        
+        for (int j = 0; j < numSectors; ++j) {
+            indices.push_back(index1 + 1);
+            indices.push_back(index1);
+            indices.push_back(index2);
+            
+            indices.push_back(index2);
+            indices.push_back(index2 + 1);
+            indices.push_back(index1 + 1);
+            
+            ++index1;
+            ++index2;
+        }
+    }
+    
+    if (radiusTop != 0.0f) {
+        for (int i = 0; i < numSectors; ++i) {    // Add top indices.
+            if (i < numSectors - 1) {
+                indices.push_back(topVerticesStart);
+                indices.push_back(topVerticesStart + i + 1);
+                indices.push_back(topVerticesStart + i + 2);
+            } else {
+                indices.push_back(topVerticesStart);
+                indices.push_back(topVerticesStart + i + 1);
+                indices.push_back(topVerticesStart + 1);
+            }
+        }
+    }
+    
+    if (radiusBase != 0.0f) {
+        for (int i = 0; i < numSectors; ++i) {    // Add base indices.
+            if (i < numSectors - 1) {
+                indices.push_back(baseVerticesStart);
+                indices.push_back(baseVerticesStart + i + 2);
+                indices.push_back(baseVerticesStart + i + 1);
+            } else {
+                indices.push_back(baseVerticesStart);
+                indices.push_back(baseVerticesStart + 1);
+                indices.push_back(baseVerticesStart + i + 1);
+            }
         }
     }
     

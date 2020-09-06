@@ -40,7 +40,7 @@ class World {
     static constexpr unsigned int ATTRIBUTE_LOCATION_V_PHONG_VALS = 10;
     static constexpr unsigned int ATTRIBUTE_LOCATION_V_ATTENUATION = 11;
     
-    Mesh lightCube_, lightSphere_, lightCone_, cube1_, sphere1_;
+    Mesh lightCube_, lightSphere_, lightCone_, cube1_;
     ModelStatic sceneTest_;
     ModelRigged modelTest_;
     Transformable sceneTestTransform_, modelTestTransform_;

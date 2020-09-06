@@ -12,8 +12,8 @@ World::World() :
     
     lightCube_.generateCube(0.05f);
     lightSphere_.generateSphere(1.0f, 16, 8);
+    lightCone_.generateCylinder(0.0f, 1.0f, 1.0f, 16, 1);
     cube1_.generateCube();
-    sphere1_.generateSphere();
     
     sceneTest_.loadFile("models/boot_camp/boot_camp.obj");
     sceneTestTransform_.setScale(glm::vec3(0.025f, 0.025f, 0.025f));
