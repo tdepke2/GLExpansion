@@ -52,12 +52,12 @@ class World {
     float sunT_, sunSpeed_;
     glm::vec3 sunPosition_;
     
+    static float calcLightRadius(const glm::vec3& color, const glm::vec3& attenuation);    // Determine the maximum bounds of a light source given the color and attenuation factors.
     World();
     ~World();
     void nextTick();
     
     private:
-    float calcLightRadius(const glm::vec3& color, const glm::vec3& attenuation) const;    // Determine the maximum bounds of a light source given the color and attenuation factors.
 };
 
 #endif

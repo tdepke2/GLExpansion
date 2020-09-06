@@ -781,7 +781,7 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
         glEnable(GL_STENCIL_TEST);
         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
         
-        pointLightShader_->use();
+        pointLightShader_->use();    // Draw scene point lights.
         pointLightShader_->setInt("texPosition", 0);
         glActiveTexture(GL_TEXTURE0);
         geometryFBO_->bindTexture(0);
@@ -791,7 +791,7 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
         pointLightShader_->setInt("texAlbedoSpec", 2);
         glActiveTexture(GL_TEXTURE2);
         geometryFBO_->bindTexture(2);
-        pointLightShader_->setInt("texSSAO", 3);
+        pointLightShader_->setInt("texSSAO", 3);    // SSAO shouldn't be required in point lights or spotlights. ###########################################################
         if (config_.getSSAO()) {
             glActiveTexture(GL_TEXTURE3);
             ssaoBlurFBO_->bindTexture(0);
@@ -819,7 +819,48 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
             }
         }
         
-        //spotLightShader_;
+        spotLightShader_->use();    // Draw scene spotlights.
+        spotLightShader_->setInt("texPosition", 0);
+        glActiveTexture(GL_TEXTURE0);
+        geometryFBO_->bindTexture(0);
+        spotLightShader_->setInt("texNormal", 1);
+        glActiveTexture(GL_TEXTURE1);
+        geometryFBO_->bindTexture(1);
+        spotLightShader_->setInt("texAlbedoSpec", 2);
+        glActiveTexture(GL_TEXTURE2);
+        geometryFBO_->bindTexture(2);
+        spotLightShader_->setInt("texSSAO", 3);
+        if (config_.getSSAO()) {
+            glActiveTexture(GL_TEXTURE3);
+            ssaoBlurFBO_->bindTexture(0);
+        }
+        spotLightShader_->setBool("applySSAO", config_.getSSAO());
+        spotLightShader_->setVec2("renderSize", renderFBO_->getBufferSize());
+        
+        //glm::mat4 flashlightModelMtx = glm::lookAt(camera.front_, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));// might work better with quaternions ################################################
+        glm::mat4 flashlightModelMtx = glm::translate(glm::mat4(1.0f), camera.position_);
+        flashlightModelMtx = glm::scale(flashlightModelMtx, glm::vec3(10.0f, 10.0f, World::calcLightRadius(world.spotLights_[0].color, world.spotLights_[0].attenuation)));
+        
+        //for (size_t i = 0; i < world.spotLights_.size(); ++i) {
+            if (world.flashlightOn_) {
+                glClear(GL_STENCIL_BUFFER_BIT);
+                nullLightShader_->use();
+                nullLightShader_->setMat4("modelMtx", flashlightModelMtx);
+                glStencilFunc(GL_ALWAYS, 1, 0xFF);
+                world.lightCone_.drawGeometry();
+                
+                spotLightShader_->use();
+                spotLightShader_->setMat4("modelMtx", flashlightModelMtx);
+                spotLightShader_->setVec3("color", world.spotLights_[0].color);
+                spotLightShader_->setVec3("phongVals", world.spotLights_[0].phongVals);
+                spotLightShader_->setVec3("attenuation", world.spotLights_[0].attenuation);
+                spotLightShader_->setVec2("cutOff", world.spotLights_[0].cutOff);
+                glCullFace(GL_FRONT);
+                glStencilFunc(GL_EQUAL, 0, 0xFF);
+                world.lightCone_.drawGeometry();
+                glCullFace(GL_BACK);
+            }
+        //}
         
         glDepthFunc(GL_LESS);
         glDepthMask(true);

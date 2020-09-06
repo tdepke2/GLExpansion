@@ -3,6 +3,11 @@
 #include <GLFW/glfw3.h>
 #include <random>
 
+float World::calcLightRadius(const glm::vec3& color, const glm::vec3& attenuation) {
+    float intensityMax = max(max(color.r, color.g), color.b);    // Equation derived from https://learnopengl.com/Advanced-Lighting/Deferred-Shading
+    return (-attenuation.y + sqrt(attenuation.y * attenuation.y - 4.0f * attenuation.z * (attenuation.x - (256.0f / 5.0f) * intensityMax))) / (2.0f * attenuation.z);
+}
+
 World::World() :
     flashlightOn_(false),
     sunlightOn_(true),
@@ -12,7 +17,7 @@ World::World() :
     
     lightCube_.generateCube(0.05f);
     lightSphere_.generateSphere(1.0f, 16, 8);
-    lightCone_.generateCylinder(0.0f, 1.0f, 1.0f, 16, 1);
+    lightCone_.generateCylinder(0.0f, 1.0f, 1.0f, 16, 1, true);
     cube1_.generateCube();
     
     sceneTest_.loadFile("models/boot_camp/boot_camp.obj");
@@ -89,9 +94,4 @@ void World::nextTick() {
     if (sunPosition_.x == 0.0f && sunPosition_.z == 0.0f) {    // Fix edge case when directional light aligns with up vector.
         sunPosition_.x = 0.00001f;
     }
-}
-
-float World::calcLightRadius(const glm::vec3& color, const glm::vec3& attenuation) const {
-    float intensityMax = max(max(color.r, color.g), color.b);    // Equation derived from https://learnopengl.com/Advanced-Lighting/Deferred-Shading
-    return (-attenuation.y + sqrt(attenuation.y * attenuation.y - 4.0f * attenuation.z * (attenuation.x - (256.0f / 5.0f) * intensityMax))) / (2.0f * attenuation.z);
 }

@@ -251,7 +251,7 @@ void Mesh::generateSphere(float radius, int numSectors, int numStacks) {
     generateMesh(move(vertices), move(indices));
 }
 
-void Mesh::generateCylinder(float radiusBase, float radiusTop, float height, int numSectors, int numStacks) {
+void Mesh::generateCylinder(float radiusBase, float radiusTop, float height, int numSectors, int numStacks, bool originAtBase) {
     assert(numSectors >= 3 && numStacks >= 1);
     
     vector<Vertex> vertices;
@@ -260,7 +260,7 @@ void Mesh::generateCylinder(float radiusBase, float radiusTop, float height, int
     float zAngle = atan2(radiusBase - radiusTop, height);
     glm::vec3 position, normal, tangent, bitangent;
     for (int i = 0; i <= numStacks; ++i) {    // Add side vertices from top-to-bottom.
-        position.z = height * 0.5f - static_cast<float>(i) / numStacks * height;
+        position.z = (originAtBase ? height : height * 0.5f) - static_cast<float>(i) / numStacks * height;
         normal.z = sin(zAngle);
         float r = radiusTop + static_cast<float>(i) / numStacks * (radiusBase - radiusTop);    // Lerp radiusBase and radiusTop to get radius of this slice.
         
@@ -279,7 +279,7 @@ void Mesh::generateCylinder(float radiusBase, float radiusTop, float height, int
     
     unsigned int topVerticesStart = static_cast<unsigned int>(vertices.size());
     if (radiusTop != 0.0f) {
-        position = glm::vec3(0.0f, 0.0f, height * 0.5f);    // Add top vertices.
+        position = glm::vec3(0.0f, 0.0f, (originAtBase ? height : height * 0.5f));    // Add top vertices.
         normal = glm::vec3(0.0f, 0.0f, 1.0f);
         tangent = glm::vec3(1.0f, 0.0f, 0.0f);
         bitangent = glm::normalize(glm::cross(normal, tangent));
@@ -287,7 +287,7 @@ void Mesh::generateCylinder(float radiusBase, float radiusTop, float height, int
         for (int i = 0; i < numSectors; ++i) {
             float sectorAngle = i * sectorStep;    // Go from 0 to 2PI.
             
-            position = glm::vec3(cos(sectorAngle) * radiusTop, sin(sectorAngle) * radiusTop, height * 0.5f);
+            position = glm::vec3(cos(sectorAngle) * radiusTop, sin(sectorAngle) * radiusTop, (originAtBase ? height : height * 0.5f));
             normal = glm::vec3(0.0f, 0.0f, 1.0f);
             tangent = glm::vec3(1.0f, 0.0f, 0.0f);
             bitangent = glm::normalize(glm::cross(normal, tangent));
@@ -297,7 +297,7 @@ void Mesh::generateCylinder(float radiusBase, float radiusTop, float height, int
     
     unsigned int baseVerticesStart = static_cast<unsigned int>(vertices.size());
     if (radiusBase != 0.0f) {
-        position = glm::vec3(0.0f, 0.0f, -height * 0.5f);    // Add base vertices.
+        position = glm::vec3(0.0f, 0.0f, (originAtBase ? 0.0f : -height * 0.5f));    // Add base vertices.
         normal = glm::vec3(0.0f, 0.0f, -1.0f);
         tangent = glm::vec3(-1.0f, 0.0f, 0.0f);
         bitangent = glm::normalize(glm::cross(normal, tangent));
@@ -305,7 +305,7 @@ void Mesh::generateCylinder(float radiusBase, float radiusTop, float height, int
         for (int i = 0; i < numSectors; ++i) {
             float sectorAngle = i * sectorStep;    // Go from 0 to 2PI.
             
-            position = glm::vec3(cos(sectorAngle) * radiusBase, sin(sectorAngle) * radiusBase, -height * 0.5f);
+            position = glm::vec3(cos(sectorAngle) * radiusBase, sin(sectorAngle) * radiusBase, (originAtBase ? 0.0f : -height * 0.5f));
             normal = glm::vec3(0.0f, 0.0f, -1.0f);
             tangent = glm::vec3(-1.0f, 0.0f, 0.0f);
             bitangent = glm::normalize(glm::cross(normal, tangent));
