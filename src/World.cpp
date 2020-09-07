@@ -30,6 +30,8 @@ World::World() :
     modelTestTransform_.setScale(glm::vec3(0.3f));
     modelTestTransform_.setPosition(glm::vec3(0.0f, 0.0f, 2.0f));
     
+    characterTest_.init();
+    
     sunLight_.color = glm::vec3(1.0f, 1.0f, 1.0f);
     sunLight_.phongVals =  glm::vec3(0.05f, 0.4f, 0.5f);
     

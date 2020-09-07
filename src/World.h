@@ -1,6 +1,7 @@
 #ifndef WORLD_H_
 #define WORLD_H_
 
+#include "CharacterTest.h"
 #include "ModelRigged.h"
 #include "ModelStatic.h"
 #include "Renderer.h"
@@ -43,6 +44,7 @@ class World {
     Mesh lightCube_, lightSphere_, lightCone_, cube1_;
     ModelStatic sceneTest_;
     ModelRigged modelTest_;
+    CharacterTest characterTest_;
     Transformable sceneTestTransform_, modelTestTransform_;
     DirectionalLight sunLight_;
     vector<PointLight> pointLights_;

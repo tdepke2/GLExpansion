@@ -575,7 +575,7 @@ void Renderer::beginFrame(const World& world) {
         }
     }
     
-    world.modelTest_.animate(0, currentTime, boneTransforms_);
+    //world.modelTest_.animate(0, currentTime, boneTransforms_);
     geometrySkinningShader_->use();
     geometrySkinningShader_->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms_.size()), boneTransforms_.data());
     shadowMapSkinningShader_->use();
@@ -1068,6 +1068,13 @@ void Renderer::renderScene(const Camera& camera, const World& world, const glm::
     }
     
     world.modelTest_.draw(*shader, world.modelTestTransform_.getTransform());
+    
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, blackTexture_);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, blueTexture_);
+    
+    world.characterTest_.draw(*shader, glm::mat4(1.0f));
 }
 
 float Renderer::randomFloat(float min, float max) {
