@@ -936,7 +936,7 @@ void Renderer::drawPostProcessing() {
     postProcessShader_->use();
     postProcessShader_->setInt("image", 0);
     postProcessShader_->setInt("bloomBlur", 1);
-    postProcessShader_->setFloat("exposure", 1.0f);
+    postProcessShader_->setFloat("exposure", 4.0f);
     postProcessShader_->setBool("applyBloom", config_.getBloom());
     glActiveTexture(GL_TEXTURE0);
     renderFBO_->bindTexture(0);
@@ -1069,6 +1069,8 @@ void Renderer::renderScene(const Camera& camera, const World& world, const glm::
     
     world.modelTest_.draw(*shader, world.modelTestTransform_.getTransform());
     
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, whiteTexture_);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, blackTexture_);
     glActiveTexture(GL_TEXTURE2);
