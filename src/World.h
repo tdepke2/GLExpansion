@@ -44,6 +44,7 @@ class World {
     Mesh lightCube_, lightSphere_, lightCone_, cube1_;
     ModelStatic sceneTest_;
     ModelRigged modelTest_;
+    vector<glm::mat4> modelTestBoneTransforms_;
     CharacterTest characterTest_;
     Transformable sceneTestTransform_, modelTestTransform_;
     DirectionalLight sunLight_;

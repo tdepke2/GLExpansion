@@ -30,6 +30,9 @@ World::World() :
     modelTestTransform_.setScale(glm::vec3(0.3f));
     modelTestTransform_.setPosition(glm::vec3(0.0f, 0.0f, 2.0f));
     
+    assert(modelTest_.boneOffsetMatrices_.size() <= ModelRigged::MAX_NUM_BONES);
+    modelTestBoneTransforms_.resize(modelTest_.boneOffsetMatrices_.size(), glm::mat4(1.0f));
+    
     characterTest_.init();
     
     sunLight_.color = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -96,4 +99,6 @@ void World::nextTick() {
     if (sunPosition_.x == 0.0f && sunPosition_.z == 0.0f) {    // Fix edge case when directional light aligns with up vector.
         sunPosition_.x = 0.00001f;
     }
+    
+    modelTest_.animate(0, glfwGetTime(), modelTestBoneTransforms_);
 }

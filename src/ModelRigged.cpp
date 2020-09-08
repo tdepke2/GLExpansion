@@ -95,7 +95,7 @@ void ModelRigged::loadFile(const string& filename) {
 }
 
 void ModelRigged::animate(unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) const {
-    boneTransforms.resize(boneOffsetMatrices_.size());
+    assert(boneTransforms.size() == boneOffsetMatrices_.size());
     
     double animationTime = fmod(time * animations_[animationIndex].ticksPerSecond_, animations_[animationIndex].duration_);
     animateNodes(rootNode_, animations_[animationIndex], animationTime, glm::mat4(1.0f), boneTransforms);

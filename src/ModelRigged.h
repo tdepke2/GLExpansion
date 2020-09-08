@@ -20,6 +20,8 @@ class ModelRigged : public ModelAbstract {
         Node(Node* parent, const string& name, unsigned int id, const glm::mat4& transform) : parent(parent), name(name), id(id), boneIndex(-1), transform(transform) {}
     };
     
+    static constexpr unsigned int MAX_NUM_BONES = 128;
+    
     vector<Animation> animations_;
     Node* rootNode_;
     unsigned int numNodes_;

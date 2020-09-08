@@ -171,8 +171,7 @@ unsigned int Renderer::generateTexture(float r, float g, float b, float a) {
 Renderer::Renderer(mt19937* randNumGenerator) :// always use this style for uniform init #############################################################
     state_(Uninitialized),
     randNumGenerator_(randNumGenerator),
-    windowSize_(INITIAL_WINDOW_SIZE),
-    boneTransforms_(128) {
+    windowSize_(INITIAL_WINDOW_SIZE) {
     
     assert(!instantiated_);    // Ensure only one instance of Renderer.
     instantiated_ = true;
@@ -193,15 +192,6 @@ Renderer::Renderer(mt19937* randNumGenerator) :// always use this style for unif
     performanceMonitors_.emplace(make_pair("FRAME", new PerformanceMonitor("FRAME", arialFont))).first->second->modelMtx_ = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
     performanceMonitors_.emplace(make_pair("SSAO", new PerformanceMonitor("SSAO", arialFont))).first->second->modelMtx_ = glm::translate(glm::mat4(1.0f), glm::vec3(220.0f, 0.0f, 0.0f));
     performanceMonitors_.emplace(make_pair("BLOOM", new PerformanceMonitor("BLOOM", arialFont))).first->second->modelMtx_ = glm::translate(glm::mat4(1.0f), glm::vec3(440.0f, 0.0f, 0.0f));
-    
-    for (size_t i = 0; i < boneTransforms_.size(); ++i) {
-        boneTransforms_[i] = glm::mat4(1.0f);
-    }
-    
-    geometrySkinningShader_->use();
-    geometrySkinningShader_->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms_.size()), boneTransforms_.data());
-    shadowMapSkinningShader_->use();
-    shadowMapSkinningShader_->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms_.size()), boneTransforms_.data());
     
     constexpr float SHADOW_BOUND_CORRECTION = 0.8f;    // Split points are exponentially distributed with a linear term. https://developer.download.nvidia.com/SDK/10.5/opengl/src/cascaded_shadow_maps/doc/cascaded_shadow_maps.pdf
     shadowZBounds_[0] = NEAR_PLANE;
@@ -503,7 +493,7 @@ void Renderer::setupBuffers() {
     geometryFBO_ = make_unique<Framebuffer>(windowSize_);
     geometryFBO_->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Position color buffer.
     geometryFBO_->attachTexture(GL_COLOR_ATTACHMENT1, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Normal color buffer.
-    geometryFBO_->attachTexture(GL_COLOR_ATTACHMENT2, GL_RGBA16F, GL_RGBA, GL_UNSIGNED_BYTE, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Albedo and specular color buffer.
+    geometryFBO_->attachTexture(GL_COLOR_ATTACHMENT2, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Albedo and specular color buffer.
     geometryFBO_->attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT24);
     geometryFBO_->setDrawBuffers({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2});
     geometryFBO_->validate();
@@ -574,12 +564,6 @@ void Renderer::beginFrame(const World& world) {
             lastFrameTime_ = currentTime;
         }
     }
-    
-    //world.modelTest_.animate(0, currentTime, boneTransforms_);
-    geometrySkinningShader_->use();
-    geometrySkinningShader_->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms_.size()), boneTransforms_.data());
-    shadowMapSkinningShader_->use();
-    shadowMapSkinningShader_->setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms_.size()), boneTransforms_.data());
 }
 
 void Renderer::drawShadowMaps(const Camera& camera, const World& world) {
@@ -1067,6 +1051,7 @@ void Renderer::renderScene(const Camera& camera, const World& world, const glm::
         glBindTexture(GL_TEXTURE_2D, blueTexture_);
     }
     
+    shader->setMat4Array("boneTransforms", static_cast<unsigned int>(world.modelTestBoneTransforms_.size()), world.modelTestBoneTransforms_.data());
     world.modelTest_.draw(*shader, world.modelTestTransform_.getTransform());
     
     glActiveTexture(GL_TEXTURE0);

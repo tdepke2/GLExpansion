@@ -4,6 +4,8 @@
 #include <cassert>
 #include <iostream>
 
+bool ModelAbstract::VERBOSE_OUTPUT_ = false;
+
 ModelAbstract::ModelAbstract() {}
 
 ModelAbstract::~ModelAbstract() {}
@@ -116,7 +118,6 @@ void ModelAbstract::processMeshAttributes(aiMesh* mesh, const aiScene* scene, ve
         }
     }
     
-    // No need to pass vector reference to loadMaterialTextures anymore. ################################################################################################################
     loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_DIFFUSE, "material.texDiffuse", 0, textures);
     loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_SPECULAR, "material.texSpecular", 1, textures);
     loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_NORMALS, "material.texNormal", 2, textures);
