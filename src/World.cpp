@@ -34,6 +34,7 @@ World::World() :
     modelTestBoneTransforms_.resize(modelTest_.boneOffsetMatrices_.size(), glm::mat4(1.0f));
     
     characterTest_.init();
+    debugPoints_.resize(1);
     
     sunLight_.color = glm::vec3(1.0f, 1.0f, 1.0f);
     sunLight_.phongVals =  glm::vec3(0.05f, 0.4f, 0.5f);
@@ -102,4 +103,9 @@ void World::nextTick() {
     
     modelTest_.animate(0, glfwGetTime(), modelTestBoneTransforms_);
     characterTest_.update();
+    
+    int boneIndex = characterTest_.model_.findBoneIndex("Head");
+    if (boneIndex != -1) {
+        debugPoints_[0] = characterTest_.transform_.getTransform() * characterTest_.boneTransforms_[boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[boneIndex]);
+    }
 }

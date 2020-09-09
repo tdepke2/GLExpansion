@@ -8,7 +8,7 @@ void CharacterTest::init() {
     model_.loadFile("models/miku/miku.fbx");
     transform_.setPosition(glm::vec3(-20.0f, 0.0f, -12.0f));
     //transform_.setPosition(glm::vec3(0.0f, 12.0f, 0.0f));
-    transform_.setPitchYawRoll(glm::vec3(glm::pi<float>() / 2.0f, 0.0f, 0.0f));
+    //transform_.setPitchYawRoll(glm::vec3(glm::pi<float>() / 2.0f, 0.0f, 0.0f));
     transform_.setScale(glm::vec3(1.0f));
     
     assert(model_.boneOffsetMatrices_.size() <= ModelRigged::MAX_NUM_BONES);

@@ -8,4 +8,5 @@ fonts/
 *.vcxproj*
 *.o
 *.exe
+assimp-vc141-mt.dll
 assimp-vc141-mtd.dll

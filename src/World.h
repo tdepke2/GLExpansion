@@ -54,6 +54,7 @@ class World {
     bool flashlightOn_, sunlightOn_, lampsOn_;
     float sunT_, sunSpeed_;
     glm::vec3 sunPosition_;
+    vector<glm::mat4> debugPoints_;
     
     static float calcLightRadius(const glm::vec3& color, const glm::vec3& attenuation);    // Determine the maximum bounds of a light source given the color and attenuation factors.
     World();

@@ -866,6 +866,11 @@ void Renderer::drawLamps(const Camera& camera, const World& world) {
         lampShader_->setVec3("color", glm::vec3(1.0f, 1.0f, 0.0f));    // Draw the sun.
         world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), world.sunPosition_ + camera.position_), glm::vec3(50.0f)));
     }
+    
+    for (size_t i = 0; i < world.debugPoints_.size(); ++i) {
+        lampShader_->setVec3("color", glm::vec3(1.0f, 0.0f, 0.0f));
+        world.cube1_.drawGeometry(*lampShader_, world.debugPoints_[i]);
+    }
 }
 
 void Renderer::drawSkybox() {

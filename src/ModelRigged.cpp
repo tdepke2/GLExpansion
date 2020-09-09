@@ -172,7 +172,7 @@ void ModelRigged::animateNodes(const Node* node, const Animation& animation, dou
     
     if (node->boneIndex != -1) {
         //cout << "  setting bone transform.\n";
-        boneTransforms[node->boneIndex] =  combinedTransform * boneOffsetMatrices_[node->boneIndex];
+        boneTransforms[node->boneIndex] = combinedTransform * boneOffsetMatrices_[node->boneIndex];
     }
     
     //cout << "    evaluating " << node->children.size() << " children.\n";
