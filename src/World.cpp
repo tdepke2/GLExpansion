@@ -12,8 +12,8 @@ World::World() :
     flashlightOn_(false),
     sunlightOn_(true),
     lampsOn_(false),
-    sunT_(0.0f),
-    sunSpeed_(0.016f) {
+    sunT_(-2.0f),
+    sunSpeed_(0.0f) {
     
     lightCube_.generateCube(0.05f);
     lightSphere_.generateSphere(1.0f, 16, 8);
@@ -101,4 +101,5 @@ void World::nextTick() {
     }
     
     modelTest_.animate(0, glfwGetTime(), modelTestBoneTransforms_);
+    characterTest_.update();
 }

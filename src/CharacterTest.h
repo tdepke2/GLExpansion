@@ -9,6 +9,7 @@ class Shader;
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <map>
 #include <vector>
 
 using namespace std;
@@ -18,6 +19,7 @@ class CharacterTest : public DrawableInterface {
     ModelRigged model_;
     Transformable transform_;
     vector<glm::mat4> boneTransforms_;
+    map<int, unsigned int> physicsBones_;
     
     void init();
     void update();

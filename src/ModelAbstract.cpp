@@ -4,8 +4,6 @@
 #include <cassert>
 #include <iostream>
 
-bool ModelAbstract::VERBOSE_OUTPUT_ = false;
-
 ModelAbstract::ModelAbstract() {}
 
 ModelAbstract::~ModelAbstract() {}
@@ -57,7 +55,7 @@ const aiScene* ModelAbstract::loadScene(Assimp::Importer* importer, const string
         cout << "Failed to load model file \"" << filename << "\": " << importer->GetErrorString() << "\n";
         return nullptr;
     }
-    directoryPath_ = filename.substr(0, filename.find_last_of('/'));
+    directoryPath_ = filename.substr(0, filename.find_last_of('/'));    // Directory path is used later to load the texture files.
     
     if (VERBOSE_OUTPUT_) {
         cout << "  Number of animations: " << scene->mNumAnimations << "\n";
@@ -92,7 +90,7 @@ void ModelAbstract::processMeshAttributes(aiMesh* mesh, const aiScene* scene, ve
         cout << "    Mesh " << mesh->mName.C_Str() << " has " << mesh->mNumBones << " bones, " << mesh->mNumFaces << " faces, and " << mesh->mNumVertices << " vertices.\n";
     }
     vertices.reserve(mesh->mNumVertices);
-    for (unsigned int i = 0; i < mesh->mNumVertices; ++i) {
+    for (unsigned int i = 0; i < mesh->mNumVertices; ++i) {    // Load in all of the mesh vertices.
         glm::vec4 vPosition(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z, 1.0f);
         glm::vec3 vNormal(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
         glm::vec2 vTexCoords;
@@ -112,13 +110,13 @@ void ModelAbstract::processMeshAttributes(aiMesh* mesh, const aiScene* scene, ve
     }
     
     indices.reserve(mesh->mNumFaces * 3);
-    for (unsigned int i = 0; i < mesh->mNumFaces; ++i) {
+    for (unsigned int i = 0; i < mesh->mNumFaces; ++i) {    // Load in all of the mesh indices.
         for (unsigned int j = 0; j < mesh->mFaces[i].mNumIndices; ++j) {
             indices.push_back(mesh->mFaces[i].mIndices[j]);
         }
     }
     
-    loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_DIFFUSE, "material.texDiffuse", 0, textures);
+    loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_DIFFUSE, "material.texDiffuse", 0, textures);    // Append each material texture for the mesh.
     loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_SPECULAR, "material.texSpecular", 1, textures);
     loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_NORMALS, "material.texNormal", 2, textures);
     loadMaterialTextures(scene->mMaterials[mesh->mMaterialIndex], aiTextureType_DISPLACEMENT, "material.texDisplacement", 3, textures);

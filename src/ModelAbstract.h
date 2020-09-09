@@ -19,7 +19,7 @@ using namespace std;
 
 class ModelAbstract : public DrawableInterface {
     public:
-    static bool VERBOSE_OUTPUT_;
+    static constexpr bool VERBOSE_OUTPUT_ = false;
     vector<Mesh> meshes_;
     vector<glm::mat4> meshTransforms_;
     string directoryPath_;
@@ -40,10 +40,10 @@ class ModelAbstract : public DrawableInterface {
     static inline glm::quat castQuat(const aiQuaternion& q) { return glm::quat(q.w, q.x, q.y, q.z); }
     static inline glm::mat4 castMat4(const aiMatrix4x4& m) { return glm::transpose(glm::make_mat4(&m.a1)); }
     static inline glm::mat3 castMat3(const aiMatrix3x3& m) { return glm::transpose(glm::make_mat3(&m.a1)); }
-    const aiScene* loadScene(Assimp::Importer* importer, const string& filename);
-    void loadMaterialTextures(aiMaterial* material, aiTextureType type, const string& uniformName, unsigned int index, vector<Mesh::Texture>& textures);
+    const aiScene* loadScene(Assimp::Importer* importer, const string& filename);    // Attempts to load the model file into an assimp scene. Returns nullptr on fail.
+    void loadMaterialTextures(aiMaterial* material, aiTextureType type, const string& uniformName, unsigned int index, vector<Mesh::Texture>& textures);    // Adds material textures to the textures vector if they exist.
     template<typename V>
-    void processMeshAttributes(aiMesh* mesh, const aiScene* scene, vector<V>& vertices, vector<unsigned int>& indices, vector<Mesh::Texture>& textures);
+    void processMeshAttributes(aiMesh* mesh, const aiScene* scene, vector<V>& vertices, vector<unsigned int>& indices, vector<Mesh::Texture>& textures);    // Loads vertices, indices, and textures for a single mesh.
 };
 
 #endif

@@ -59,7 +59,7 @@ void ModelRigged::loadFile(const string& filename) {
     }
     
     animations_.reserve(scene->mNumAnimations);
-    for (unsigned int i = 0; i < scene->mNumAnimations; ++i) {
+    for (unsigned int i = 0; i < scene->mNumAnimations; ++i) {    // Load all animations into the model.
         animations_.emplace_back(string(scene->mAnimations[i]->mName.C_Str()), scene->mAnimations[i]->mDuration, (scene->mAnimations[i]->mTicksPerSecond != 0.0 ? scene->mAnimations[i]->mTicksPerSecond : 20.0));
         
         animations_.back().channels_.resize(numNodes_);
@@ -98,7 +98,13 @@ void ModelRigged::animate(unsigned int animationIndex, double time, vector<glm::
     assert(boneTransforms.size() == boneOffsetMatrices_.size());
     
     double animationTime = fmod(time * animations_[animationIndex].ticksPerSecond_, animations_[animationIndex].duration_);
-    animateNodes(rootNode_, animations_[animationIndex], animationTime, glm::mat4(1.0f), boneTransforms);
+    animateNodes(rootNode_, animations_[animationIndex], animationTime, globalInverseMtx_, boneTransforms);
+}
+
+void ModelRigged::animate2(map<int, unsigned int>& physicsBones, double time, vector<glm::mat4>& boneTransforms) const {
+    assert(boneTransforms.size() == boneOffsetMatrices_.size());
+    
+    animateNodes2(rootNode_, physicsBones, time, globalInverseMtx_, boneTransforms);
 }
 
 ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping) {
@@ -131,18 +137,18 @@ Mesh ModelRigged::processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<
     vector<Mesh::Texture> textures;
     processMeshAttributes<Mesh::VertexBone>(mesh, scene, vertices, indices, textures);
     
-    for (unsigned int i = 0; i < mesh->mNumBones; ++i) {
+    for (unsigned int i = 0; i < mesh->mNumBones; ++i) {    // Iterate through all bones that effect this mesh (may include bones that have zero weights and do not effect the mesh).
         if (VERBOSE_OUTPUT_) {
             cout << "      Bone " << mesh->mBones[i]->mName.C_Str() << " has " << mesh->mBones[i]->mNumWeights << " weights.\n";
         }
         uint8_t boneID;
         string boneName(mesh->mBones[i]->mName.C_Str());
         auto findResult = boneMapping.find(boneName);
-        if (findResult == boneMapping.end()) {
+        if (findResult == boneMapping.end()) {    // Found a new bone, add it to the look-up table and add an offset matrix for it.
             boneID = static_cast<uint8_t>(boneMapping.size());
             boneMapping[boneName] = boneID;
             boneOffsetMatrices_.push_back(castMat4(mesh->mBones[i]->mOffsetMatrix));
-        } else {
+        } else {    // Found an existing bone.
             boneID = findResult->second;
         }
         
@@ -155,18 +161,61 @@ Mesh ModelRigged::processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<
 }
 
 void ModelRigged::animateNodes(const Node* node, const Animation& animation, double animationTime, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const {
+    //cout << "animateNodes() on " << node->name << " with id " << node->id << " and boneIndex " << node->boneIndex << "\n";
     glm::mat4 nodeTransform = node->transform;
     if (animation.channels_[node->id].translationKeys.size() > 0) {    // Check if this node has an animation.
+        //cout << "  adding channel transform.\n";
         nodeTransform = animation.calcChannelTransform(node->id, animationTime);
     }
     
     combinedTransform *= nodeTransform;
     
     if (node->boneIndex != -1) {
-        boneTransforms[node->boneIndex] = globalInverseMtx_ * combinedTransform * boneOffsetMatrices_[node->boneIndex];
+        //cout << "  setting bone transform.\n";
+        boneTransforms[node->boneIndex] =  combinedTransform * boneOffsetMatrices_[node->boneIndex];
     }
     
+    //cout << "    evaluating " << node->children.size() << " children.\n";
     for (unsigned int i = 0; i < node->children.size(); ++i) {
         animateNodes(node->children[i], animation, animationTime, combinedTransform, boneTransforms);
     }
+}
+
+void ModelRigged::animateNodes2(const Node* node, map<int, unsigned int>& physicsBones, double time, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const {
+    glm::mat4 nodeTransform = node->transform;
+    
+    auto findResult = physicsBones.find(node->boneIndex);
+    if (findResult != physicsBones.end()) {
+        nodeTransform = glm::translate(nodeTransform, glm::vec3((1.0f + sin(time)) / 10.0f, 0.0f, 0.0f));
+    }
+    
+    combinedTransform *= nodeTransform;
+    
+    if (node->boneIndex != -1) {
+        boneTransforms[node->boneIndex] = combinedTransform * boneOffsetMatrices_[node->boneIndex];
+    }
+    
+    for (unsigned int i = 0; i < node->children.size(); ++i) {
+        animateNodes2(node->children[i], physicsBones, time, combinedTransform, boneTransforms);
+    }
+}
+
+int ModelRigged::findBoneIndex(const string& boneName) const {
+    stack<Node*> nodeStack;
+    nodeStack.push(rootNode_);
+    while (!nodeStack.empty()) {
+        Node* first = nodeStack.top();
+        nodeStack.pop();
+        
+        if (first->name == boneName) {
+            return first->boneIndex;
+        }
+        
+        for (Node* n : first->children) {
+            nodeStack.push(n);
+        }
+    }
+    
+    cout << "Error: Unable to find bone with name " << boneName << ".\n";
+    return -1;
 }
