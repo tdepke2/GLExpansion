@@ -223,6 +223,7 @@ Renderer::~Renderer() {
     lampShader_.reset();
     shadowMapShader_.reset();
     shadowMapSkinningShader_.reset();
+    debugVectorsShader_.reset();
     
     nullLightShader_.reset();
     directionalLightShader_.reset();
@@ -448,6 +449,9 @@ void Renderer::setupShaders() {
     shadowMapShader_ = make_unique<Shader>("shaders/shadowMap.v.glsl", "shaders/shadowMap.f.glsl");
     
     shadowMapSkinningShader_ = make_unique<Shader>("shaders/shadowMapSkinning.v.glsl", "shaders/shadowMap.f.glsl");
+    
+    debugVectorsShader_ = make_unique<Shader>("shaders/debugVectors.v.glsl", "shaders/debugVectors.g.glsl", "shaders/debugVectors.f.glsl");
+    debugVectorsShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
     
     nullLightShader_ = make_unique<Shader>("shaders/effects/nullLight.v.glsl", "shaders/effects/nullLight.f.glsl");
     nullLightShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
@@ -867,10 +871,15 @@ void Renderer::drawLamps(const Camera& camera, const World& world) {
         world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), world.sunPosition_ + camera.position_), glm::vec3(50.0f)));
     }
     
-    for (size_t i = 0; i < world.debugPoints_.size(); ++i) {
+    // extra debugging stuff
+    /*for (size_t i = 0; i < world.debugPoints_.size(); ++i) {
         lampShader_->setVec3("color", glm::vec3(1.0f, 0.0f, 0.0f));
         world.cube1_.drawGeometry(*lampShader_, world.debugPoints_[i]);
-    }
+    }*/
+    
+    debugVectorsShader_->use();
+    glBindVertexArray(world.debugVectorsVAO_);
+    glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(world.debugVectors_.size()));
 }
 
 void Renderer::drawSkybox() {

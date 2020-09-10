@@ -38,23 +38,37 @@ void ModelRigged::loadFile(const string& filename) {
     meshTransforms_.reserve(scene->mNumMeshes);
     numNodes_ = 0;
     unordered_map<string, uint8_t> boneMapping;
-    globalInverseMtx_ = glm::inverse(castMat4(scene->mRootNode->mTransformation));
     rootNode_ = processNode(nullptr, scene->mRootNode, glm::mat4(1.0f), scene, boneMapping);
     
     unordered_map<string, unsigned int> nodeMapping;    // Traverse node hierarchy again to set bone indices.
     stack<Node*> nodeStack;
     nodeStack.push(rootNode_);
+    stack<glm::mat4> combinedTransformStack;    // Keep another stack of combined transforms to find the globalInverseMtx_.
+    combinedTransformStack.push(rootNode_->transform);
+    bool foundFirstBone = false;
     while (!nodeStack.empty()) {
         Node* first = nodeStack.top();
         nodeStack.pop();
+        glm::mat4 firstCombinedTransform;
+        if (!foundFirstBone) {
+            firstCombinedTransform = combinedTransformStack.top();
+            combinedTransformStack.pop();
+        }
         nodeMapping[first->name] = first->id;
         auto findResult = boneMapping.find(first->name);
         if (findResult != boneMapping.end()) {
             first->boneIndex = findResult->second;
+            if (!foundFirstBone) {    // When the first bone is found, compute the globalInverseMtx_ as the matrix that can be multiplied by (combinedTransforms * boneOffsetMatrix) to get the identity matrix.
+                globalInverseMtx_ = glm::inverse(firstCombinedTransform * boneOffsetMatrices_[first->boneIndex]);    // This step is key because for whatever reason animation key frames and boneOffsetMatrices_ are relative to the first bone, not the model origin!
+                foundFirstBone = true;
+            }
         }
         
         for (Node* n : first->children) {
             nodeStack.push(n);
+            if (!foundFirstBone) {
+                combinedTransformStack.push(firstCombinedTransform * n->transform);
+            }
         }
     }
     

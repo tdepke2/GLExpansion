@@ -20,7 +20,7 @@ World::World() :
     lightCone_.generateCylinder(0.0f, 1.0f, 1.0f, 16, 1, true);
     cube1_.generateCube();
     
-    sceneTest_.loadFile("models/boot_camp/boot_camp.obj");
+    //sceneTest_.loadFile("models/boot_camp/boot_camp.obj");
     sceneTestTransform_.setScale(glm::vec3(0.025f, 0.025f, 0.025f));
     sceneTestTransform_.setPitchYawRoll(glm::vec3(-glm::pi<float>() / 2.0f, 0.0f, 0.0f));
     
@@ -34,7 +34,6 @@ World::World() :
     modelTestBoneTransforms_.resize(modelTest_.boneOffsetMatrices_.size(), glm::mat4(1.0f));
     
     characterTest_.init();
-    debugPoints_.resize(1);
     
     sunLight_.color = glm::vec3(1.0f, 1.0f, 1.0f);
     sunLight_.phongVals =  glm::vec3(0.05f, 0.4f, 0.5f);
@@ -79,10 +78,27 @@ World::World() :
     spotLights_[0].phongVals = glm::vec3(0.0f, 1.0f, 1.0f);
     spotLights_[0].attenuation = glm::vec3(1.0f, 0.09f, 0.032f);
     spotLights_[0].cutOff = glm::vec2(glm::cos(glm::radians(12.5f)), glm::cos(glm::radians(17.5f)));
+    
+    debugVectors_.push_back(glm::mat4(1.0f));    // Set up data for debug vectors.
+    glGenVertexArrays(1, &debugVectorsVAO_);
+    glBindVertexArray(debugVectorsVAO_);
+    glGenBuffers(1, &debugVectorsVBO_);
+    glBindBuffer(GL_ARRAY_BUFFER, debugVectorsVBO_);
+    glBufferData(GL_ARRAY_BUFFER, debugVectors_.size() * sizeof(glm::mat4), debugVectors_.data(), GL_DYNAMIC_DRAW);
+    
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 4, GL_FLOAT, false, sizeof(glm::mat4), reinterpret_cast<void*>(0));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 4, GL_FLOAT, false, sizeof(glm::mat4), reinterpret_cast<void*>(1 * sizeof(glm::vec4)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 4, GL_FLOAT, false, sizeof(glm::mat4), reinterpret_cast<void*>(2 * sizeof(glm::vec4)));
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 4, GL_FLOAT, false, sizeof(glm::mat4), reinterpret_cast<void*>(3 * sizeof(glm::vec4)));
 }
 
 World::~World() {
-    
+    glDeleteVertexArrays(1, &debugVectorsVAO_);
+    glDeleteBuffers(1, &debugVectorsVBO_);
 }
 
 void World::nextTick() {
@@ -104,8 +120,26 @@ void World::nextTick() {
     modelTest_.animate(0, glfwGetTime(), modelTestBoneTransforms_);
     characterTest_.update();
     
+    /*
     int boneIndex = characterTest_.model_.findBoneIndex("Head");
     if (boneIndex != -1) {
-        debugPoints_[0] = characterTest_.transform_.getTransform() * characterTest_.boneTransforms_[boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[boneIndex]);
+        debugPoints_[0] = characterTest_.transform_.getTransform() * glm::inverse(characterTest_.model_.globalInverseMtx_) * characterTest_.boneTransforms_[boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[boneIndex]);
+    }
+    */
+    
+    debugVectors_.resize(2);
+    int boneIndex = modelTest_.findBoneIndex("head");
+    if (boneIndex != -1) {
+        debugVectors_[1] = modelTestTransform_.getTransform() * glm::inverse(modelTest_.globalInverseMtx_) * modelTestBoneTransforms_[boneIndex] * glm::inverse(modelTest_.boneOffsetMatrices_[boneIndex]);
+    }
+    
+    glBindVertexArray(debugVectorsVAO_);
+    glBindBuffer(GL_ARRAY_BUFFER, debugVectorsVBO_);
+    int bufferSize;
+    glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bufferSize);
+    if (bufferSize < static_cast<int>(debugVectors_.size() * sizeof(glm::mat4))) {
+        glBufferData(GL_ARRAY_BUFFER, debugVectors_.size() * sizeof(glm::mat4), debugVectors_.data(), GL_DYNAMIC_DRAW);
+    } else {
+        glBufferSubData(GL_ARRAY_BUFFER, 0, debugVectors_.size() * sizeof(glm::mat4), debugVectors_.data());
     }
 }
