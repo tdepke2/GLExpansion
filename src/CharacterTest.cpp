@@ -2,6 +2,7 @@
 #include "Shader.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <cmath>
 #include <iostream>
 
 void CharacterTest::init() {
@@ -14,14 +15,61 @@ void CharacterTest::init() {
     assert(model_.boneOffsetMatrices_.size() <= ModelRigged::MAX_NUM_BONES);
     boneTransforms_.resize(model_.boneOffsetMatrices_.size(), glm::mat4(1.0f));
     
-    int boneIndex = model_.findBoneIndex("Head");
-    if (boneIndex != -1) {
-        physicsBones_[boneIndex] = 0;
-    }
+    activeForces_.push_back(glm::vec3(0.0f, -0.01f, 0.0f));
+    lastBoneTransform_ = glm::mat4(1.0f);
 }
 
 void CharacterTest::update() {
-    model_.animate2(physicsBones_, glfwGetTime(), boneTransforms_);
+    for (glm::mat4& m : boneTransforms_) {
+        m = glm::rotate(glm::mat4(1.0f), static_cast<float>(sin(glfwGetTime() * 0.3)), glm::vec3(0.0f, 1.0f, 0.0f));
+        m = glm::rotate(m, static_cast<float>(sin(glfwGetTime() * 0.21)), glm::vec3(0.0f, 0.0f, 1.0f));
+        m = glm::rotate(m, static_cast<float>(sin(glfwGetTime() * 0.16)), glm::vec3(1.0f, 0.0f, 0.0f));
+    }
+    
+    const ModelRigged::Node* node = model_.findNode("Breast_R");
+    if (node != nullptr) {
+        glm::vec3 heading(0.0f, 0.0f, 1.0f);
+        glm::mat4 boneTransformMS = boneTransforms_[node->boneIndex] * glm::inverse(model_.boneOffsetMatrices_[node->boneIndex]);
+        glm::mat4 boneTransformWS = transform_.getTransform() * glm::inverse(model_.globalInverseMtx_) * boneTransformMS;
+        
+        //glm::vec3 position = glm::vec3(boneTransformMS * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        //glm::vec3 direction = glm::normalize(glm::vec3(boneTransformMS * glm::vec4(heading, 0.0f)));
+        
+        // previous bone:
+        // velocity, acceleration, angular vel, torque.
+        
+        glm::vec3 boneDir = glm::normalize(glm::mat3(boneTransformWS) * heading);
+        glm::vec3 newBoneDir = glm::vec3(0.0f, -1.0f, 0.0f);//glm::mat3(glm::rotate(glm::mat4(1.0f), 1.0f, glm::vec3(1.0f, 0.0f, 0.0f))) * boneDir;
+        glm::mat4 r = glm::mat4_cast(findRotationBetweenVectors(boneDir, newBoneDir));
+        //glm::mat4 r = glm::rotate(glm::mat4(1.0f), );
+        
+        boneTransformWS = glm::rotate(boneTransformWS, static_cast<float>(sin(glfwGetTime())), glm::vec3(1.0f, 0.0f, 0.0f));
+        //boneTransformWS = glm::translate(glm::mat4(1.0f), glm::vec3(boneTransformWS * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)));
+        //boneTransformWS = boneTransformWS * r;
+        
+        lastBoneTransform_ = boneTransformWS;
+        //boneTransforms_[node->boneIndex] = glm::translate(glm::rotate(glm::translate(glm::mat4(1.0f), position), static_cast<float>(sin(glfwGetTime())), glm::vec3(1.0f, 0.0f, 0.0f)), -position) * boneTransforms_[node->boneIndex];
+        //boneTransforms_[node->boneIndex] = glm::rotate(boneTransformMS, static_cast<float>(sin(glfwGetTime())), glm::vec3(1.0f, 0.0f, 0.0f)) * glm::inverse(boneTransformMS) * boneTransforms_[node->boneIndex];    // From right to left go from model space, to bone space, apply transform, and back to model space.
+        boneTransforms_[node->boneIndex] = model_.globalInverseMtx_ * glm::inverse(transform_.getTransform()) * boneTransformWS * model_.boneOffsetMatrices_[node->boneIndex];
+    }
+}
+
+glm::quat CharacterTest::findRotationBetweenVectors(glm::vec3 source, glm::vec3 destination) const {
+    source = glm::normalize(source);
+    destination = glm::normalize(destination);
+    float cosTheta = glm::dot(source, destination);
+    
+    if (cosTheta < -1.0f + 0.001f) {    // Special case where vectors are in opposite direction.
+        glm::vec3 axis = glm::cross(source, glm::vec3(1.0f, 0.0f, 0.0f));
+        if (glm::length(axis) < 0.01f) {
+            axis = glm::cross(source, glm::vec3(0.0f, 1.0f, 0.0f));
+        }
+        return glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::pi<float>(), axis);
+    }
+    
+    glm::vec3 axis = glm::cross(source, destination);
+    float s = sqrt((1.0f + cosTheta) * 2.0f);
+    return glm::quat(s / 2.0f, axis.x / s, axis.y / s, axis.z / s);
 }
 
 void CharacterTest::draw(const Shader& shader, const glm::mat4& modelMtx) const {

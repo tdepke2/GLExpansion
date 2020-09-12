@@ -34,14 +34,12 @@ class ModelRigged : public ModelAbstract {
     ~ModelRigged();
     void loadFile(const string& filename);
     void animate(unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) const;    // Sets the transforms in the boneTransforms vector to match the given animation at the specified time.
-    void animate2(map<int, unsigned int>& physicsBones, double time, vector<glm::mat4>& boneTransforms) const;
-    int findBoneIndex(const string& boneName) const;
+    const Node* findNode(const string& nodeName) const;
     
     private:
     Node* processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping);    // Recursively traverse the scene nodes while adding mesh data. This also builds the node tree and maps bone names.
     Mesh processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping);    // Generate a new mesh and collect any new bone data.
     void animateNodes(const Node* node, const Animation& animation, double animationTime, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const;    // Recursively traverse the nodes to set each bone transform.
-    void animateNodes2(const Node* node, map<int, unsigned int>& physicsBones, double time, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const;
 };
 
 #endif

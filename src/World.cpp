@@ -120,18 +120,17 @@ void World::nextTick() {
     modelTest_.animate(0, glfwGetTime(), modelTestBoneTransforms_);
     characterTest_.update();
     
-    /*
-    int boneIndex = characterTest_.model_.findBoneIndex("Head");
-    if (boneIndex != -1) {
-        debugPoints_[0] = characterTest_.transform_.getTransform() * glm::inverse(characterTest_.model_.globalInverseMtx_) * characterTest_.boneTransforms_[boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[boneIndex]);
-    }
-    */
-    
     debugVectors_.resize(2);
-    int boneIndex = modelTest_.findBoneIndex("head");
+    const ModelRigged::Node* node = characterTest_.model_.findNode("Breast_R");
+    if (node != nullptr) {
+        debugVectors_[1] = characterTest_.transform_.getTransform() * glm::inverse(characterTest_.model_.globalInverseMtx_) * characterTest_.boneTransforms_[node->boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[node->boneIndex]);
+    }
+    
+    /*debugVectors_.resize(2);
+    int boneIndex = modelTest_.findNode("head");
     if (boneIndex != -1) {
         debugVectors_[1] = modelTestTransform_.getTransform() * glm::inverse(modelTest_.globalInverseMtx_) * modelTestBoneTransforms_[boneIndex] * glm::inverse(modelTest_.boneOffsetMatrices_[boneIndex]);
-    }
+    }*/
     
     glBindVertexArray(debugVectorsVAO_);
     glBindBuffer(GL_ARRAY_BUFFER, debugVectorsVBO_);

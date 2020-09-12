@@ -115,12 +115,6 @@ void ModelRigged::animate(unsigned int animationIndex, double time, vector<glm::
     animateNodes(rootNode_, animations_[animationIndex], animationTime, globalInverseMtx_, boneTransforms);
 }
 
-void ModelRigged::animate2(map<int, unsigned int>& physicsBones, double time, vector<glm::mat4>& boneTransforms) const {
-    assert(boneTransforms.size() == boneOffsetMatrices_.size());
-    
-    animateNodes2(rootNode_, physicsBones, time, globalInverseMtx_, boneTransforms);
-}
-
 ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping) {
     glm::mat4 thisTransformMtx = castMat4(node->mTransformation);
     combinedTransform *= thisTransformMtx;
@@ -195,34 +189,15 @@ void ModelRigged::animateNodes(const Node* node, const Animation& animation, dou
     }
 }
 
-void ModelRigged::animateNodes2(const Node* node, map<int, unsigned int>& physicsBones, double time, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const {
-    glm::mat4 nodeTransform = node->transform;
-    
-    auto findResult = physicsBones.find(node->boneIndex);
-    if (findResult != physicsBones.end()) {
-        nodeTransform = glm::translate(nodeTransform, glm::vec3((1.0f + sin(time)) / 10.0f, 0.0f, 0.0f));
-    }
-    
-    combinedTransform *= nodeTransform;
-    
-    if (node->boneIndex != -1) {
-        boneTransforms[node->boneIndex] = combinedTransform * boneOffsetMatrices_[node->boneIndex];
-    }
-    
-    for (unsigned int i = 0; i < node->children.size(); ++i) {
-        animateNodes2(node->children[i], physicsBones, time, combinedTransform, boneTransforms);
-    }
-}
-
-int ModelRigged::findBoneIndex(const string& boneName) const {
+const ModelRigged::Node* ModelRigged::findNode(const string& nodeName) const {
     stack<Node*> nodeStack;
     nodeStack.push(rootNode_);
     while (!nodeStack.empty()) {
         Node* first = nodeStack.top();
         nodeStack.pop();
         
-        if (first->name == boneName) {
-            return first->boneIndex;
+        if (first->name == nodeName) {
+            return first;
         }
         
         for (Node* n : first->children) {
@@ -230,6 +205,6 @@ int ModelRigged::findBoneIndex(const string& boneName) const {
         }
     }
     
-    cout << "Error: Unable to find bone with name " << boneName << ".\n";
-    return -1;
+    cout << "Error: Unable to find node with name " << nodeName << ".\n";
+    return nullptr;
 }
