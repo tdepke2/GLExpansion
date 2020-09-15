@@ -123,7 +123,7 @@ void World::nextTick() {
     debugVectors_.resize(2);
     const ModelRigged::Node* node = characterTest_.model_.findNode("Breast_R");
     if (node != nullptr) {
-        debugVectors_[1] = characterTest_.transform_.getTransform() * glm::inverse(characterTest_.model_.globalInverseMtx_) * characterTest_.boneTransforms_[node->boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[node->boneIndex]);
+        debugVectors_[1] = characterTest_.transform_.getTransform() * glm::inverse(characterTest_.model_.getGlobalInverseMtx()) * characterTest_.boneTransforms_[node->boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[node->boneIndex]);
     }
     
     /*debugVectors_.resize(2);

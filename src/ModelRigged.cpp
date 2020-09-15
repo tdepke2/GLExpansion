@@ -1,4 +1,5 @@
 #include "ModelRigged.h"
+#include <glm/gtx/quaternion.hpp>
 #include <cassert>
 #include <iostream>
 #include <stack>
@@ -26,6 +27,18 @@ ModelRigged::~ModelRigged() {
             delete first;
         }
     }
+}
+
+ModelRigged::Node* ModelRigged::getRootNode() const {
+    return rootNode_;
+}
+
+unsigned int ModelRigged::getNumNodes() const {
+    return numNodes_;
+}
+
+const glm::mat4& ModelRigged::getGlobalInverseMtx() const {
+    return globalInverseMtx_;
 }
 
 void ModelRigged::loadFile(const string& filename) {
@@ -108,6 +121,12 @@ void ModelRigged::loadFile(const string& filename) {
     }
 }
 
+void ModelRigged::ragdoll(map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
+    assert(boneTransforms.size() == boneOffsetMatrices_.size());
+    
+    ragdollNodes(rootNode_, dynamicBones, glm::mat4(1.0f), boneTransforms);
+}
+
 void ModelRigged::animate(unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) const {
     assert(boneTransforms.size() == boneOffsetMatrices_.size());
     
@@ -168,6 +187,50 @@ Mesh ModelRigged::processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<
     return Mesh(move(vertices), move(indices), move(textures));
 }
 
+void ModelRigged::ragdollNodes(const Node* node, map<int, DynamicBone>& dynamicBones, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const {
+    auto findResult = dynamicBones.find(node->boneIndex);
+    if (findResult != dynamicBones.end()) {
+        /*DynamicBone& bone = findResult->second;
+        glm::mat4 nodeTransform = glm::translate(glm::mat4(1.0f), bone.linearVel);
+        nodeTransform *= glm::mat4_cast(bone.angularVel);
+        bone.linearVel += bone.linearAcc;
+        bone.angularVel *= bone.angularAcc;
+        
+        combinedTransform *= glm::inverse(boneOffsetMatrices_[node->boneIndex]) * nodeTransform * boneOffsetMatrices_[node->boneIndex];
+        boneTransforms[node->boneIndex] *= combinedTransform;
+        
+        /*glm::vec3 currentDir = glm::mat3(boneTransforms[node->boneIndex]) * glm::vec3(0.0f, 0.0f, 1.0f);
+        cout << "delta: " << glm::length(currentDir - glm::vec3(0.0f, 0.0f, 1.0f)) << "\n";
+        if (true) {
+            glm::quat restoringQuat = findRotationBetweenVectors(glm::vec3(0.0f, 0.0f, 1.0f), currentDir);
+            cout << "restoring:  " << glm::to_string(restoringQuat) << "\n";
+            restoringQuat = glm::angleAxis(glm::angle(restoringQuat) * 0.01f, glm::axis(restoringQuat));
+            bone.angularAcc = restoringQuat;
+            cout << "restoring2: " << glm::to_string(restoringQuat) << "\n";
+        }*/
+        
+        //glm::vec3 currentPos = glm::vec3(boneOffsetMatrices_[node->boneIndex] * boneTransforms[node->boneIndex] * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        //bone.linearAcc = -0.02f * bone.linearVel - 0.002f * currentPos;
+        
+        //cout << "currentPos = " << glm::to_string(currentPos) << "\n";
+        
+        DynamicBone& bone = findResult->second;
+        glm::vec3 currentPos = glm::vec3(boneOffsetMatrices_[node->boneIndex] * boneTransforms[node->boneIndex] * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        bone.springMotion.updateMotion(&currentPos, &bone.linearVel, glm::vec3(0.0f, 0.0f, 0.0f));
+        glm::mat4 nodeTransform = glm::translate(glm::mat4(1.0f), currentPos);
+        
+        combinedTransform *= glm::inverse(boneOffsetMatrices_[node->boneIndex]) * nodeTransform * boneOffsetMatrices_[node->boneIndex];
+        boneTransforms[node->boneIndex] = combinedTransform;
+        
+        currentPos = glm::vec3(boneOffsetMatrices_[node->boneIndex] * boneTransforms[node->boneIndex] * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        cout << "currentPos = " << glm::to_string(currentPos) << "\n";
+    }
+    
+    for (unsigned int i = 0; i < node->children.size(); ++i) {
+        ragdollNodes(node->children[i], dynamicBones, combinedTransform, boneTransforms);
+    }
+}
+
 void ModelRigged::animateNodes(const Node* node, const Animation& animation, double animationTime, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const {
     //cout << "animateNodes() on " << node->name << " with id " << node->id << " and boneIndex " << node->boneIndex << "\n";
     glm::mat4 nodeTransform = node->transform;
@@ -207,4 +270,22 @@ const ModelRigged::Node* ModelRigged::findNode(const string& nodeName) const {
     
     cout << "Error: Unable to find node with name " << nodeName << ".\n";
     return nullptr;
+}
+
+glm::quat ModelRigged::findRotationBetweenVectors(glm::vec3 source, glm::vec3 destination) const {
+    source = glm::normalize(source);
+    destination = glm::normalize(destination);
+    float cosTheta = glm::dot(source, destination);
+    
+    if (cosTheta < -1.0f + 0.001f) {    // Special case where vectors are in opposite direction.
+        glm::vec3 axis = glm::cross(source, glm::vec3(1.0f, 0.0f, 0.0f));
+        if (glm::length(axis) < 0.01f) {
+            axis = glm::cross(source, glm::vec3(0.0f, 1.0f, 0.0f));
+        }
+        return glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::pi<float>(), axis);
+    }
+    
+    glm::vec3 axis = glm::cross(source, destination);
+    float s = sqrt((1.0f + cosTheta) * 2.0f);
+    return glm::quat(s / 2.0f, axis.x / s, axis.y / s, axis.z / s);
 }

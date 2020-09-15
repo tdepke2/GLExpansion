@@ -19,12 +19,12 @@ class CharacterTest : public DrawableInterface {
     ModelRigged model_;
     Transformable transform_;
     vector<glm::mat4> boneTransforms_;
+    map<int, ModelRigged::DynamicBone> dynamicBones_;
     vector<glm::vec3> activeForces_;
     glm::mat4 lastBoneTransform_;
     
     void init();
     void update();
-    glm::quat findRotationBetweenVectors(glm::vec3 source, glm::vec3 destination) const;
     void draw(const Shader& shader, const glm::mat4& modelMtx) const;
 };
 
