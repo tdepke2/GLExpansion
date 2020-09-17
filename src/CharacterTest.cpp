@@ -62,7 +62,7 @@ void CharacterTest::update() {
         boneTransforms_[node->boneIndex] = model_.getGlobalInverseMtx() * glm::inverse(transform_.getTransform()) * boneTransformWS * model_.boneOffsetMatrices_[node->boneIndex];
     }*/
     
-    model_.ragdoll(dynamicBones_, boneTransforms_);
+    model_.ragdoll(transform_.getTransform(), dynamicBones_, boneTransforms_);
 }
 
 void CharacterTest::draw(const Shader& shader, const glm::mat4& modelMtx) const {

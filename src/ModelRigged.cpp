@@ -121,10 +121,10 @@ void ModelRigged::loadFile(const string& filename) {
     }
 }
 
-void ModelRigged::ragdoll(map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
+void ModelRigged::ragdoll(const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
     assert(boneTransforms.size() == boneOffsetMatrices_.size());
     
-    ragdollNodes(rootNode_, dynamicBones, glm::mat4(1.0f), boneTransforms);
+    ragdollNodes(rootNode_, modelMtx, dynamicBones, globalInverseMtx_, boneTransforms);
 }
 
 void ModelRigged::animate(unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) const {
@@ -187,7 +187,8 @@ Mesh ModelRigged::processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<
     return Mesh(move(vertices), move(indices), move(textures));
 }
 
-void ModelRigged::ragdollNodes(const Node* node, map<int, DynamicBone>& dynamicBones, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const {
+void ModelRigged::ragdollNodes(const Node* node, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const {
+    glm::mat4 nodeTransform = node->transform;
     auto findResult = dynamicBones.find(node->boneIndex);
     if (findResult != dynamicBones.end()) {
         /*DynamicBone& bone = findResult->second;
@@ -214,20 +215,31 @@ void ModelRigged::ragdollNodes(const Node* node, map<int, DynamicBone>& dynamicB
         
         //cout << "currentPos = " << glm::to_string(currentPos) << "\n";
         
+        //glm::vec3 parentPos = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * boneTransforms[node->boneIndex] * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        //cout << "parentPos = " << glm::to_string(parentPos) << "\n";
+        
         DynamicBone& bone = findResult->second;
+        glm::vec3 equilibriumPos = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        glm::quat equilibriumRot = glm::quat_cast(modelMtx * glm::inverse(globalInverseMtx_) * glm::inverse(boneOffsetMatrices_[node->boneIndex]));
+        glm::vec3 equilibriumRotEuler = glm::eulerAngles(equilibriumRot);
+        //cout << "equilibriumRot = " << glm::to_string(equilibriumRot) << ", (0, 1, 0, 0) -> " << glm::to_string(equilibriumRot * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f)) << "\n";
+        bone.springMotion.updateMotion(&bone.lastPosition, &bone.linearVel, equilibriumPos);
+        bone.springMotion.updateMotion(&bone.lastRotation, &bone.angularVel, equilibriumRotEuler);
+        nodeTransform = glm::inverse(modelMtx) * glm::translate(glm::mat4(1.0f), bone.lastPosition) * glm::mat4_cast(glm::quat(bone.lastRotation));//glm::rotate(glm::mat4(1.0f), glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f));
+        //debugVectors_[1] = characterTest_.transform_.getTransform() * glm::inverse(characterTest_.model_.getGlobalInverseMtx()) * characterTest_.boneTransforms_[node->boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[node->boneIndex]);
+        
+        combinedTransform *= nodeTransform;
+        boneTransforms[node->boneIndex] = globalInverseMtx_ * nodeTransform * boneOffsetMatrices_[node->boneIndex];
+        
         glm::vec3 currentPos = glm::vec3(boneOffsetMatrices_[node->boneIndex] * boneTransforms[node->boneIndex] * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-        bone.springMotion.updateMotion(&currentPos, &bone.linearVel, glm::vec3(0.0f, 0.0f, 0.0f));
-        glm::mat4 nodeTransform = glm::translate(glm::mat4(1.0f), currentPos);
         
-        combinedTransform *= glm::inverse(boneOffsetMatrices_[node->boneIndex]) * nodeTransform * boneOffsetMatrices_[node->boneIndex];
-        boneTransforms[node->boneIndex] = combinedTransform;
-        
-        currentPos = glm::vec3(boneOffsetMatrices_[node->boneIndex] * boneTransforms[node->boneIndex] * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-        cout << "currentPos = " << glm::to_string(currentPos) << "\n";
+        //cout << "    currentPos = " << glm::to_string(currentPos) << "\n";
+    } else {
+        combinedTransform *= nodeTransform;
     }
     
     for (unsigned int i = 0; i < node->children.size(); ++i) {
-        ragdollNodes(node->children[i], dynamicBones, combinedTransform, boneTransforms);
+        ragdollNodes(node->children[i], modelMtx, dynamicBones, combinedTransform, boneTransforms);
     }
 }
 
