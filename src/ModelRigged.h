@@ -23,14 +23,14 @@ class ModelRigged : public ModelAbstract {
     };
     struct DynamicBone {
         glm::vec3 lastPosition;
-        glm::vec3 lastRotation;
+        glm::vec3 lastPositionCOM;
         glm::vec3 linearVel;
-        glm::vec3 angularVel;
+        glm::vec3 linearVelCOM;
         glm::vec3 linearAcc;
         glm::quat angularAcc;
         DampedSpringMotion springMotion;
         
-        DynamicBone() : lastPosition(0.0f), lastRotation(0.0f), linearVel(0.0f), angularVel(0.0f), linearAcc(0.0f), angularAcc(1.0f, 0.0f, 0.0f, 0.0f) {}
+        DynamicBone() : lastPosition(0.0f), lastPositionCOM(0.0f), linearVel(0.0f), linearVelCOM(0.0f), linearAcc(0.0f), angularAcc(1.0f, 0.0f, 0.0f, 0.0f) {}
     };
     
     static constexpr unsigned int MAX_NUM_BONES = 128;

@@ -218,18 +218,35 @@ void ModelRigged::ragdollNodes(const Node* node, const glm::mat4& modelMtx, map<
         //glm::vec3 parentPos = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * boneTransforms[node->boneIndex] * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         //cout << "parentPos = " << glm::to_string(parentPos) << "\n";
         
+        // Applying physics to a dynamic bone overwrites any keyframes associated with the bone.
+        
         DynamicBone& bone = findResult->second;
-        glm::vec3 equilibriumPos = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-        glm::quat equilibriumRot = glm::quat_cast(modelMtx * glm::inverse(globalInverseMtx_) * glm::inverse(boneOffsetMatrices_[node->boneIndex]));
-        glm::vec3 equilibriumRotEuler = glm::eulerAngles(equilibriumRot);
-        //cout << "equilibriumRot = " << glm::to_string(equilibriumRot) << ", (0, 1, 0, 0) -> " << glm::to_string(equilibriumRot * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f)) << "\n";
-        bone.springMotion.updateMotion(&bone.lastPosition, &bone.linearVel, equilibriumPos);
-        bone.springMotion.updateMotion(&bone.lastRotation, &bone.angularVel, equilibriumRotEuler);
-        nodeTransform = glm::inverse(modelMtx) * glm::translate(glm::mat4(1.0f), bone.lastPosition) * glm::mat4_cast(glm::quat(bone.lastRotation));//glm::rotate(glm::mat4(1.0f), glm::pi<float>() / 2.0f, glm::vec3(1.0f, 0.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::vec3 centerOfMassOffset(0.0f, 1.0f, 0.0f);    // this vector should be provided from DynamicBone
+        glm::vec3 equilibriumPos    = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * combinedTransform * node->transform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));    // this should factor in combinedTransform to be relative to parent bone.
+        glm::vec3 equilibriumPosCOM = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * combinedTransform * node->transform * glm::vec4(centerOfMassOffset, 1.0f));
+        //cout << "equilibriumPos = " << glm::to_string(equilibriumPos) << "\n";    // equilibriumPos = vec3(-20.056000, 1.184000, -11.968000)
+        glm::vec3 test              = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(1.0f, 0.0f, 0.0f, 0.0f));
+        bone.springMotion.updateMotion(&bone.lastPosition, &bone.linearVel, equilibriumPos);    // consider using the difference of bone.lastPosition and equilibriumPos as the real position (to account for precision)
+        //bone.lastPosition = equilibriumPos;
+        bone.springMotion.updateMotion(&bone.lastPositionCOM, &bone.linearVelCOM, equilibriumPosCOM);
+        //bone.lastPositionCOM = equilibriumPosCOM;
+        //float dotProd = glm::dot(glm::vec3(0.0f, 0.0f, 1.0f), bone.lastPositionCOM);
+        //glm::quat result = glm::angleAxis(-acos(dotProd) / glm::length(bone.lastPositionCOM), glm::vec3(1.0f, 0.0f, 0.0f));//findRotationBetweenVectors(glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(bone.lastPositionCOM.x, bone.lastPositionCOM.y, 0.0f));
+        //float dotProd2 = glm::dot(glm::vec3(1.0f, 0.0f, 0.0f), test);
+        //glm::quat result2 = glm::angleAxis(acos(dotProd2) / glm::length(test) * (test.z < 0.0f ? 1.0f : -1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        //glm::quat rotateToCOM = findRotationBetweenVectors(equilibriumPosCOM - equilibriumPos, bone.lastPositionCOM - equilibriumPos);
+        //nodeTransform = globalInverseMtx_ * glm::inverse(modelMtx) * glm::translate(glm::mat4(1.0f), bone.lastPosition) * glm::mat4_cast(rotateToCOM) * glm::mat4(glm::mat3(modelMtx * node->transform));
+        glm::vec3 bonePosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPosition, 1.0f));
+        glm::vec3 equilibriumPosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPos, 1.0f));
+        glm::vec3 equilibriumPosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPosCOM, 1.0f));
+        glm::vec3 bonePosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPositionCOM, 1.0f));
+        glm::quat rotateToCOM = findRotationBetweenVectors(equilibriumPosCOMLS - equilibriumPosLS, bonePosCOMLS - equilibriumPosLS);
+        nodeTransform = combinedTransform * node->transform * glm::translate(glm::mat4(1.0f), bonePosLS) * glm::mat4_cast(rotateToCOM);
         //debugVectors_[1] = characterTest_.transform_.getTransform() * glm::inverse(characterTest_.model_.getGlobalInverseMtx()) * characterTest_.boneTransforms_[node->boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[node->boneIndex]);
         
         combinedTransform *= nodeTransform;
-        boneTransforms[node->boneIndex] = globalInverseMtx_ * nodeTransform * boneOffsetMatrices_[node->boneIndex];
+        boneTransforms[node->boneIndex] = nodeTransform * boneOffsetMatrices_[node->boneIndex];    // not quite right
+        //cout << "boneTransforms[node->boneIndex] = " << glm::to_string(boneTransforms[node->boneIndex]) << "\n";
         
         glm::vec3 currentPos = glm::vec3(boneOffsetMatrices_[node->boneIndex] * boneTransforms[node->boneIndex] * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         

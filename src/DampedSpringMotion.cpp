@@ -1,4 +1,5 @@
 #include "DampedSpringMotion.h"
+#include <glm/gtx/quaternion.hpp>
 #include <cassert>
 #include <cmath>
 
@@ -83,13 +84,22 @@ void DampedSpringMotion::updateMotion(float* pos, float* vel, float equilibriumP
     *vel = oldPos * velPosCoef_ + oldVel * velVelCoef_;
 }
 
-void DampedSpringMotion::updateMotion(glm::vec2* pos, glm::vec2* vel, glm::vec2 equilibriumPos) const {
+void DampedSpringMotion::updateMotion(glm::vec2* pos, glm::vec2* vel, const glm::vec2& equilibriumPos) const {
     updateMotion(&(pos->x), &(vel->x), equilibriumPos.x);
     updateMotion(&(pos->y), &(vel->y), equilibriumPos.y);
 }
 
-void DampedSpringMotion::updateMotion(glm::vec3* pos, glm::vec3* vel, glm::vec3 equilibriumPos) const {
+void DampedSpringMotion::updateMotion(glm::vec3* pos, glm::vec3* vel, const glm::vec3& equilibriumPos) const {
     updateMotion(&(pos->x), &(vel->x), equilibriumPos.x);
     updateMotion(&(pos->y), &(vel->y), equilibriumPos.y);
     updateMotion(&(pos->z), &(vel->z), equilibriumPos.z);
+}
+
+void DampedSpringMotion::updateMotion(glm::quat* angle, glm::quat* angularVel, const glm::quat& equilibriumAngle) const {
+    glm::quat oldAngle = *angle * glm::inverse(equilibriumAngle);    // Update in equilibrium relative space.
+    glm::quat oldAngularVel = *angularVel;
+    
+    // This may require further testing for correctness, but it theoretically works for now.
+    *angle = glm::angleAxis(glm::angle(oldAngle) * posPosCoef_, glm::axis(oldAngle)) * glm::angleAxis(glm::angle(oldAngularVel) * posVelCoef_, glm::axis(oldAngularVel)) * equilibriumAngle;
+    *angularVel = glm::angleAxis(glm::angle(oldAngle) * velPosCoef_, glm::axis(oldAngle)) * glm::angleAxis(glm::angle(oldAngularVel) * velVelCoef_, glm::axis(oldAngularVel));
 }
