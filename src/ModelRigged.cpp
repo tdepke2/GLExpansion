@@ -88,6 +88,9 @@ void ModelRigged::loadFile(const string& filename) {
     animations_.reserve(scene->mNumAnimations);
     for (unsigned int i = 0; i < scene->mNumAnimations; ++i) {    // Load all animations into the model.
         animations_.emplace_back(string(scene->mAnimations[i]->mName.C_Str()), scene->mAnimations[i]->mDuration, (scene->mAnimations[i]->mTicksPerSecond != 0.0 ? scene->mAnimations[i]->mTicksPerSecond : 20.0));
+        if (VERBOSE_OUTPUT_) {
+            cout << "Loading animation " << animations_.back().name_ << " with duration " << animations_.back().duration_ << "s at " << animations_.back().ticksPerSecond_ << " TPS.\n";
+        }
         
         animations_.back().channels_.resize(numNodes_);
         for (unsigned int j = 0; j < scene->mAnimations[i]->mNumChannels; ++j) {
@@ -132,6 +135,13 @@ void ModelRigged::animate(unsigned int animationIndex, double time, vector<glm::
     
     double animationTime = fmod(time * animations_[animationIndex].ticksPerSecond_, animations_[animationIndex].duration_);
     animateNodes(rootNode_, animations_[animationIndex], animationTime, globalInverseMtx_, boneTransforms);
+}
+
+void ModelRigged::animateWithDynamics(unsigned int animationIndex, double time, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
+    assert(boneTransforms.size() == boneOffsetMatrices_.size());
+    
+    double animationTime = fmod(time * animations_[animationIndex].ticksPerSecond_, animations_[animationIndex].duration_);
+    animateNodesWithDynamics(rootNode_, animations_[animationIndex], animationTime, modelMtx, dynamicBones, globalInverseMtx_, boneTransforms);
 }
 
 ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping) {
@@ -278,6 +288,42 @@ void ModelRigged::animateNodes(const Node* node, const Animation& animation, dou
     //cout << "    evaluating " << node->children.size() << " children.\n";
     for (unsigned int i = 0; i < node->children.size(); ++i) {
         animateNodes(node->children[i], animation, animationTime, combinedTransform, boneTransforms);
+    }
+}
+
+void ModelRigged::animateNodesWithDynamics(const Node* node, const Animation& animation, double animationTime, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const {
+    glm::mat4 nodeTransform = node->transform;
+    auto findResult = dynamicBones.find(node->boneIndex);
+    if (findResult != dynamicBones.end()) {    // Check if this is a dynamic bone, and override its transforms and any keyframes it may have.
+        DynamicBone& bone = findResult->second;
+        glm::vec3 centerOfMassOffset(0.0f, 1.0f, 0.0f);    // this vector should be provided from DynamicBone
+        glm::vec3 equilibriumPos    = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * combinedTransform * node->transform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        glm::vec3 equilibriumPosCOM = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * combinedTransform * node->transform * glm::vec4(centerOfMassOffset, 1.0f));
+        
+        bone.springMotion.updateMotion(&bone.lastPosition, &bone.linearVel, equilibriumPos);    // consider using the difference of bone.lastPosition and equilibriumPos as the real position (to account for precision)
+        //bone.lastPosition = equilibriumPos;
+        bone.springMotion.updateMotion(&bone.lastPositionCOM, &bone.linearVelCOM, equilibriumPosCOM);
+        //bone.lastPositionCOM = equilibriumPosCOM;
+        
+        glm::vec3 bonePosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPosition, 1.0f));
+        glm::vec3 equilibriumPosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPos, 1.0f));
+        glm::vec3 equilibriumPosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPosCOM, 1.0f));
+        glm::vec3 bonePosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPositionCOM, 1.0f));
+        glm::quat rotateToCOM = findRotationBetweenVectors(equilibriumPosCOMLS - equilibriumPosLS, bonePosCOMLS - equilibriumPosLS);
+        
+        nodeTransform = node->transform * glm::translate(glm::mat4(1.0f), bonePosLS) * glm::mat4_cast(rotateToCOM);
+    } else if (animation.channels_[node->id].translationKeys.size() > 0) {    // Check if this node has an animation.
+        nodeTransform = animation.calcChannelTransform(node->id, animationTime);
+    }
+    
+    combinedTransform *= nodeTransform;
+    
+    if (node->boneIndex != -1) {
+        boneTransforms[node->boneIndex] = combinedTransform * boneOffsetMatrices_[node->boneIndex];
+    }
+    
+    for (unsigned int i = 0; i < node->children.size(); ++i) {
+        animateNodesWithDynamics(node->children[i], animation, animationTime, modelMtx, dynamicBones, combinedTransform, boneTransforms);
     }
 }
 

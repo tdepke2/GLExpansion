@@ -47,6 +47,7 @@ class ModelRigged : public ModelAbstract {
     void loadFile(const string& filename);
     void ragdoll(const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const;
     void animate(unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) const;    // Sets the transforms in the boneTransforms vector to match the given animation at the specified time.
+    void animateWithDynamics(unsigned int animationIndex, double time, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const;    // Same process as animate() but additionally applies dynamics/constraints to some bones.
     const Node* findNode(const string& nodeName) const;
     
     private:
@@ -58,6 +59,7 @@ class ModelRigged : public ModelAbstract {
     Mesh processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping);    // Generate a new mesh and collect any new bone data.
     void ragdollNodes(const Node* node, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const;
     void animateNodes(const Node* node, const Animation& animation, double animationTime, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const;    // Recursively traverse the nodes to set each bone transform.
+    void animateNodesWithDynamics(const Node* node, const Animation& animation, double animationTime, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const;
     glm::quat findRotationBetweenVectors(glm::vec3 source, glm::vec3 destination) const;
 };
 
