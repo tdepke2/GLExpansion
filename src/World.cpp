@@ -25,6 +25,7 @@ World::World() :
     sceneTestTransform_.setPitchYawRoll(glm::vec3(-glm::pi<float>() / 2.0f, 0.0f, 0.0f));
     
     modelTest_.loadFile("models/bob_lamp_update/bob_lamp_update.md5mesh");
+    modelTest_.setArmatureRootInv(glm::inverse(glm::mat4({1.0, 0.0, 0.0, 0.0}, {0.0, 0.0, -1.0, 0.0}, {0.0, 1.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 1.0})));
     //modelTest_.loadFile("models/hellknight/hellknight.md5mesh");
     //modelTest_.loadFile("models/spaceship/Intergalactic Spaceship_Blender_2.8_Packed textures.dae");
     modelTestTransform_.setScale(glm::vec3(0.3f));
@@ -120,16 +121,22 @@ void World::nextTick() {
     modelTest_.animate(0, glfwGetTime(), modelTestBoneTransforms_);
     characterTest_.update();
     
-    debugVectors_.resize(2);
+    debugVectors_.resize(4);
     const ModelRigged::Node* node = characterTest_.model_.findNode("Breast_R");
     if (node != nullptr) {
-        debugVectors_[1] = characterTest_.transform_.getTransform() * glm::inverse(characterTest_.model_.getGlobalInverseMtx()) * characterTest_.boneTransforms_[node->boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[node->boneIndex]);
+        debugVectors_[1] = characterTest_.transform_.getTransform();
+        debugVectors_[2] = characterTest_.transform_.getTransform() * glm::inverse(characterTest_.model_.getArmatureRootInv()) * characterTest_.boneTransforms_[node->boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[node->boneIndex]);
+    }
+    
+    node = modelTest_.findNode("head");
+    if (node != nullptr) {
+        debugVectors_[3] = modelTestTransform_.getTransform() * glm::inverse(modelTest_.getArmatureRootInv()) * modelTestBoneTransforms_[node->boneIndex] * glm::inverse(modelTest_.boneOffsetMatrices_[node->boneIndex]);
     }
     
     /*debugVectors_.resize(2);
     int boneIndex = modelTest_.findNode("head");
     if (boneIndex != -1) {
-        debugVectors_[1] = modelTestTransform_.getTransform() * glm::inverse(modelTest_.globalInverseMtx_) * modelTestBoneTransforms_[boneIndex] * glm::inverse(modelTest_.boneOffsetMatrices_[boneIndex]);
+        debugVectors_[1] = modelTestTransform_.getTransform() * glm::inverse(modelTest_.getArmatureRootInv()) * modelTestBoneTransforms_[boneIndex] * glm::inverse(modelTest_.boneOffsetMatrices_[boneIndex]);
     }*/
     
     glBindVertexArray(debugVectorsVAO_);

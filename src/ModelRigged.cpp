@@ -37,8 +37,12 @@ unsigned int ModelRigged::getNumNodes() const {
     return numNodes_;
 }
 
-const glm::mat4& ModelRigged::getGlobalInverseMtx() const {
-    return globalInverseMtx_;
+const glm::mat4& ModelRigged::getArmatureRootInv() const {
+    return armatureRootInv_;
+}
+
+void ModelRigged::setArmatureRootInv(const glm::mat4& armatureRootInv) {
+    armatureRootInv_ = armatureRootInv;
 }
 
 void ModelRigged::loadFile(const string& filename) {
@@ -56,7 +60,7 @@ void ModelRigged::loadFile(const string& filename) {
     unordered_map<string, unsigned int> nodeMapping;    // Traverse node hierarchy again to set bone indices.
     stack<Node*> nodeStack;
     nodeStack.push(rootNode_);
-    stack<glm::mat4> combinedTransformStack;    // Keep another stack of combined transforms to find the globalInverseMtx_.
+    stack<glm::mat4> combinedTransformStack;    // Keep another stack of combined transforms to find the armatureRootInv_.
     combinedTransformStack.push(rootNode_->transform);
     bool foundFirstBone = false;
     while (!nodeStack.empty()) {
@@ -71,8 +75,15 @@ void ModelRigged::loadFile(const string& filename) {
         auto findResult = boneMapping.find(first->name);
         if (findResult != boneMapping.end()) {
             first->boneIndex = findResult->second;
-            if (!foundFirstBone) {    // When the first bone is found, compute the globalInverseMtx_ as the matrix that can be multiplied by (combinedTransforms * boneOffsetMatrix) to get the identity matrix.
-                globalInverseMtx_ = glm::inverse(firstCombinedTransform * boneOffsetMatrices_[first->boneIndex]);    // This step is key because for whatever reason animation key frames and boneOffsetMatrices_ are relative to the first bone, not the model origin!
+            if (!foundFirstBone) {
+                // When the first bone is found, compute the armatureRootInv_ as the inverse of the armature root transform.
+                // In theory, this can be multiplied by (combinedTransforms * boneOffsetMatrix) to get the identity matrix when the animation matches bind pose.
+                // Some models don't work properly with this, so the setArmatureRootInv() can be used as an override.
+                // This step is key because for whatever reason, animation key frames and boneOffsetMatrices_ are relative to the first bone, not the model origin!
+                armatureRootInv_ = glm::inverse(firstCombinedTransform * glm::inverse(first->transform));
+                if (VERBOSE_OUTPUT_) {
+                    cout << "Transform of the armature root computed as " << glm::to_string(firstCombinedTransform * glm::inverse(first->transform)) << ".\n";
+                }
                 foundFirstBone = true;
             }
         }
@@ -127,21 +138,21 @@ void ModelRigged::loadFile(const string& filename) {
 void ModelRigged::ragdoll(const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
     assert(boneTransforms.size() == boneOffsetMatrices_.size());
     
-    ragdollNodes(rootNode_, modelMtx, dynamicBones, globalInverseMtx_, boneTransforms);
+    ragdollNodes(rootNode_, modelMtx, dynamicBones, armatureRootInv_, boneTransforms);
 }
 
 void ModelRigged::animate(unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) const {
     assert(boneTransforms.size() == boneOffsetMatrices_.size());
     
     double animationTime = fmod(time * animations_[animationIndex].ticksPerSecond_, animations_[animationIndex].duration_);
-    animateNodes(rootNode_, animations_[animationIndex], animationTime, globalInverseMtx_, boneTransforms);
+    animateNodes(rootNode_, animations_[animationIndex], animationTime, armatureRootInv_, boneTransforms);
 }
 
 void ModelRigged::animateWithDynamics(unsigned int animationIndex, double time, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
     assert(boneTransforms.size() == boneOffsetMatrices_.size());
     
     double animationTime = fmod(time * animations_[animationIndex].ticksPerSecond_, animations_[animationIndex].duration_);
-    animateNodesWithDynamics(rootNode_, animations_[animationIndex], animationTime, modelMtx, dynamicBones, globalInverseMtx_, boneTransforms);
+    animateNodesWithDynamics(rootNode_, animations_[animationIndex], animationTime, modelMtx, dynamicBones, armatureRootInv_, boneTransforms);
 }
 
 ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping) {
@@ -225,17 +236,17 @@ void ModelRigged::ragdollNodes(const Node* node, const glm::mat4& modelMtx, map<
         
         //cout << "currentPos = " << glm::to_string(currentPos) << "\n";
         
-        //glm::vec3 parentPos = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * boneTransforms[node->boneIndex] * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        //glm::vec3 parentPos = glm::vec3(modelMtx * glm::inverse(armatureRootInv_) * boneTransforms[node->boneIndex] * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         //cout << "parentPos = " << glm::to_string(parentPos) << "\n";
         
         // Applying physics to a dynamic bone overwrites any keyframes associated with the bone.
         
         DynamicBone& bone = findResult->second;
         glm::vec3 centerOfMassOffset(0.0f, 1.0f, 0.0f);    // this vector should be provided from DynamicBone
-        glm::vec3 equilibriumPos    = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * combinedTransform * node->transform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));    // this should factor in combinedTransform to be relative to parent bone.
-        glm::vec3 equilibriumPosCOM = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * combinedTransform * node->transform * glm::vec4(centerOfMassOffset, 1.0f));
+        glm::vec3 equilibriumPos    = glm::vec3(modelMtx * glm::inverse(armatureRootInv_) * combinedTransform * node->transform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));    // this should factor in combinedTransform to be relative to parent bone.
+        glm::vec3 equilibriumPosCOM = glm::vec3(modelMtx * glm::inverse(armatureRootInv_) * combinedTransform * node->transform * glm::vec4(centerOfMassOffset, 1.0f));
         //cout << "equilibriumPos = " << glm::to_string(equilibriumPos) << "\n";    // equilibriumPos = vec3(-20.056000, 1.184000, -11.968000)
-        glm::vec3 test              = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(1.0f, 0.0f, 0.0f, 0.0f));
+        glm::vec3 test              = glm::vec3(modelMtx * glm::inverse(armatureRootInv_) * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(1.0f, 0.0f, 0.0f, 0.0f));
         bone.springMotion.updateMotion(&bone.lastPosition, &bone.linearVel, equilibriumPos);    // consider using the difference of bone.lastPosition and equilibriumPos as the real position (to account for precision)
         //bone.lastPosition = equilibriumPos;
         bone.springMotion.updateMotion(&bone.lastPositionCOM, &bone.linearVelCOM, equilibriumPosCOM);
@@ -245,14 +256,14 @@ void ModelRigged::ragdollNodes(const Node* node, const glm::mat4& modelMtx, map<
         //float dotProd2 = glm::dot(glm::vec3(1.0f, 0.0f, 0.0f), test);
         //glm::quat result2 = glm::angleAxis(acos(dotProd2) / glm::length(test) * (test.z < 0.0f ? 1.0f : -1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         //glm::quat rotateToCOM = findRotationBetweenVectors(equilibriumPosCOM - equilibriumPos, bone.lastPositionCOM - equilibriumPos);
-        //nodeTransform = globalInverseMtx_ * glm::inverse(modelMtx) * glm::translate(glm::mat4(1.0f), bone.lastPosition) * glm::mat4_cast(rotateToCOM) * glm::mat4(glm::mat3(modelMtx * node->transform));
-        glm::vec3 bonePosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPosition, 1.0f));
-        glm::vec3 equilibriumPosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPos, 1.0f));
-        glm::vec3 equilibriumPosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPosCOM, 1.0f));
-        glm::vec3 bonePosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPositionCOM, 1.0f));
+        //nodeTransform = armatureRootInv_ * glm::inverse(modelMtx) * glm::translate(glm::mat4(1.0f), bone.lastPosition) * glm::mat4_cast(rotateToCOM) * glm::mat4(glm::mat3(modelMtx * node->transform));
+        glm::vec3 bonePosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPosition, 1.0f));
+        glm::vec3 equilibriumPosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPos, 1.0f));
+        glm::vec3 equilibriumPosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPosCOM, 1.0f));
+        glm::vec3 bonePosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPositionCOM, 1.0f));
         glm::quat rotateToCOM = findRotationBetweenVectors(equilibriumPosCOMLS - equilibriumPosLS, bonePosCOMLS - equilibriumPosLS);
         nodeTransform = combinedTransform * node->transform * glm::translate(glm::mat4(1.0f), bonePosLS) * glm::mat4_cast(rotateToCOM);
-        //debugVectors_[1] = characterTest_.transform_.getTransform() * glm::inverse(characterTest_.model_.getGlobalInverseMtx()) * characterTest_.boneTransforms_[node->boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[node->boneIndex]);
+        //debugVectors_[1] = characterTest_.transform_.getTransform() * glm::inverse(characterTest_.model_.getArmatureRootInv()) * characterTest_.boneTransforms_[node->boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[node->boneIndex]);
         
         combinedTransform *= nodeTransform;
         boneTransforms[node->boneIndex] = nodeTransform * boneOffsetMatrices_[node->boneIndex];    // not quite right
@@ -297,18 +308,18 @@ void ModelRigged::animateNodesWithDynamics(const Node* node, const Animation& an
     if (findResult != dynamicBones.end()) {    // Check if this is a dynamic bone, and override its transforms and any keyframes it may have.
         DynamicBone& bone = findResult->second;
         glm::vec3 centerOfMassOffset(0.0f, 1.0f, 0.0f);    // this vector should be provided from DynamicBone
-        glm::vec3 equilibriumPos    = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * combinedTransform * node->transform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-        glm::vec3 equilibriumPosCOM = glm::vec3(modelMtx * glm::inverse(globalInverseMtx_) * combinedTransform * node->transform * glm::vec4(centerOfMassOffset, 1.0f));
+        glm::vec3 equilibriumPos    = glm::vec3(modelMtx * glm::inverse(armatureRootInv_) * combinedTransform * node->transform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        glm::vec3 equilibriumPosCOM = glm::vec3(modelMtx * glm::inverse(armatureRootInv_) * combinedTransform * node->transform * glm::vec4(centerOfMassOffset, 1.0f));
         
         bone.springMotion.updateMotion(&bone.lastPosition, &bone.linearVel, equilibriumPos);    // consider using the difference of bone.lastPosition and equilibriumPos as the real position (to account for precision)
         //bone.lastPosition = equilibriumPos;
         bone.springMotion.updateMotion(&bone.lastPositionCOM, &bone.linearVelCOM, equilibriumPosCOM);
         //bone.lastPositionCOM = equilibriumPosCOM;
         
-        glm::vec3 bonePosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPosition, 1.0f));
-        glm::vec3 equilibriumPosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPos, 1.0f));
-        glm::vec3 equilibriumPosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPosCOM, 1.0f));
-        glm::vec3 bonePosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * globalInverseMtx_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPositionCOM, 1.0f));
+        glm::vec3 bonePosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPosition, 1.0f));
+        glm::vec3 equilibriumPosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPos, 1.0f));
+        glm::vec3 equilibriumPosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPosCOM, 1.0f));
+        glm::vec3 bonePosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPositionCOM, 1.0f));
         glm::quat rotateToCOM = findRotationBetweenVectors(equilibriumPosCOMLS - equilibriumPosLS, bonePosCOMLS - equilibriumPosLS);
         
         nodeTransform = node->transform * glm::translate(glm::mat4(1.0f), bonePosLS) * glm::mat4_cast(rotateToCOM);

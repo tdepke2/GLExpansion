@@ -43,7 +43,8 @@ class ModelRigged : public ModelAbstract {
     ~ModelRigged();
     Node* getRootNode() const;
     unsigned int getNumNodes() const;
-    const glm::mat4& getGlobalInverseMtx() const;
+    const glm::mat4& getArmatureRootInv() const;
+    void setArmatureRootInv(const glm::mat4& armatureRootInv);
     void loadFile(const string& filename);
     void ragdoll(const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const;
     void animate(unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) const;    // Sets the transforms in the boneTransforms vector to match the given animation at the specified time.
@@ -53,7 +54,7 @@ class ModelRigged : public ModelAbstract {
     private:
     Node* rootNode_;
     unsigned int numNodes_;
-    glm::mat4 globalInverseMtx_;
+    glm::mat4 armatureRootInv_;
     
     Node* processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping);    // Recursively traverse the scene nodes while adding mesh data. This also builds the node tree and maps bone names.
     Mesh processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping);    // Generate a new mesh and collect any new bone data.

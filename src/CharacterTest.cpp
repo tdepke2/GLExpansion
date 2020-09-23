@@ -39,7 +39,7 @@ void CharacterTest::update() {
     if (node != nullptr) {
         glm::vec3 heading(0.0f, 0.0f, 1.0f);
         glm::mat4 boneTransformMS = boneTransforms_[node->boneIndex] * glm::inverse(model_.boneOffsetMatrices_[node->boneIndex]);
-        glm::mat4 boneTransformWS = transform_.getTransform() * glm::inverse(model_.getGlobalInverseMtx()) * boneTransformMS;
+        glm::mat4 boneTransformWS = transform_.getTransform() * glm::inverse(model_.getArmatureRootInv()) * boneTransformMS;
         
         //glm::vec3 position = glm::vec3(boneTransformMS * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         //glm::vec3 direction = glm::normalize(glm::vec3(boneTransformMS * glm::vec4(heading, 0.0f)));
@@ -59,7 +59,7 @@ void CharacterTest::update() {
         lastBoneTransform_ = boneTransformWS;
         //boneTransforms_[node->boneIndex] = glm::translate(glm::rotate(glm::translate(glm::mat4(1.0f), position), static_cast<float>(sin(glfwGetTime())), glm::vec3(1.0f, 0.0f, 0.0f)), -position) * boneTransforms_[node->boneIndex];
         //boneTransforms_[node->boneIndex] = glm::rotate(boneTransformMS, static_cast<float>(sin(glfwGetTime())), glm::vec3(1.0f, 0.0f, 0.0f)) * glm::inverse(boneTransformMS) * boneTransforms_[node->boneIndex];    // From right to left go from model space, to bone space, apply transform, and back to model space.
-        boneTransforms_[node->boneIndex] = model_.getGlobalInverseMtx() * glm::inverse(transform_.getTransform()) * boneTransformWS * model_.boneOffsetMatrices_[node->boneIndex];
+        boneTransforms_[node->boneIndex] = model_.getArmatureRootInv() * glm::inverse(transform_.getTransform()) * boneTransformWS * model_.boneOffsetMatrices_[node->boneIndex];
     }*/
     
     //model_.ragdoll(transform_.getTransform(), dynamicBones_, boneTransforms_);
