@@ -1,6 +1,7 @@
 #ifndef MODEL_ABSTRACT_H_
 #define MODEL_ABSTRACT_H_
 
+class Animation;
 class Shader;
 
 #include "DrawableInterface.h"
@@ -13,6 +14,7 @@ class Shader;
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/string_cast.hpp>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 using namespace std;
@@ -26,7 +28,7 @@ class ModelAbstract : public DrawableInterface {
     
     ModelAbstract();
     virtual ~ModelAbstract();
-    virtual void loadFile(const string& filename) = 0;
+    virtual void loadFile(const string& filename, unordered_map<string, Animation>* animations = nullptr) = 0;
     virtual void applyInstanceBuffer(unsigned int startIndex) const;
     virtual void draw(const Shader& shader, const glm::mat4& modelMtx) const;
     virtual void drawGeometry() const;

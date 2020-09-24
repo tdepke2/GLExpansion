@@ -1,7 +1,8 @@
 #ifndef MODEL_RIGGED_H_
 #define MODEL_RIGGED_H_
 
-#include "Animation.h"
+class Animation;
+
 #include "DampedSpringMotion.h"
 #include "ModelAbstract.h"
 #include <map>
@@ -34,8 +35,6 @@ class ModelRigged : public ModelAbstract {
     };
     
     static constexpr unsigned int MAX_NUM_BONES = 128;
-    
-    vector<Animation> animations_;
     vector<glm::mat4> boneOffsetMatrices_;
     
     ModelRigged();
@@ -45,10 +44,10 @@ class ModelRigged : public ModelAbstract {
     unsigned int getNumNodes() const;
     const glm::mat4& getArmatureRootInv() const;
     void setArmatureRootInv(const glm::mat4& armatureRootInv);
-    void loadFile(const string& filename);
+    void loadFile(const string& filename, unordered_map<string, Animation>* animations = nullptr);
     void ragdoll(const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const;
-    void animate(unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) const;    // Sets the transforms in the boneTransforms vector to match the given animation at the specified time.
-    void animateWithDynamics(unsigned int animationIndex, double time, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const;    // Same process as animate() but additionally applies dynamics/constraints to some bones.
+    void animate(const Animation& animation, double time, vector<glm::mat4>& boneTransforms) const;    // Sets the transforms in the boneTransforms vector to match the given animation at the specified time.
+    void animateWithDynamics(const Animation& animation, double time, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const;    // Same process as animate() but additionally applies dynamics/constraints to some bones.
     const Node* findNode(const string& nodeName) const;
     
     private:

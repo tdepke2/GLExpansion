@@ -1,6 +1,7 @@
 #ifndef WORLD_H_
 #define WORLD_H_
 
+#include "Animation.h"
 #include "CharacterTest.h"
 #include "ModelRigged.h"
 #include "ModelStatic.h"
@@ -9,6 +10,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 using namespace std;
@@ -45,6 +48,7 @@ class World {
     ModelStatic sceneTest_;
     ModelRigged modelTest_;
     vector<glm::mat4> modelTestBoneTransforms_;
+    unordered_map<string, Animation> modelTestAnimations_;
     CharacterTest characterTest_;
     Transformable sceneTestTransform_, modelTestTransform_;
     DirectionalLight sunLight_;

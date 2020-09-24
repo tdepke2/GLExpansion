@@ -9,7 +9,7 @@ class ModelStatic : public ModelAbstract {
     public:
     ModelStatic();
     ModelStatic(const string& filename);
-    void loadFile(const string& filename);
+    void loadFile(const string& filename, unordered_map<string, Animation>* animations = nullptr);
     
     private:
     void processNode(aiNode* node, glm::mat4 combinedTransform, const aiScene* scene);

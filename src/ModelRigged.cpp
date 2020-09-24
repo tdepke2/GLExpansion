@@ -1,3 +1,4 @@
+#include "Animation.h"
 #include "ModelRigged.h"
 #include <glm/gtx/quaternion.hpp>
 #include <cassert>
@@ -45,7 +46,7 @@ void ModelRigged::setArmatureRootInv(const glm::mat4& armatureRootInv) {
     armatureRootInv_ = armatureRootInv;
 }
 
-void ModelRigged::loadFile(const string& filename) {
+void ModelRigged::loadFile(const string& filename, unordered_map<string, Animation>* animations) {
     Assimp::Importer importer;
     const aiScene* scene = loadScene(&importer, filename);
     if (scene == nullptr) {
@@ -57,8 +58,7 @@ void ModelRigged::loadFile(const string& filename) {
     unordered_map<string, uint8_t> boneMapping;
     rootNode_ = processNode(nullptr, scene->mRootNode, glm::mat4(1.0f), scene, boneMapping);
     
-    unordered_map<string, unsigned int> nodeMapping;    // Traverse node hierarchy again to set bone indices.
-    stack<Node*> nodeStack;
+    stack<Node*> nodeStack;    // Traverse node hierarchy again to set bone indices.
     nodeStack.push(rootNode_);
     stack<glm::mat4> combinedTransformStack;    // Keep another stack of combined transforms to find the armatureRootInv_.
     combinedTransformStack.push(rootNode_->transform);
@@ -71,7 +71,6 @@ void ModelRigged::loadFile(const string& filename) {
             firstCombinedTransform = combinedTransformStack.top();
             combinedTransformStack.pop();
         }
-        nodeMapping[first->name] = first->id;
         auto findResult = boneMapping.find(first->name);
         if (findResult != boneMapping.end()) {
             first->boneIndex = findResult->second;
@@ -96,40 +95,11 @@ void ModelRigged::loadFile(const string& filename) {
         }
     }
     
-    animations_.reserve(scene->mNumAnimations);
-    for (unsigned int i = 0; i < scene->mNumAnimations; ++i) {    // Load all animations into the model.
-        animations_.emplace_back(string(scene->mAnimations[i]->mName.C_Str()), scene->mAnimations[i]->mDuration, (scene->mAnimations[i]->mTicksPerSecond != 0.0 ? scene->mAnimations[i]->mTicksPerSecond : 20.0));
-        if (VERBOSE_OUTPUT_) {
-            cout << "Loading animation " << animations_.back().name_ << " with duration " << animations_.back().duration_ << "s at " << animations_.back().ticksPerSecond_ << " TPS.\n";
-        }
-        
-        animations_.back().channels_.resize(numNodes_);
-        for (unsigned int j = 0; j < scene->mAnimations[i]->mNumChannels; ++j) {
-            const aiNodeAnim* nodeAnim = scene->mAnimations[i]->mChannels[j];
-            auto findResult = nodeMapping.find(nodeAnim->mNodeName.C_Str());
-            if (findResult == nodeMapping.end()) {
-                cout << "Warn: Animation contains a channel item with no corresponding node name.\n";
-            } else {
-                Animation::Channel* channel = &animations_.back().channels_[findResult->second];
-                
-                channel->translationKeys.reserve(nodeAnim->mNumPositionKeys);
-                for (unsigned int k = 0; k < nodeAnim->mNumPositionKeys; ++k) {
-                    channel->translationKeys.emplace_back(castVec3(nodeAnim->mPositionKeys[k].mValue), nodeAnim->mPositionKeys[k].mTime);
-                }
-                channel->rotationKeys.reserve(nodeAnim->mNumRotationKeys);
-                for (unsigned int k = 0; k < nodeAnim->mNumRotationKeys; ++k) {
-                    channel->rotationKeys.emplace_back(castQuat(nodeAnim->mRotationKeys[k].mValue), nodeAnim->mRotationKeys[k].mTime);
-                }
-                channel->scalingKeys.reserve(nodeAnim->mNumScalingKeys);
-                for (unsigned int k = 0; k < nodeAnim->mNumScalingKeys; ++k) {
-                    channel->scalingKeys.emplace_back(castVec3(nodeAnim->mScalingKeys[k].mValue), nodeAnim->mScalingKeys[k].mTime);
-                }
-                
-                if (nodeAnim->mNumPositionKeys + nodeAnim->mNumRotationKeys + nodeAnim->mNumScalingKeys > 1) {
-                    if (nodeAnim->mNumPositionKeys == 0 || nodeAnim->mNumRotationKeys == 0 || nodeAnim->mNumScalingKeys == 0) {
-                        cout << "Warn: Animation contains a channel with a missing transform key.\n";
-                    }
-                }
+    if (animations != nullptr) {
+        for (unsigned int i = 0; i < scene->mNumAnimations; ++i) {    // Load all animations of the model.
+            auto insertResult = animations->insert({string(scene->mAnimations[i]->mName.C_Str()), Animation(scene, i)});
+            if (!insertResult.second) {
+                cout << "Error: Found animation with the same name as an existing one.\n";
             }
         }
     }
@@ -141,18 +111,18 @@ void ModelRigged::ragdoll(const glm::mat4& modelMtx, map<int, DynamicBone>& dyna
     ragdollNodes(rootNode_, modelMtx, dynamicBones, armatureRootInv_, boneTransforms);
 }
 
-void ModelRigged::animate(unsigned int animationIndex, double time, vector<glm::mat4>& boneTransforms) const {
+void ModelRigged::animate(const Animation& animation, double time, vector<glm::mat4>& boneTransforms) const {
     assert(boneTransforms.size() == boneOffsetMatrices_.size());
     
-    double animationTime = fmod(time * animations_[animationIndex].ticksPerSecond_, animations_[animationIndex].duration_);
-    animateNodes(rootNode_, animations_[animationIndex], animationTime, armatureRootInv_, boneTransforms);
+    double animationTime = fmod(time * animation.ticksPerSecond_, animation.duration_);
+    animateNodes(rootNode_, animation, animationTime, armatureRootInv_, boneTransforms);
 }
 
-void ModelRigged::animateWithDynamics(unsigned int animationIndex, double time, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
+void ModelRigged::animateWithDynamics(const Animation& animation, double time, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
     assert(boneTransforms.size() == boneOffsetMatrices_.size());
     
-    double animationTime = fmod(time * animations_[animationIndex].ticksPerSecond_, animations_[animationIndex].duration_);
-    animateNodesWithDynamics(rootNode_, animations_[animationIndex], animationTime, modelMtx, dynamicBones, armatureRootInv_, boneTransforms);
+    double animationTime = fmod(time * animation.ticksPerSecond_, animation.duration_);
+    animateNodesWithDynamics(rootNode_, animation, animationTime, modelMtx, dynamicBones, armatureRootInv_, boneTransforms);
 }
 
 ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping) {
@@ -284,9 +254,10 @@ void ModelRigged::ragdollNodes(const Node* node, const glm::mat4& modelMtx, map<
 void ModelRigged::animateNodes(const Node* node, const Animation& animation, double animationTime, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const {
     //cout << "animateNodes() on " << node->name << " with id " << node->id << " and boneIndex " << node->boneIndex << "\n";
     glm::mat4 nodeTransform = node->transform;
-    if (animation.channels_[node->id].translationKeys.size() > 0) {    // Check if this node has an animation.
+    auto findResult = animation.channels_.find(node->name);
+    if (findResult != animation.channels_.end()) {    // Check if this node has an animation.
         //cout << "  adding channel transform.\n";
-        nodeTransform = animation.calcChannelTransform(node->id, animationTime);
+        nodeTransform = animation.calcChannelTransform(findResult->second, animationTime);
     }
     
     combinedTransform *= nodeTransform;
@@ -323,8 +294,11 @@ void ModelRigged::animateNodesWithDynamics(const Node* node, const Animation& an
         glm::quat rotateToCOM = findRotationBetweenVectors(equilibriumPosCOMLS - equilibriumPosLS, bonePosCOMLS - equilibriumPosLS);
         
         nodeTransform = node->transform * glm::translate(glm::mat4(1.0f), bonePosLS) * glm::mat4_cast(rotateToCOM);
-    } else if (animation.channels_[node->id].translationKeys.size() > 0) {    // Check if this node has an animation.
-        nodeTransform = animation.calcChannelTransform(node->id, animationTime);
+    } else {
+        auto findResult2 = animation.channels_.find(node->name);
+        if (findResult2 != animation.channels_.end()) {    // Check if this node has an animation.
+            nodeTransform = animation.calcChannelTransform(findResult2->second, animationTime);
+        }
     }
     
     combinedTransform *= nodeTransform;

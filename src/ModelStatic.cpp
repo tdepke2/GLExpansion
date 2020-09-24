@@ -1,3 +1,4 @@
+#include "Animation.h"
 #include "ModelStatic.h"
 #include <cassert>
 #include <iostream>
@@ -9,7 +10,7 @@ ModelStatic::ModelStatic(const string& filename) {
     loadFile(filename);
 }
 
-void ModelStatic::loadFile(const string& filename) {
+void ModelStatic::loadFile(const string& filename, unordered_map<string, Animation>* animations) {
     Assimp::Importer importer;
     const aiScene* scene = loadScene(&importer, filename);
     if (scene == nullptr) {
@@ -18,6 +19,15 @@ void ModelStatic::loadFile(const string& filename) {
     meshes_.reserve(scene->mNumMeshes);
     meshTransforms_.reserve(scene->mNumMeshes);
     processNode(scene->mRootNode, glm::mat4(1.0f), scene);
+    
+    if (animations != nullptr) {
+        for (unsigned int i = 0; i < scene->mNumAnimations; ++i) {    // Load all animations of the model.
+            auto insertResult = animations->insert({string(scene->mAnimations[i]->mName.C_Str()), Animation(scene, i)});
+            if (!insertResult.second) {
+                cout << "Error: Found animation with the same name as an existing one.\n";
+            }
+        }
+    }
 }
 
 void ModelStatic::processNode(aiNode* node, glm::mat4 combinedTransform, const aiScene* scene) {

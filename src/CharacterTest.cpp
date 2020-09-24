@@ -6,7 +6,7 @@
 #include <iostream>
 
 void CharacterTest::init() {
-    model_.loadFile("models/miku/miku2.fbx");
+    model_.loadFile("models/miku/miku2.fbx", &animations_);
     transform_.setPosition(glm::vec3(-20.0f, 0.0f, -12.0f));
     //transform_.setPosition(glm::vec3(0.0f, 12.0f, 0.0f));
     //transform_.setPitchYawRoll(glm::vec3(glm::pi<float>() / 2.0f, 0.0f, 0.0f));
@@ -63,8 +63,8 @@ void CharacterTest::update() {
     }*/
     
     //model_.ragdoll(transform_.getTransform(), dynamicBones_, boneTransforms_);
-    model_.animate(0, glfwGetTime(), boneTransforms_);
-    //model_.animateWithDynamics(0, glfwGetTime(), transform_.getTransform(), dynamicBones_, boneTransforms_);
+    model_.animate(animations_.at("Armature|ArmatureAction"), glfwGetTime(), boneTransforms_);
+    //model_.animateWithDynamics(animations_.at("Armature|ArmatureAction"), glfwGetTime(), transform_.getTransform(), dynamicBones_, boneTransforms_);
 }
 
 void CharacterTest::draw(const Shader& shader, const glm::mat4& modelMtx) const {

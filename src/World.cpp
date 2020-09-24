@@ -24,7 +24,7 @@ World::World() :
     sceneTestTransform_.setScale(glm::vec3(0.025f, 0.025f, 0.025f));
     sceneTestTransform_.setPitchYawRoll(glm::vec3(-glm::pi<float>() / 2.0f, 0.0f, 0.0f));
     
-    modelTest_.loadFile("models/bob_lamp_update/bob_lamp_update.md5mesh");
+    modelTest_.loadFile("models/bob_lamp_update/bob_lamp_update.md5mesh", &modelTestAnimations_);
     modelTest_.setArmatureRootInv(glm::inverse(glm::mat4({1.0, 0.0, 0.0, 0.0}, {0.0, 0.0, -1.0, 0.0}, {0.0, 1.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 1.0})));
     //modelTest_.loadFile("models/hellknight/hellknight.md5mesh");
     //modelTest_.loadFile("models/spaceship/Intergalactic Spaceship_Blender_2.8_Packed textures.dae");
@@ -118,7 +118,7 @@ void World::nextTick() {
         sunPosition_.x = 0.00001f;
     }
     
-    modelTest_.animate(0, glfwGetTime(), modelTestBoneTransforms_);
+    modelTest_.animate(modelTestAnimations_.at(""), glfwGetTime(), modelTestBoneTransforms_);
     characterTest_.update();
     
     debugVectors_.resize(4);
