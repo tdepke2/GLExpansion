@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/string_cast.hpp>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -26,10 +27,10 @@ class Animation {
     string name_;
     double duration_, ticksPerSecond_;
     
-    static void loadFile(const string& filename, unordered_map<string, Animation>* animations = nullptr);
+    static void loadFile(const string& filename, unordered_map<string, Animation>* animations, const string& repairFilename = "");
     Animation(const string& name, double duration, double ticksPerSecond);
-    Animation(const aiScene* scene, unsigned int index);
-    void loadFromScene(const aiScene* scene, unsigned int index);
+    Animation(const aiScene* scene, unsigned int index, unordered_map<string, string>* nodeSubstitutes = nullptr);
+    void loadFromScene(const aiScene* scene, unsigned int index, unordered_map<string, string>* nodeSubstitutes);
     glm::mat4 calcChannelTransform(const Channel& channel, double animationTime) const;
     
     private:

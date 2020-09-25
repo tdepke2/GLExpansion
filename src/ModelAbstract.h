@@ -21,7 +21,7 @@ using namespace std;
 
 class ModelAbstract : public DrawableInterface {
     public:
-    static constexpr bool VERBOSE_OUTPUT_ = true;
+    static constexpr bool VERBOSE_OUTPUT_ = false;
     vector<Mesh> meshes_;
     vector<glm::mat4> meshTransforms_;
     string directoryPath_;

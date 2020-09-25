@@ -19,13 +19,12 @@ using namespace std;
 
 class CharacterTest : public DrawableInterface {
     public:
-    ModelRigged model_;
-    Transformable transform_;
-    unordered_map<string, Animation> animations_;
-    vector<glm::mat4> boneTransforms_;
+    ModelRigged model_, model2_;
+    Transformable transform_, transform2_;
+    unordered_map<string, Animation> animations_, animations2_;
+    vector<glm::mat4> boneTransforms_, boneTransforms2_;
     map<int, ModelRigged::DynamicBone> dynamicBones_;
     vector<glm::vec3> activeForces_;
-    glm::mat4 lastBoneTransform_;
     
     void init();
     void update();
