@@ -1,13 +1,15 @@
 #include "Animation.h"
+#include "ModelRigged.h"
 #include <cassert>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <stack>
 #include <stdexcept>
 
-void Animation::loadFile(const string& filename, unordered_map<string, Animation>* animations, const string& repairFilename) {
+void Animation::loadFile(const string& filename, unordered_map<string, Animation>* animations, const string& repairFilename, const ModelRigged* referenceModel) {
     Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(filename, 0);
+    const aiScene* scene = importer.ReadFile(filename, aiProcess_JoinIdenticalVertices | aiProcess_Triangulate);
     
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         cout << "Failed to load model file \"" << filename << "\": " << importer.GetErrorString() << "\n";
@@ -41,7 +43,7 @@ void Animation::loadFile(const string& filename, unordered_map<string, Animation
     }
     
     for (unsigned int i = 0; i < scene->mNumAnimations; ++i) {    // Load all animations of the model.
-        auto insertResult = animations->insert({string(scene->mAnimations[i]->mName.C_Str()), Animation(scene, i, nodeSubstitutesPtr.get())});
+        auto insertResult = animations->insert({string(scene->mAnimations[i]->mName.C_Str()), Animation(scene, i, nodeSubstitutesPtr.get(), referenceModel)});
         if (!insertResult.second) {
             cout << "Error: Found animation with the same name as an existing one.\n";
         }
@@ -50,11 +52,11 @@ void Animation::loadFile(const string& filename, unordered_map<string, Animation
 
 Animation::Animation(const string& name, double duration, double ticksPerSecond) : name_(name), duration_(duration), ticksPerSecond_(ticksPerSecond) {}
 
-Animation::Animation(const aiScene* scene, unsigned int index, unordered_map<string, string>* nodeSubstitutes) {
-    loadFromScene(scene, index, nodeSubstitutes);
+Animation::Animation(const aiScene* scene, unsigned int index, const unordered_map<string, string>* nodeSubstitutes, const ModelRigged* referenceModel) {
+    loadFromScene(scene, index, nodeSubstitutes, referenceModel);
 }
 
-void Animation::loadFromScene(const aiScene* scene, unsigned int index, unordered_map<string, string>* nodeSubstitutes) {
+void Animation::loadFromScene(const aiScene* scene, unsigned int index, const unordered_map<string, string>* nodeSubstitutes, const ModelRigged* referenceModel) {
     name_ = string(scene->mAnimations[index]->mName.C_Str());
     duration_ = scene->mAnimations[index]->mDuration;
     ticksPerSecond_ = (scene->mAnimations[index]->mTicksPerSecond != 0.0 ? scene->mAnimations[index]->mTicksPerSecond : 20.0);
@@ -115,6 +117,10 @@ void Animation::loadFromScene(const aiScene* scene, unsigned int index, unordere
         
         //}
     }
+    
+    if (nodeSubstitutes != nullptr) {
+        printBoneDiffTest(scene, nodeSubstitutes, referenceModel);
+    }
 }
 
 glm::mat4 Animation::calcChannelTransform(const Channel& channel, double animationTime) const {
@@ -161,4 +167,114 @@ glm::quat Animation::interpolateQuatKeys(const vector<pair<glm::quat, double>>& 
     
     float t = static_cast<float>((animationTime - keys[i].second) / (keys[i + 1].second - keys[i].second));
     return glm::slerp(keys[i].first, keys[i + 1].first, t);
+}
+
+void Animation::printBoneDiffTest(const aiScene* scene, const unordered_map<string, string>* nodeSubstitutes, const ModelRigged* referenceModel) {
+    cout << "/////////////////////// printBoneDiffTest //////////////////////////////\n";
+    
+    unordered_map<string, pair<const aiNode*, glm::mat4>> mappedNodes;
+    
+    stack<const aiNode*> nodeStack;
+    nodeStack.push(scene->mRootNode);
+    stack<glm::mat4> transformStack;
+    transformStack.push(castMat4(scene->mRootNode->mTransformation));
+    while (!nodeStack.empty()) {
+        const aiNode* topNode = nodeStack.top();
+        nodeStack.pop();
+        glm::mat4 topTransform = transformStack.top();
+        transformStack.pop();
+        
+        /*cout << "  Node " << topNode->mName.C_Str() << " has " << topNode->mNumMeshes << " meshes and " << topNode->mNumChildren << " children.\n";
+        if (castMat4(topNode->mTransformation) == glm::mat4(1.0f)) {
+            cout << "  Transform: IdentityMtx\n";
+        } else {
+            cout << "  Transform: " << glm::to_string(castMat4(topNode->mTransformation)) << "\n";
+        }*/
+        
+        auto findResult = nodeSubstitutes->find(string(topNode->mName.C_Str()));
+        if (findResult != nodeSubstitutes->end()) {
+            auto insertResult = mappedNodes.insert({findResult->second, {topNode, topTransform}});
+            if (!insertResult.second) {
+                cout << "Warn: Animation contains a duplicate channel name.\n";
+            }
+        }
+        
+        for (unsigned int i = 0; i < topNode->mNumChildren; ++i) {
+            nodeStack.push(topNode->mChildren[i]);
+            transformStack.push(topTransform * castMat4(topNode->mChildren[i]->mTransformation));
+        }
+    }
+    
+    cout << "//////////////////////////////////////////////////////////////////////////\n";
+    
+    stack<const ModelRigged::Node*> refNodeStack;
+    refNodeStack.push(referenceModel->getRootNode());
+    stack<glm::mat4> refTransformStack;
+    refTransformStack.push(referenceModel->getRootNode()->transform);
+    while (!refNodeStack.empty()) {
+        const ModelRigged::Node* topNode = refNodeStack.top();
+        refNodeStack.pop();
+        glm::mat4 topTransform = refTransformStack.top();
+        refTransformStack.pop();
+        
+        /*cout << "  Node " << topNode->name << " has " << topNode->children.size() << " children.\n";
+        if (topNode->transform == glm::mat4(1.0f)) {
+            cout << "  Transform: IdentityMtx\n";
+        } else {
+            cout << "  Transform: " << glm::to_string(topNode->transform) << "\n";
+        }*/
+        
+        auto findResult = mappedNodes.find(topNode->name);
+        if (findResult != mappedNodes.end()) {
+            cout << "[" << topNode->name << "]:\n";
+            if (topNode->name == "Hips") {
+                cout << "Relative:\n";
+                cout << glm::to_string(topNode->transform) << "\n";
+                cout << glm::to_string(castMat4(findResult->second.first->mTransformation)) << "\n";
+                cout << "Combined:\n";
+                cout << glm::to_string(topTransform) << "\n";
+                cout << glm::to_string(findResult->second.second) << "\n";
+            }
+            auto findChannel = channels_.find(topNode->name);
+            if (findChannel != channels_.end()) {
+                float scaling = glm::length(glm::vec3(topNode->transform * glm::vec4(0.0, 0.0, 0.0, 1.0))) / glm::length(findChannel->second.translationKeys[0].first);
+                if (topNode->name == "Armature") {
+                    scaling = 0.01f;
+                }
+                cout << "Scaling set to " << scaling << "\n";
+                if (topNode->name != "Armature" && topNode->name != "Hips") {
+                    for (pair<glm::vec3, double>& key : findChannel->second.translationKeys) {
+                        key.first = glm::vec3(topNode->transform * glm::inverse(castMat4(findResult->second.first->mTransformation)) * glm::vec4(key.first, 1.0f));
+                    }
+                    if (topNode->name == "Left knee" || topNode->name == "Right knee") {
+                        glm::quat q = glm::quat_cast(topNode->transform);// * glm::inverse(glm::quat_cast(castMat4(findResult->second.first->mTransformation)));
+                        cout << "Quat q = " << glm::to_string(q) << "\nModel node: " << glm::to_string(topNode->transform) << "\nArmature node: " << glm::to_string(castMat4(findResult->second.first->mTransformation)) << "\n";
+                        for (pair<glm::quat, double>& key : findChannel->second.rotationKeys) {
+                            //key.first = glm::quat_cast(topNode->transform * glm::inverse(castMat4(findResult->second.first->mTransformation)) * mat4_cast(key.first));
+                            //key.first = glm::quat_cast(topNode->transform);
+                            key.first = q * key.first;
+                        }
+                    }
+                } else {
+                    for (pair<glm::vec3, double>& key : findChannel->second.translationKeys) {
+                        //key.first = glm::vec3(glm::mat4({0.009, 0.0, 0.0, 0.0}, {0.0, 0.009, 0.0, 0.0}, {0.0, 0.0, 0.009, 0.0}, {0.0, 0.0, 0.0, 1.0}) * glm::vec4(key.first, 1.0));
+                        //key.first = glm::vec3(topNode->transform * glm::inverse(castMat4(findResult->second.first->mTransformation)) * glm::vec4(key.first, 1.0f));
+                        key.first *= scaling;
+                    }
+                }
+                if (topNode->name == "Left elbow") {
+                    cout << "Base elbow length = " << glm::length(glm::vec3(topNode->transform * glm::vec4(0.0, 0.0, 0.0, 1.0))) << "\n";
+                    cout << "Converted elbow length = " << glm::length(findChannel->second.translationKeys[0].first) << "\n";
+                }
+                for (pair<glm::vec3, double>& key : findChannel->second.scalingKeys) {
+                    key.first = glm::vec3(1.0f);
+                }
+            }
+        }
+        
+        for (const ModelRigged::Node* n : topNode->children) {
+            refNodeStack.push(n);
+            refTransformStack.push(topTransform * n->transform);
+        }
+    }
 }

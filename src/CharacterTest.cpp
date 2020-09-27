@@ -9,12 +9,15 @@ void CharacterTest::init() {
     model_.loadFile("models/miku/miku2.fbx", &animations_);
     model2_.loadFile("models/miku/animationTest.fbx", &animations2_);
     //model_.loadFile("models/miku/animationTest.fbx", &animations_);
-    Animation::loadFile("models/miku/animationTest.fbx", &animations_, "models/miku/animationNodeSubstitutes.txt");
+    Animation::loadFile("models/miku/animationTest.fbx", &animations_, "models/miku/animationNodeSubstitutes.txt", &model_);
     transform_.setPosition(glm::vec3(-20.0f, 0.0f, -12.0f));
     //transform_.setPosition(glm::vec3(0.0f, 12.0f, 0.0f));
     //transform_.setPitchYawRoll(glm::vec3(glm::pi<float>() / 2.0f, 0.0f, 0.0f));
-    transform_.setScale(glm::vec3(1.0f));
-    transform2_.setPosition(glm::vec3(-15.0f, 0.0f, -12.0f));
+    transform2_.setPosition(glm::vec3(-19.0f, 0.0f, -12.0f));
+    transform2_.setScale(glm::vec3(0.2f));
+    transform3_.setPosition(glm::vec3(-21.0f, 0.0f, -12.0f));
+    transform4_.setPosition(glm::vec3(-18.0f, 0.0f, -12.0f));
+    transform4_.setScale(glm::vec3(0.2f));
     
     Animation moveForward("moveForward", 30.0, 20.0);
     moveForward.channels_["Hips"].translationKeys.emplace_back(glm::vec3(0.0f, 0.0f, 0.0f), 0.0);
@@ -25,8 +28,10 @@ void CharacterTest::init() {
     
     assert(model_.boneOffsetMatrices_.size() <= ModelRigged::MAX_NUM_BONES);
     boneTransforms_.resize(model_.boneOffsetMatrices_.size(), glm::mat4(1.0f));
+    boneTransforms3_.resize(model_.boneOffsetMatrices_.size(), glm::mat4(1.0f));
     assert(model2_.boneOffsetMatrices_.size() <= ModelRigged::MAX_NUM_BONES);
     boneTransforms2_.resize(model2_.boneOffsetMatrices_.size(), glm::mat4(1.0f));
+    boneTransforms4_.resize(model2_.boneOffsetMatrices_.size(), glm::mat4(1.0f));
     
     activeForces_.push_back(glm::vec3(0.0f, -0.01f, 0.0f));
     
@@ -75,8 +80,10 @@ void CharacterTest::update() {
     }*/
     
     //model_.ragdoll(transform_.getTransform(), dynamicBones_, boneTransforms_);
-    model_.animate(animations_.at("Armature|Armature|mixamo.com|Layer0"), glfwGetTime(), boneTransforms_);
-    model2_.animate(animations2_.at("Armature|Armature|mixamo.com|Layer0"), glfwGetTime(), boneTransforms2_);
+    model_.animate(animations_.at("Armature|Armature|mixamo.com|Layer0"), glfwGetTime() / 2.0f, boneTransforms_);
+    model2_.animate(animations2_.at("Armature|Armature|mixamo.com|Layer0"), glfwGetTime() / 2.0f, boneTransforms2_);
+    //model_.animate(animations_.at("Armature|Armature|mixamo.com|Layer0"), 0.0f, boneTransforms_);
+    //model2_.animate(animations2_.at("Armature|Armature|mixamo.com|Layer0"), 0.0f, boneTransforms2_);
     //model_.animate(animations_.at("moveForward"), glfwGetTime(), boneTransforms_);
     //model_.animateWithDynamics(animations_.at("Armature|ArmatureAction"), glfwGetTime(), transform_.getTransform(), dynamicBones_, boneTransforms_);
 }
@@ -85,6 +92,12 @@ void CharacterTest::draw(const Shader& shader, const glm::mat4& modelMtx) const 
     shader.setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms2_.size()), boneTransforms2_.data());
     model2_.draw(shader, transform2_.getTransform());
     
+    shader.setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms4_.size()), boneTransforms4_.data());
+    model2_.draw(shader, transform4_.getTransform());
+    
     shader.setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms_.size()), boneTransforms_.data());
     model_.draw(shader, transform_.getTransform());
+    
+    shader.setMat4Array("boneTransforms", static_cast<unsigned int>(boneTransforms3_.size()), boneTransforms3_.data());
+    model_.draw(shader, transform3_.getTransform());
 }
