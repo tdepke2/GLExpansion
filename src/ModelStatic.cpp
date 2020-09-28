@@ -6,8 +6,8 @@
 
 ModelStatic::ModelStatic() {}
 
-ModelStatic::ModelStatic(const string& filename) {
-    loadFile(filename);
+ModelStatic::ModelStatic(const string& filename, unordered_map<string, Animation>* animations) {
+    loadFile(filename, animations);
 }
 
 void ModelStatic::loadFile(const string& filename, unordered_map<string, Animation>* animations) {

@@ -25,6 +25,7 @@ class Animation {
         vector<pair<glm::vec3, double>> scalingKeys;
     };
     
+    static glm::mat4 test;
     unordered_map<string, Channel> channels_;
     string name_;
     double duration_, ticksPerSecond_;
@@ -43,7 +44,7 @@ class Animation {
     static inline glm::mat3 castMat3(const aiMatrix3x3& m) { return glm::transpose(glm::make_mat3(&m.a1)); }
     glm::vec3 interpolateVec3Keys(const vector<pair<glm::vec3, double>>& keys, double animationTime) const;
     glm::quat interpolateQuatKeys(const vector<pair<glm::quat, double>>& keys, double animationTime) const;
-    void printBoneDiffTest(const aiScene* scene, const unordered_map<string, string>* nodeSubstitutes, const ModelRigged* referenceModel);
+    void printBoneDiffTest(const aiScene* scene, const unordered_map<string, string>& nodeSubstitutes, const ModelRigged& referenceModel);
 };
 
 #endif

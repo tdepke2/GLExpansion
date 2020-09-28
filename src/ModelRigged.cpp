@@ -10,9 +10,9 @@ ModelRigged::ModelRigged() {
     rootNode_ = nullptr;
 }
 
-ModelRigged::ModelRigged(const string& filename) {
+ModelRigged::ModelRigged(const string& filename, unordered_map<string, Animation>* animations) {
     rootNode_ = nullptr;
-    loadFile(filename);
+    loadFile(filename, animations);
 }
 
 ModelRigged::~ModelRigged() {
@@ -52,6 +52,50 @@ void ModelRigged::loadFile(const string& filename, unordered_map<string, Animati
     if (scene == nullptr) {
         return;
     }
+    buildFromScene(scene, animations);
+}
+
+void ModelRigged::ragdoll(const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
+    assert(boneTransforms.size() == boneOffsetMatrices_.size());
+    
+    ragdollNodes(rootNode_, modelMtx, dynamicBones, armatureRootInv_, boneTransforms);
+}
+
+void ModelRigged::animate(const Animation& animation, double time, vector<glm::mat4>& boneTransforms) const {
+    assert(boneTransforms.size() == boneOffsetMatrices_.size());
+    
+    double animationTime = fmod(time * animation.ticksPerSecond_, animation.duration_);
+    animateNodes(rootNode_, animation, animationTime, armatureRootInv_, boneTransforms);
+}
+
+void ModelRigged::animateWithDynamics(const Animation& animation, double time, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
+    assert(boneTransforms.size() == boneOffsetMatrices_.size());
+    
+    double animationTime = fmod(time * animation.ticksPerSecond_, animation.duration_);
+    animateNodesWithDynamics(rootNode_, animation, animationTime, modelMtx, dynamicBones, armatureRootInv_, boneTransforms);
+}
+
+const ModelRigged::Node* ModelRigged::findNode(const string& nodeName) const {
+    stack<Node*> nodeStack;
+    nodeStack.push(rootNode_);
+    while (!nodeStack.empty()) {
+        Node* first = nodeStack.top();
+        nodeStack.pop();
+        
+        if (first->name == nodeName) {
+            return first;
+        }
+        
+        for (Node* n : first->children) {
+            nodeStack.push(n);
+        }
+    }
+    
+    cout << "Error: Unable to find node with name " << nodeName << ".\n";
+    return nullptr;
+}
+
+void ModelRigged::buildFromScene(const aiScene* scene, unordered_map<string, Animation>* animations) {
     meshes_.reserve(scene->mNumMeshes);
     meshTransforms_.reserve(scene->mNumMeshes);
     numNodes_ = 0;
@@ -103,26 +147,6 @@ void ModelRigged::loadFile(const string& filename, unordered_map<string, Animati
             }
         }
     }
-}
-
-void ModelRigged::ragdoll(const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
-    assert(boneTransforms.size() == boneOffsetMatrices_.size());
-    
-    ragdollNodes(rootNode_, modelMtx, dynamicBones, armatureRootInv_, boneTransforms);
-}
-
-void ModelRigged::animate(const Animation& animation, double time, vector<glm::mat4>& boneTransforms) const {
-    assert(boneTransforms.size() == boneOffsetMatrices_.size());
-    
-    double animationTime = fmod(time * animation.ticksPerSecond_, animation.duration_);
-    animateNodes(rootNode_, animation, animationTime, armatureRootInv_, boneTransforms);
-}
-
-void ModelRigged::animateWithDynamics(const Animation& animation, double time, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
-    assert(boneTransforms.size() == boneOffsetMatrices_.size());
-    
-    double animationTime = fmod(time * animation.ticksPerSecond_, animation.duration_);
-    animateNodesWithDynamics(rootNode_, animation, animationTime, modelMtx, dynamicBones, armatureRootInv_, boneTransforms);
 }
 
 ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping) {
@@ -257,7 +281,7 @@ void ModelRigged::animateNodes(const Node* node, const Animation& animation, dou
     auto findResult = animation.channels_.find(node->name);
     if (findResult != animation.channels_.end()) {    // Check if this node has an animation.
         //cout << "  adding channel transform.\n";
-        nodeTransform = animation.calcChannelTransform(findResult->second, animationTime);
+        //nodeTransform = animation.calcChannelTransform(findResult->second, animationTime);
     }
     
     combinedTransform *= nodeTransform;
@@ -310,26 +334,6 @@ void ModelRigged::animateNodesWithDynamics(const Node* node, const Animation& an
     for (unsigned int i = 0; i < node->children.size(); ++i) {
         animateNodesWithDynamics(node->children[i], animation, animationTime, modelMtx, dynamicBones, combinedTransform, boneTransforms);
     }
-}
-
-const ModelRigged::Node* ModelRigged::findNode(const string& nodeName) const {
-    stack<Node*> nodeStack;
-    nodeStack.push(rootNode_);
-    while (!nodeStack.empty()) {
-        Node* first = nodeStack.top();
-        nodeStack.pop();
-        
-        if (first->name == nodeName) {
-            return first;
-        }
-        
-        for (Node* n : first->children) {
-            nodeStack.push(n);
-        }
-    }
-    
-    cout << "Error: Unable to find node with name " << nodeName << ".\n";
-    return nullptr;
 }
 
 glm::quat ModelRigged::findRotationBetweenVectors(glm::vec3 source, glm::vec3 destination) const {

@@ -8,7 +8,7 @@ using namespace std;
 class ModelStatic : public ModelAbstract {
     public:
     ModelStatic();
-    ModelStatic(const string& filename);
+    ModelStatic(const string& filename, unordered_map<string, Animation>* animations = nullptr);
     void loadFile(const string& filename, unordered_map<string, Animation>* animations = nullptr);
     
     private:

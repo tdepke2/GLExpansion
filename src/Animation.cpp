@@ -7,9 +7,11 @@
 #include <stack>
 #include <stdexcept>
 
+glm::mat4 Animation::test(1.0f);
+
 void Animation::loadFile(const string& filename, unordered_map<string, Animation>* animations, const string& repairFilename, const ModelRigged* referenceModel) {
     Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(filename, aiProcess_JoinIdenticalVertices | aiProcess_Triangulate);
+    const aiScene* scene = importer.ReadFile(filename, aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate | aiProcess_GenSmoothNormals);
     
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         cout << "Failed to load model file \"" << filename << "\": " << importer.GetErrorString() << "\n";
@@ -119,7 +121,7 @@ void Animation::loadFromScene(const aiScene* scene, unsigned int index, const un
     }
     
     if (nodeSubstitutes != nullptr) {
-        printBoneDiffTest(scene, nodeSubstitutes, referenceModel);
+        printBoneDiffTest(scene, *nodeSubstitutes, *referenceModel);
     }
 }
 
@@ -169,17 +171,20 @@ glm::quat Animation::interpolateQuatKeys(const vector<pair<glm::quat, double>>& 
     return glm::slerp(keys[i].first, keys[i + 1].first, t);
 }
 
-void Animation::printBoneDiffTest(const aiScene* scene, const unordered_map<string, string>* nodeSubstitutes, const ModelRigged* referenceModel) {
+void Animation::printBoneDiffTest(const aiScene* scene, const unordered_map<string, string>& nodeSubstitutes, const ModelRigged& referenceModel) {
     cout << "/////////////////////// printBoneDiffTest //////////////////////////////\n";
     
-    unordered_map<string, pair<const aiNode*, glm::mat4>> mappedNodes;
+    ModelRigged model;
+    model.buildFromScene(scene, nullptr);
     
-    stack<const aiNode*> nodeStack;
-    nodeStack.push(scene->mRootNode);
+    unordered_map<string, pair<const ModelRigged::Node*, glm::mat4>> mappedNodes;
+    
+    stack<const ModelRigged::Node*> nodeStack;
+    nodeStack.push(model.getRootNode());
     stack<glm::mat4> transformStack;
-    transformStack.push(castMat4(scene->mRootNode->mTransformation));
+    transformStack.push(model.getRootNode()->transform);
     while (!nodeStack.empty()) {
-        const aiNode* topNode = nodeStack.top();
+        const ModelRigged::Node* topNode = nodeStack.top();
         nodeStack.pop();
         glm::mat4 topTransform = transformStack.top();
         transformStack.pop();
@@ -191,26 +196,26 @@ void Animation::printBoneDiffTest(const aiScene* scene, const unordered_map<stri
             cout << "  Transform: " << glm::to_string(castMat4(topNode->mTransformation)) << "\n";
         }*/
         
-        auto findResult = nodeSubstitutes->find(string(topNode->mName.C_Str()));
-        if (findResult != nodeSubstitutes->end()) {
+        auto findResult = nodeSubstitutes.find(topNode->name);    // Check if this node name needs to be mapped to a different name, if it does then we need to update the keyframes attached to it.
+        if (findResult != nodeSubstitutes.end()) {
             auto insertResult = mappedNodes.insert({findResult->second, {topNode, topTransform}});
             if (!insertResult.second) {
                 cout << "Warn: Animation contains a duplicate channel name.\n";
             }
         }
         
-        for (unsigned int i = 0; i < topNode->mNumChildren; ++i) {
-            nodeStack.push(topNode->mChildren[i]);
-            transformStack.push(topTransform * castMat4(topNode->mChildren[i]->mTransformation));
+        for (const ModelRigged::Node* n : topNode->children) {
+            nodeStack.push(n);
+            transformStack.push(topTransform * n->transform);
         }
     }
     
     cout << "//////////////////////////////////////////////////////////////////////////\n";
     
     stack<const ModelRigged::Node*> refNodeStack;
-    refNodeStack.push(referenceModel->getRootNode());
+    refNodeStack.push(referenceModel.getRootNode());
     stack<glm::mat4> refTransformStack;
-    refTransformStack.push(referenceModel->getRootNode()->transform);
+    refTransformStack.push(referenceModel.getRootNode()->transform);
     while (!refNodeStack.empty()) {
         const ModelRigged::Node* topNode = refNodeStack.top();
         refNodeStack.pop();
@@ -226,14 +231,17 @@ void Animation::printBoneDiffTest(const aiScene* scene, const unordered_map<stri
         
         auto findResult = mappedNodes.find(topNode->name);
         if (findResult != mappedNodes.end()) {
+            const ModelRigged::Node* foundNode = findResult->second.first;
+            glm::mat4 foundTransform = findResult->second.second;
+            
             cout << "[" << topNode->name << "]:\n";
             if (topNode->name == "Hips") {
                 cout << "Relative:\n";
                 cout << glm::to_string(topNode->transform) << "\n";
-                cout << glm::to_string(castMat4(findResult->second.first->mTransformation)) << "\n";
+                cout << glm::to_string(foundNode->transform) << "\n";
                 cout << "Combined:\n";
                 cout << glm::to_string(topTransform) << "\n";
-                cout << glm::to_string(findResult->second.second) << "\n";
+                cout << glm::to_string(foundTransform) << "\n";
             }
             auto findChannel = channels_.find(topNode->name);
             if (findChannel != channels_.end()) {
@@ -244,21 +252,44 @@ void Animation::printBoneDiffTest(const aiScene* scene, const unordered_map<stri
                 cout << "Scaling set to " << scaling << "\n";
                 if (topNode->name != "Armature" && topNode->name != "Hips") {
                     for (pair<glm::vec3, double>& key : findChannel->second.translationKeys) {
-                        key.first = glm::vec3(topNode->transform * glm::inverse(castMat4(findResult->second.first->mTransformation)) * glm::vec4(key.first, 1.0f));
+                        key.first = glm::vec3(topNode->transform * glm::inverse(foundNode->transform) * glm::vec4(key.first, 1.0f));
                     }
                     if (topNode->name == "Left knee" || topNode->name == "Right knee") {
-                        glm::quat q = glm::quat_cast(topNode->transform);// * glm::inverse(glm::quat_cast(castMat4(findResult->second.first->mTransformation)));
-                        cout << "Quat q = " << glm::to_string(q) << "\nModel node: " << glm::to_string(topNode->transform) << "\nArmature node: " << glm::to_string(castMat4(findResult->second.first->mTransformation)) << "\n";
+                        glm::mat4 combinedTransformLast = foundTransform * glm::inverse(foundNode->transform);
+                        glm::mat4 tPoseTransform = (foundTransform * glm::inverse(foundTransform * model.boneOffsetMatrices_[foundNode->boneIndex])) * glm::inverse(combinedTransformLast * glm::inverse(combinedTransformLast * model.boneOffsetMatrices_[foundNode->boneIndex]));
+                        cout << "absTransform = " << glm::to_string(foundTransform) << "\n";
+                        cout << "tPoseTransform = " << glm::to_string(tPoseTransform) << "\n";
+                        
+                        test = foundTransform * model.boneOffsetMatrices_[foundNode->boneIndex] * model.getArmatureRootInv();
+                        test = glm::inverse(test);
+                        test *= foundTransform * model.getArmatureRootInv() * model.getArmatureRootInv();
+                        
+                        glm::mat4 refCombinedTransformLast = topTransform * glm::inverse(topNode->transform);
+                        glm::mat4 refTPoseTransform = (topTransform * glm::inverse(topTransform * referenceModel.boneOffsetMatrices_[topNode->boneIndex])) * glm::inverse(refCombinedTransformLast * glm::inverse(refCombinedTransformLast * referenceModel.boneOffsetMatrices_[topNode->boneIndex]));
+                        
+                        //test = topTransform * referenceModel.boneOffsetMatrices_[topNode->boneIndex] * referenceModel.getArmatureRootInv();
+                        //test = glm::inverse(test);
+                        //test *= topTransform * referenceModel.getArmatureRootInv() * referenceModel.getArmatureRootInv();
+                        
+                        //test = glm::translate(glm::mat4(1.0f), -glm::vec3(topTransform * referenceModel.boneOffsetMatrices_[topNode->boneIndex] * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))) * topTransform;
+                        //test = glm::inverse(glm::translate(glm::mat4(glm::mat3(test)), glm::vec3(test * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))));
+                        
+                        glm::quat q = glm::inverse(glm::normalize(glm::quat_cast(tPoseTransform))) * glm::normalize(glm::quat_cast(refTPoseTransform));
+                        cout << "Quat q = " << glm::to_string(q) << "\n";
+                        
+                        
+                        //glm::quat q = glm::quat_cast(topNode->transform);// * glm::inverse(glm::quat_cast(foundNode->transform));
+                        //cout << "Quat q = " << glm::to_string(q) << "\nModel node: " << glm::to_string(topNode->transform) << "\nArmature node: " << glm::to_string(foundNode->transform) << "\n";
                         for (pair<glm::quat, double>& key : findChannel->second.rotationKeys) {
-                            //key.first = glm::quat_cast(topNode->transform * glm::inverse(castMat4(findResult->second.first->mTransformation)) * mat4_cast(key.first));
+                            //key.first = glm::quat_cast(topNode->transform * glm::inverse(foundNode->transform) * mat4_cast(key.first));
                             //key.first = glm::quat_cast(topNode->transform);
-                            key.first = q * key.first;
+                            key.first = key.first * q;
                         }
                     }
                 } else {
                     for (pair<glm::vec3, double>& key : findChannel->second.translationKeys) {
                         //key.first = glm::vec3(glm::mat4({0.009, 0.0, 0.0, 0.0}, {0.0, 0.009, 0.0, 0.0}, {0.0, 0.0, 0.009, 0.0}, {0.0, 0.0, 0.0, 1.0}) * glm::vec4(key.first, 1.0));
-                        //key.first = glm::vec3(topNode->transform * glm::inverse(castMat4(findResult->second.first->mTransformation)) * glm::vec4(key.first, 1.0f));
+                        //key.first = glm::vec3(topNode->transform * glm::inverse(foundNode->transform) * glm::vec4(key.first, 1.0f));
                         key.first *= scaling;
                     }
                 }
