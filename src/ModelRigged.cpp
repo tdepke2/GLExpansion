@@ -6,6 +6,24 @@
 #include <stack>
 #include <utility>
 
+glm::quat ModelRigged::findRotationBetweenVectors(glm::vec3 source, glm::vec3 destination) {
+    source = glm::normalize(source);
+    destination = glm::normalize(destination);
+    float cosTheta = glm::dot(source, destination);
+    
+    if (cosTheta < -1.0f + 0.001f) {    // Special case where vectors are in opposite direction.
+        glm::vec3 axis = glm::cross(source, glm::vec3(1.0f, 0.0f, 0.0f));
+        if (glm::length(axis) < 0.01f) {
+            axis = glm::cross(source, glm::vec3(0.0f, 1.0f, 0.0f));
+        }
+        return glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::pi<float>(), axis);
+    }
+    
+    glm::vec3 axis = glm::cross(source, destination);
+    float s = sqrt((1.0f + cosTheta) * 2.0f);
+    return glm::quat(s / 2.0f, axis.x / s, axis.y / s, axis.z / s);
+}
+
 ModelRigged::ModelRigged() {
     rootNode_ = nullptr;
 }
@@ -281,7 +299,7 @@ void ModelRigged::animateNodes(const Node* node, const Animation& animation, dou
     auto findResult = animation.channels_.find(node->name);
     if (findResult != animation.channels_.end()) {    // Check if this node has an animation.
         //cout << "  adding channel transform.\n";
-        //nodeTransform = animation.calcChannelTransform(findResult->second, animationTime);
+        nodeTransform = animation.calcChannelTransform(findResult->second, animationTime);
     }
     
     combinedTransform *= nodeTransform;
@@ -334,22 +352,4 @@ void ModelRigged::animateNodesWithDynamics(const Node* node, const Animation& an
     for (unsigned int i = 0; i < node->children.size(); ++i) {
         animateNodesWithDynamics(node->children[i], animation, animationTime, modelMtx, dynamicBones, combinedTransform, boneTransforms);
     }
-}
-
-glm::quat ModelRigged::findRotationBetweenVectors(glm::vec3 source, glm::vec3 destination) const {
-    source = glm::normalize(source);
-    destination = glm::normalize(destination);
-    float cosTheta = glm::dot(source, destination);
-    
-    if (cosTheta < -1.0f + 0.001f) {    // Special case where vectors are in opposite direction.
-        glm::vec3 axis = glm::cross(source, glm::vec3(1.0f, 0.0f, 0.0f));
-        if (glm::length(axis) < 0.01f) {
-            axis = glm::cross(source, glm::vec3(0.0f, 1.0f, 0.0f));
-        }
-        return glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::pi<float>(), axis);
-    }
-    
-    glm::vec3 axis = glm::cross(source, destination);
-    float s = sqrt((1.0f + cosTheta) * 2.0f);
-    return glm::quat(s / 2.0f, axis.x / s, axis.y / s, axis.z / s);
 }

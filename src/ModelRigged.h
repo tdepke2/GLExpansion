@@ -37,6 +37,7 @@ class ModelRigged : public ModelAbstract {
     static constexpr unsigned int MAX_NUM_BONES = 128;
     vector<glm::mat4> boneOffsetMatrices_;
     
+    static glm::quat findRotationBetweenVectors(glm::vec3 source, glm::vec3 destination);
     ModelRigged();
     ModelRigged(const string& filename, unordered_map<string, Animation>* animations = nullptr);
     ~ModelRigged();
@@ -61,7 +62,6 @@ class ModelRigged : public ModelAbstract {
     void ragdollNodes(const Node* node, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const;
     void animateNodes(const Node* node, const Animation& animation, double animationTime, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const;    // Recursively traverse the nodes to set each bone transform.
     void animateNodesWithDynamics(const Node* node, const Animation& animation, double animationTime, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const;
-    glm::quat findRotationBetweenVectors(glm::vec3 source, glm::vec3 destination) const;
     
     friend class Animation;
 };

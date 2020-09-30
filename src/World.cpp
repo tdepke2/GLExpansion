@@ -133,9 +133,9 @@ void World::nextTick() {
         debugVectors_[3] = modelTestTransform_.getTransform() * glm::inverse(modelTest_.getArmatureRootInv()) * modelTestBoneTransforms_[node->boneIndex] * glm::inverse(modelTest_.boneOffsetMatrices_[node->boneIndex]);
     }
     
-    debugVectors_[4] = characterTest_.transform_.getTransform() * Animation::test;
-    debugVectors_[5] = glm::scale(characterTest_.transform2_.getTransform(), glm::vec3(10.0f));
-    debugVectors_[6] = glm::scale(characterTest_.transform2_.getTransform() * Animation::test, glm::vec3(10.0f));
+    debugVectors_[4] = characterTest_.transform3_.getTransform() * Animation::test;
+    debugVectors_[5] = characterTest_.transform2_.getTransform();
+    debugVectors_[6] = characterTest_.transform4_.getTransform() * Animation::test;
     
     /*debugVectors_.resize(2);
     int boneIndex = modelTest_.findNode("head");

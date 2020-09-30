@@ -254,27 +254,43 @@ void Animation::printBoneDiffTest(const aiScene* scene, const unordered_map<stri
                     for (pair<glm::vec3, double>& key : findChannel->second.translationKeys) {
                         key.first = glm::vec3(topNode->transform * glm::inverse(foundNode->transform) * glm::vec4(key.first, 1.0f));
                     }
-                    if (topNode->name == "Left knee" || topNode->name == "Right knee") {
-                        glm::mat4 combinedTransformLast = foundTransform * glm::inverse(foundNode->transform);
-                        glm::mat4 tPoseTransform = (foundTransform * glm::inverse(foundTransform * model.boneOffsetMatrices_[foundNode->boneIndex])) * glm::inverse(combinedTransformLast * glm::inverse(combinedTransformLast * model.boneOffsetMatrices_[foundNode->boneIndex]));
-                        cout << "absTransform = " << glm::to_string(foundTransform) << "\n";
-                        cout << "tPoseTransform = " << glm::to_string(tPoseTransform) << "\n";
+                    //if (topNode->name == "Left ankle" || topNode->name == "Right ankle") {
+                        //glm::mat4 combinedTransformLast = foundTransform * glm::inverse(foundNode->transform);
+                        //glm::mat4 tPoseTransform = (foundTransform * glm::inverse(foundTransform * model.boneOffsetMatrices_[foundNode->boneIndex])) * glm::inverse(combinedTransformLast * glm::inverse(combinedTransformLast * model.boneOffsetMatrices_[foundNode->parent->boneIndex]));
+                        //cout << "absTransform = " << glm::to_string(foundTransform) << "\n";
+                        //cout << "tPoseTransform = " << glm::to_string(tPoseTransform) << "\n";
                         
-                        test = foundTransform * model.boneOffsetMatrices_[foundNode->boneIndex] * model.getArmatureRootInv();
-                        test = glm::inverse(test);
-                        test *= foundTransform * model.getArmatureRootInv() * model.getArmatureRootInv();
+                        glm::mat4 foundNodeTPose = glm::inverse(foundTransform * model.boneOffsetMatrices_[foundNode->boneIndex] * model.getArmatureRootInv()) * foundTransform * model.getArmatureRootInv() * model.getArmatureRootInv();
+                        glm::mat4 foundNodeParentTPose = glm::inverse(foundTransform * glm::inverse(foundNode->transform) * model.boneOffsetMatrices_[foundNode->parent->boneIndex] * model.getArmatureRootInv()) * foundTransform * glm::inverse(foundNode->transform) * model.getArmatureRootInv() * model.getArmatureRootInv();
+                        //test = glm::inverse(foundNodeParentTPose) * foundNodeTPose;
+                        glm::vec3 foundNodeHeading = glm::vec3(foundNodeTPose * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)) - glm::vec3(foundNodeParentTPose * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+                        //test = glm::translate(glm::mat4(1.0f), foundNodeHeading);
                         
-                        glm::mat4 refCombinedTransformLast = topTransform * glm::inverse(topNode->transform);
-                        glm::mat4 refTPoseTransform = (topTransform * glm::inverse(topTransform * referenceModel.boneOffsetMatrices_[topNode->boneIndex])) * glm::inverse(refCombinedTransformLast * glm::inverse(refCombinedTransformLast * referenceModel.boneOffsetMatrices_[topNode->boneIndex]));
+                        //glm::mat4 refCombinedTransformLast = topTransform * glm::inverse(topNode->transform);
+                        //glm::mat4 refTPoseTransform = (topTransform * glm::inverse(topTransform * referenceModel.boneOffsetMatrices_[topNode->boneIndex])) * glm::inverse(refCombinedTransformLast * glm::inverse(refCombinedTransformLast * referenceModel.boneOffsetMatrices_[topNode->parent->boneIndex]));
                         
-                        //test = topTransform * referenceModel.boneOffsetMatrices_[topNode->boneIndex] * referenceModel.getArmatureRootInv();
-                        //test = glm::inverse(test);
-                        //test *= topTransform * referenceModel.getArmatureRootInv() * referenceModel.getArmatureRootInv();
+                        glm::mat4 topNodeTPose = glm::inverse(topTransform * referenceModel.boneOffsetMatrices_[topNode->boneIndex] * referenceModel.getArmatureRootInv()) * topTransform * referenceModel.getArmatureRootInv() * referenceModel.getArmatureRootInv();
+                        glm::mat4 topNodeParentTPose = glm::inverse(topTransform * glm::inverse(topNode->transform) * referenceModel.boneOffsetMatrices_[topNode->parent->boneIndex] * referenceModel.getArmatureRootInv()) * topTransform * glm::inverse(topNode->transform) * referenceModel.getArmatureRootInv() * referenceModel.getArmatureRootInv();
+                        //test = glm::inverse(topNodeParentTPose) * topNodeTPose;
+                        glm::vec3 topNodeHeading = glm::vec3(topNodeTPose * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)) - glm::vec3(topNodeParentTPose * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+                        //test = topNodeParentTPose;//glm::translate(glm::mat4(1.0f), topNodeHeading);
                         
                         //test = glm::translate(glm::mat4(1.0f), -glm::vec3(topTransform * referenceModel.boneOffsetMatrices_[topNode->boneIndex] * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))) * topTransform;
                         //test = glm::inverse(glm::translate(glm::mat4(glm::mat3(test)), glm::vec3(test * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))));
                         
-                        glm::quat q = glm::inverse(glm::normalize(glm::quat_cast(tPoseTransform))) * glm::normalize(glm::quat_cast(refTPoseTransform));
+                        //test = topTransform;
+                        //test = glm::inverse(topTransform * referenceModel.boneOffsetMatrices_[topNode->boneIndex] * referenceModel.getArmatureRootInv()) * topTransform;
+                        glm::mat3 a = glm::inverse(glm::mat3(referenceModel.boneOffsetMatrices_[topNode->boneIndex] * referenceModel.getArmatureRootInv()));
+                        //test = glm::inverse(referenceModel.boneOffsetMatrices_[topNode->boneIndex] * referenceModel.getArmatureRootInv());
+                        
+                        glm::mat3 b = glm::inverse(glm::mat3(model.boneOffsetMatrices_[foundNode->boneIndex] * model.getArmatureRootInv()));
+                        //test = glm::inverse(model.boneOffsetMatrices_[foundNode->boneIndex] * model.getArmatureRootInv());
+                        
+                        //glm::quat q = glm::inverse(glm::normalize(glm::quat_cast(tPoseTransform))) * glm::normalize(glm::quat_cast(refTPoseTransform));
+                        //glm::quat q = ModelRigged::findRotationBetweenVectors(foundNodeHeading, topNodeHeading);// = glm::normalize(glm::quat_cast(tPoseTransform)) * glm::inverse(glm::normalize(glm::quat_cast(refTPoseTransform)));
+                        //glm::quat q = ModelRigged::findRotationBetweenVectors(glm::vec3(0.0f, 1.0f, -0.4f), glm::vec3(0.0f, 1.0f, 0.0f));
+                        //glm::quat q = ModelRigged::findRotationBetweenVectors(b * glm::vec3(0.0f, 1.0f, 0.0f), a * glm::vec3(0.0f, 1.0f, 0.0f));
+                        glm::quat q = glm::normalize(glm::quat_cast(a)) * glm::inverse(glm::normalize(glm::quat_cast(b)));
                         cout << "Quat q = " << glm::to_string(q) << "\n";
                         
                         
@@ -285,7 +301,7 @@ void Animation::printBoneDiffTest(const aiScene* scene, const unordered_map<stri
                             //key.first = glm::quat_cast(topNode->transform);
                             key.first = key.first * q;
                         }
-                    }
+                    //}
                 } else {
                     for (pair<glm::vec3, double>& key : findChannel->second.translationKeys) {
                         //key.first = glm::vec3(glm::mat4({0.009, 0.0, 0.0, 0.0}, {0.0, 0.009, 0.0, 0.0}, {0.0, 0.0, 0.009, 0.0}, {0.0, 0.0, 0.0, 1.0}) * glm::vec4(key.first, 1.0));
