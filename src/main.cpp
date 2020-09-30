@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
     
     try {
         //Camera camera(glm::vec3(0.0f, 1.8f, 2.0f));
-        Camera camera(glm::vec3(-20.0f, 1.8f, -8.0f));
+        Camera camera(glm::vec3(0.0f, 1.8f, 8.0f));
         World world;
         cout << "Setup complete.\n";
         while (renderer.getState() != Renderer::Exiting) {

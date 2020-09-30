@@ -121,7 +121,7 @@ void World::nextTick() {
     modelTest_.animate(modelTestAnimations_.at(""), glfwGetTime(), modelTestBoneTransforms_);
     characterTest_.update();
     
-    debugVectors_.resize(7);
+    debugVectors_.resize(4);
     const ModelRigged::Node* node = characterTest_.model_.findNode("Breast_R");
     if (node != nullptr) {
         debugVectors_[1] = characterTest_.transform_.getTransform();
@@ -132,10 +132,6 @@ void World::nextTick() {
     if (node != nullptr) {
         debugVectors_[3] = modelTestTransform_.getTransform() * glm::inverse(modelTest_.getArmatureRootInv()) * modelTestBoneTransforms_[node->boneIndex] * glm::inverse(modelTest_.boneOffsetMatrices_[node->boneIndex]);
     }
-    
-    debugVectors_[4] = characterTest_.transform3_.getTransform() * Animation::test;
-    debugVectors_[5] = characterTest_.transform2_.getTransform();
-    debugVectors_[6] = characterTest_.transform4_.getTransform() * Animation::test;
     
     /*debugVectors_.resize(2);
     int boneIndex = modelTest_.findNode("head");

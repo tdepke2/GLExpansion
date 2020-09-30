@@ -70,50 +70,6 @@ void ModelRigged::loadFile(const string& filename, unordered_map<string, Animati
     if (scene == nullptr) {
         return;
     }
-    buildFromScene(scene, animations);
-}
-
-void ModelRigged::ragdoll(const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
-    assert(boneTransforms.size() == boneOffsetMatrices_.size());
-    
-    ragdollNodes(rootNode_, modelMtx, dynamicBones, armatureRootInv_, boneTransforms);
-}
-
-void ModelRigged::animate(const Animation& animation, double time, vector<glm::mat4>& boneTransforms) const {
-    assert(boneTransforms.size() == boneOffsetMatrices_.size());
-    
-    double animationTime = fmod(time * animation.ticksPerSecond_, animation.duration_);
-    animateNodes(rootNode_, animation, animationTime, armatureRootInv_, boneTransforms);
-}
-
-void ModelRigged::animateWithDynamics(const Animation& animation, double time, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
-    assert(boneTransforms.size() == boneOffsetMatrices_.size());
-    
-    double animationTime = fmod(time * animation.ticksPerSecond_, animation.duration_);
-    animateNodesWithDynamics(rootNode_, animation, animationTime, modelMtx, dynamicBones, armatureRootInv_, boneTransforms);
-}
-
-const ModelRigged::Node* ModelRigged::findNode(const string& nodeName) const {
-    stack<Node*> nodeStack;
-    nodeStack.push(rootNode_);
-    while (!nodeStack.empty()) {
-        Node* first = nodeStack.top();
-        nodeStack.pop();
-        
-        if (first->name == nodeName) {
-            return first;
-        }
-        
-        for (Node* n : first->children) {
-            nodeStack.push(n);
-        }
-    }
-    
-    cout << "Error: Unable to find node with name " << nodeName << ".\n";
-    return nullptr;
-}
-
-void ModelRigged::buildFromScene(const aiScene* scene, unordered_map<string, Animation>* animations) {
     meshes_.reserve(scene->mNumMeshes);
     meshTransforms_.reserve(scene->mNumMeshes);
     numNodes_ = 0;
@@ -165,6 +121,46 @@ void ModelRigged::buildFromScene(const aiScene* scene, unordered_map<string, Ani
             }
         }
     }
+}
+
+void ModelRigged::ragdoll(const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
+    assert(boneTransforms.size() == boneOffsetMatrices_.size());
+    
+    ragdollNodes(rootNode_, modelMtx, dynamicBones, armatureRootInv_, boneTransforms);
+}
+
+void ModelRigged::animate(const Animation& animation, double time, vector<glm::mat4>& boneTransforms) const {
+    assert(boneTransforms.size() == boneOffsetMatrices_.size());
+    
+    double animationTime = fmod(time * animation.ticksPerSecond_, animation.duration_);
+    animateNodes(rootNode_, animation, animationTime, armatureRootInv_, boneTransforms);
+}
+
+void ModelRigged::animateWithDynamics(const Animation& animation, double time, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
+    assert(boneTransforms.size() == boneOffsetMatrices_.size());
+    
+    double animationTime = fmod(time * animation.ticksPerSecond_, animation.duration_);
+    animateNodesWithDynamics(rootNode_, animation, animationTime, modelMtx, dynamicBones, armatureRootInv_, boneTransforms);
+}
+
+const ModelRigged::Node* ModelRigged::findNode(const string& nodeName) const {
+    stack<Node*> nodeStack;
+    nodeStack.push(rootNode_);
+    while (!nodeStack.empty()) {
+        Node* first = nodeStack.top();
+        nodeStack.pop();
+        
+        if (first->name == nodeName) {
+            return first;
+        }
+        
+        for (Node* n : first->children) {
+            nodeStack.push(n);
+        }
+    }
+    
+    cout << "Error: Unable to find node with name " << nodeName << ".\n";
+    return nullptr;
 }
 
 ModelRigged::Node* ModelRigged::processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping) {

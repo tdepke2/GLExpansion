@@ -1,15 +1,12 @@
 #ifndef ANIMATION_H_
 #define ANIMATION_H_
 
-class ModelRigged;
-
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <glm/gtx/string_cast.hpp>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -25,15 +22,14 @@ class Animation {
         vector<pair<glm::vec3, double>> scalingKeys;
     };
     
-    static glm::mat4 test;
     unordered_map<string, Channel> channels_;
     string name_;
     double duration_, ticksPerSecond_;
     
-    static void loadFile(const string& filename, unordered_map<string, Animation>* animations, const string& mappingFilename = "", const ModelRigged* referenceModel = nullptr);
+    static void loadFile(const string& filename, unordered_map<string, Animation>* animations);
     Animation(const string& name, double duration, double ticksPerSecond);
-    Animation(const aiScene* scene, unsigned int index, const unordered_map<string, string>* nodeSubstitutes = nullptr, const ModelRigged* referenceModel = nullptr);
-    void loadFromScene(const aiScene* scene, unsigned int index, const unordered_map<string, string>* nodeSubstitutes, const ModelRigged* referenceModel);
+    Animation(const aiScene* scene, unsigned int index);
+    void loadFromScene(const aiScene* scene, unsigned int index);
     glm::mat4 calcChannelTransform(const Channel& channel, double animationTime) const;
     
     private:
@@ -44,7 +40,6 @@ class Animation {
     static inline glm::mat3 castMat3(const aiMatrix3x3& m) { return glm::transpose(glm::make_mat3(&m.a1)); }
     glm::vec3 interpolateVec3Keys(const vector<pair<glm::vec3, double>>& keys, double animationTime) const;
     glm::quat interpolateQuatKeys(const vector<pair<glm::quat, double>>& keys, double animationTime) const;
-    void printBoneDiffTest(const aiScene* scene, const unordered_map<string, string>& nodeSubstitutes, const ModelRigged& referenceModel);
 };
 
 #endif

@@ -1031,7 +1031,7 @@ void Renderer::renderScene(const Camera& camera, const World& world, const glm::
         modelMtx = glm::rotate(modelMtx, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
         world.cube1_.drawGeometry(*shader, modelMtx);
     }
-    world.cube1_.drawGeometry(*shader, glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, -2.4f, 3.0f)));
+    world.cube1_.drawGeometry(*shader, glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0.5f, 3.0f)));
     
     world.cube1_.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), camera.position_), glm::vec3(0.4f, 0.4f, 0.4f)));
     
@@ -1039,7 +1039,7 @@ void Renderer::renderScene(const Camera& camera, const World& world, const glm::
     glBindTexture(GL_TEXTURE_2D, woodTexture_);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, woodTexture_);
-    world.cube1_.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -3.0f, 0.0f)), glm::vec3(15.0f, 0.2f, 15.0f)));
+    world.cube1_.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f)), glm::vec3(15.0f, 0.2f, 15.0f)));
     
     if (!shadowRender) {    // For some reason, lighting does not work properly when geometryNormalMapShader is used with boot_camp.obj, may want to investigate this ###############################################
         shader = geometryShader_.get();

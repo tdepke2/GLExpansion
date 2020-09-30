@@ -56,14 +56,11 @@ class ModelRigged : public ModelAbstract {
     unsigned int numNodes_;
     glm::mat4 armatureRootInv_;
     
-    void buildFromScene(const aiScene* scene, unordered_map<string, Animation>* animations);
     Node* processNode(Node* parent, aiNode* node, glm::mat4 combinedTransform, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping);    // Recursively traverse the scene nodes while adding mesh data. This also builds the node tree and maps bone names.
     Mesh processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<string, uint8_t>& boneMapping);    // Generate a new mesh and collect any new bone data.
     void ragdollNodes(const Node* node, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const;
     void animateNodes(const Node* node, const Animation& animation, double animationTime, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const;    // Recursively traverse the nodes to set each bone transform.
     void animateNodesWithDynamics(const Node* node, const Animation& animation, double animationTime, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const;
-    
-    friend class Animation;
 };
 
 #endif
