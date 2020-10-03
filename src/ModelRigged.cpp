@@ -123,12 +123,6 @@ void ModelRigged::loadFile(const string& filename, unordered_map<string, Animati
     }
 }
 
-void ModelRigged::ragdoll(const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, vector<glm::mat4>& boneTransforms) const {
-    assert(boneTransforms.size() == boneOffsetMatrices_.size());
-    
-    ragdollNodes(rootNode_, modelMtx, dynamicBones, armatureRootInv_, boneTransforms);
-}
-
 void ModelRigged::animate(const Animation& animation, double time, vector<glm::mat4>& boneTransforms) const {
     assert(boneTransforms.size() == boneOffsetMatrices_.size());
     
@@ -216,79 +210,6 @@ Mesh ModelRigged::processMesh(aiMesh* mesh, const aiScene* scene, unordered_map<
     return Mesh(move(vertices), move(indices), move(textures));
 }
 
-void ModelRigged::ragdollNodes(const Node* node, const glm::mat4& modelMtx, map<int, DynamicBone>& dynamicBones, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const {
-    glm::mat4 nodeTransform = node->transform;
-    auto findResult = dynamicBones.find(node->boneIndex);
-    if (findResult != dynamicBones.end()) {
-        /*DynamicBone& bone = findResult->second;
-        glm::mat4 nodeTransform = glm::translate(glm::mat4(1.0f), bone.linearVel);
-        nodeTransform *= glm::mat4_cast(bone.angularVel);
-        bone.linearVel += bone.linearAcc;
-        bone.angularVel *= bone.angularAcc;
-        
-        combinedTransform *= glm::inverse(boneOffsetMatrices_[node->boneIndex]) * nodeTransform * boneOffsetMatrices_[node->boneIndex];
-        boneTransforms[node->boneIndex] *= combinedTransform;
-        
-        /*glm::vec3 currentDir = glm::mat3(boneTransforms[node->boneIndex]) * glm::vec3(0.0f, 0.0f, 1.0f);
-        cout << "delta: " << glm::length(currentDir - glm::vec3(0.0f, 0.0f, 1.0f)) << "\n";
-        if (true) {
-            glm::quat restoringQuat = findRotationBetweenVectors(glm::vec3(0.0f, 0.0f, 1.0f), currentDir);
-            cout << "restoring:  " << glm::to_string(restoringQuat) << "\n";
-            restoringQuat = glm::angleAxis(glm::angle(restoringQuat) * 0.01f, glm::axis(restoringQuat));
-            bone.angularAcc = restoringQuat;
-            cout << "restoring2: " << glm::to_string(restoringQuat) << "\n";
-        }*/
-        
-        //glm::vec3 currentPos = glm::vec3(boneOffsetMatrices_[node->boneIndex] * boneTransforms[node->boneIndex] * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-        //bone.linearAcc = -0.02f * bone.linearVel - 0.002f * currentPos;
-        
-        //cout << "currentPos = " << glm::to_string(currentPos) << "\n";
-        
-        //glm::vec3 parentPos = glm::vec3(modelMtx * glm::inverse(armatureRootInv_) * boneTransforms[node->boneIndex] * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-        //cout << "parentPos = " << glm::to_string(parentPos) << "\n";
-        
-        // Applying physics to a dynamic bone overwrites any keyframes associated with the bone.
-        
-        DynamicBone& bone = findResult->second;
-        glm::vec3 centerOfMassOffset(0.0f, 1.0f, 0.0f);    // this vector should be provided from DynamicBone
-        glm::vec3 equilibriumPos    = glm::vec3(modelMtx * glm::inverse(armatureRootInv_) * combinedTransform * node->transform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));    // this should factor in combinedTransform to be relative to parent bone.
-        glm::vec3 equilibriumPosCOM = glm::vec3(modelMtx * glm::inverse(armatureRootInv_) * combinedTransform * node->transform * glm::vec4(centerOfMassOffset, 1.0f));
-        //cout << "equilibriumPos = " << glm::to_string(equilibriumPos) << "\n";    // equilibriumPos = vec3(-20.056000, 1.184000, -11.968000)
-        glm::vec3 test              = glm::vec3(modelMtx * glm::inverse(armatureRootInv_) * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(1.0f, 0.0f, 0.0f, 0.0f));
-        bone.springMotion.updateMotion(&bone.lastPosition, &bone.linearVel, equilibriumPos);    // consider using the difference of bone.lastPosition and equilibriumPos as the real position (to account for precision)
-        //bone.lastPosition = equilibriumPos;
-        bone.springMotion.updateMotion(&bone.lastPositionCOM, &bone.linearVelCOM, equilibriumPosCOM);
-        //bone.lastPositionCOM = equilibriumPosCOM;
-        //float dotProd = glm::dot(glm::vec3(0.0f, 0.0f, 1.0f), bone.lastPositionCOM);
-        //glm::quat result = glm::angleAxis(-acos(dotProd) / glm::length(bone.lastPositionCOM), glm::vec3(1.0f, 0.0f, 0.0f));//findRotationBetweenVectors(glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(bone.lastPositionCOM.x, bone.lastPositionCOM.y, 0.0f));
-        //float dotProd2 = glm::dot(glm::vec3(1.0f, 0.0f, 0.0f), test);
-        //glm::quat result2 = glm::angleAxis(acos(dotProd2) / glm::length(test) * (test.z < 0.0f ? 1.0f : -1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        //glm::quat rotateToCOM = findRotationBetweenVectors(equilibriumPosCOM - equilibriumPos, bone.lastPositionCOM - equilibriumPos);
-        //nodeTransform = armatureRootInv_ * glm::inverse(modelMtx) * glm::translate(glm::mat4(1.0f), bone.lastPosition) * glm::mat4_cast(rotateToCOM) * glm::mat4(glm::mat3(modelMtx * node->transform));
-        glm::vec3 bonePosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPosition, 1.0f));
-        glm::vec3 equilibriumPosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPos, 1.0f));
-        glm::vec3 equilibriumPosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPosCOM, 1.0f));
-        glm::vec3 bonePosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPositionCOM, 1.0f));
-        glm::quat rotateToCOM = findRotationBetweenVectors(equilibriumPosCOMLS - equilibriumPosLS, bonePosCOMLS - equilibriumPosLS);
-        nodeTransform = combinedTransform * node->transform * glm::translate(glm::mat4(1.0f), bonePosLS) * glm::mat4_cast(rotateToCOM);
-        //debugVectors_[1] = characterTest_.transform_.getTransform() * glm::inverse(characterTest_.model_.getArmatureRootInv()) * characterTest_.boneTransforms_[node->boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[node->boneIndex]);
-        
-        combinedTransform *= nodeTransform;
-        boneTransforms[node->boneIndex] = nodeTransform * boneOffsetMatrices_[node->boneIndex];    // not quite right
-        //cout << "boneTransforms[node->boneIndex] = " << glm::to_string(boneTransforms[node->boneIndex]) << "\n";
-        
-        glm::vec3 currentPos = glm::vec3(boneOffsetMatrices_[node->boneIndex] * boneTransforms[node->boneIndex] * glm::inverse(boneOffsetMatrices_[node->boneIndex]) * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-        
-        //cout << "    currentPos = " << glm::to_string(currentPos) << "\n";
-    } else {
-        combinedTransform *= nodeTransform;
-    }
-    
-    for (unsigned int i = 0; i < node->children.size(); ++i) {
-        ragdollNodes(node->children[i], modelMtx, dynamicBones, combinedTransform, boneTransforms);
-    }
-}
-
 void ModelRigged::animateNodes(const Node* node, const Animation& animation, double animationTime, glm::mat4 combinedTransform, vector<glm::mat4>& boneTransforms) const {
     //cout << "animateNodes() on " << node->name << " with id " << node->id << " and boneIndex " << node->boneIndex << "\n";
     glm::mat4 nodeTransform = node->transform;
@@ -316,20 +237,41 @@ void ModelRigged::animateNodesWithDynamics(const Node* node, const Animation& an
     auto findResult = dynamicBones.find(node->boneIndex);
     if (findResult != dynamicBones.end()) {    // Check if this is a dynamic bone, and override its transforms and any keyframes it may have.
         DynamicBone& bone = findResult->second;
-        glm::vec3 centerOfMassOffset(0.0f, 1.0f, 0.0f);    // this vector should be provided from DynamicBone
-        glm::vec3 equilibriumPos    = glm::vec3(modelMtx * glm::inverse(armatureRootInv_) * combinedTransform * node->transform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-        glm::vec3 equilibriumPosCOM = glm::vec3(modelMtx * glm::inverse(armatureRootInv_) * combinedTransform * node->transform * glm::vec4(centerOfMassOffset, 1.0f));
+        glm::vec3 bonePosLS(0.0f);
+        glm::quat rotateToCOM(1.0f, 0.0f, 0.0f, 0.0f);
         
-        bone.springMotion.updateMotion(&bone.lastPosition, &bone.linearVel, equilibriumPos);    // consider using the difference of bone.lastPosition and equilibriumPos as the real position (to account for precision)
-        //bone.lastPosition = equilibriumPos;
-        bone.springMotion.updateMotion(&bone.lastPositionCOM, &bone.linearVelCOM, equilibriumPosCOM);
-        //bone.lastPositionCOM = equilibriumPosCOM;
+        float scaleX = glm::length(glm::vec3(modelMtx[0][0], modelMtx[0][1], modelMtx[0][2]));
+        float scaleY = glm::length(glm::vec3(modelMtx[1][0], modelMtx[1][1], modelMtx[1][2]));
+        float scaleZ = glm::length(glm::vec3(modelMtx[2][0], modelMtx[2][1], modelMtx[2][2]));
+        float scaleAvg = (scaleX + scaleY + scaleZ) / 3.0f;
+        glm::mat4 localToWorldSpace = modelMtx * glm::inverse(armatureRootInv_) * combinedTransform * node->transform;
+        glm::mat4 worldToLocalSpace = glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx);
         
-        glm::vec3 bonePosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPosition, 1.0f));
-        glm::vec3 equilibriumPosLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPos, 1.0f));
-        glm::vec3 equilibriumPosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(equilibriumPosCOM, 1.0f));
-        glm::vec3 bonePosCOMLS = glm::vec3(glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx) * glm::vec4(bone.lastPositionCOM, 1.0f));
-        glm::quat rotateToCOM = findRotationBetweenVectors(equilibriumPosCOMLS - equilibriumPosLS, bonePosCOMLS - equilibriumPosLS);
+        if (bone.maxDisplacement != 0.0f) {
+            glm::vec3 equilibriumPos = glm::vec3(localToWorldSpace * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+            
+            if (bone.maxDisplacement != numeric_limits<float>::max()) {    // Clamp bone.lastPosition within a circular area bounded by bone.maxDisplacement.
+                bone.lastPosition = clampVec3WithinSphere(bone.lastPosition, equilibriumPos, bone.maxDisplacement * scaleAvg);
+            }
+            
+            bone.springMotion.updateMotion(&bone.lastPosition, &bone.linearVel, equilibriumPos);
+            
+            bonePosLS = glm::vec3(worldToLocalSpace * glm::vec4(bone.lastPosition, 1.0f));
+        }
+        
+        if (bone.maxDisplacementCOM != 0.0f) {
+            glm::vec3 equilibriumPosCOM = glm::vec3(localToWorldSpace * glm::vec4(bone.centerOfMassOffset, 1.0f));
+            
+            if (bone.maxDisplacementCOM != numeric_limits<float>::max()) {    // Clamp bone.lastPositionCOM within a circular area bounded by bone.maxDisplacementCOM.
+                bone.lastPositionCOM = clampVec3WithinSphere(bone.lastPositionCOM, equilibriumPosCOM, bone.maxDisplacementCOM * scaleAvg);
+            }
+            
+            bone.springMotion.updateMotion(&bone.lastPositionCOM, &bone.linearVelCOM, equilibriumPosCOM);
+            
+            glm::vec3 equilibriumPosCOMLS = glm::vec3(worldToLocalSpace * glm::vec4(equilibriumPosCOM, 1.0f));
+            glm::vec3 bonePosCOMLS = glm::vec3(worldToLocalSpace * glm::vec4(bone.lastPositionCOM, 1.0f));
+            rotateToCOM = findRotationBetweenVectors(equilibriumPosCOMLS - glm::vec3(0.0f), bonePosCOMLS - glm::vec3(0.0f));
+        }
         
         nodeTransform = node->transform * glm::translate(glm::mat4(1.0f), bonePosLS) * glm::mat4_cast(rotateToCOM);
     } else {
@@ -348,4 +290,16 @@ void ModelRigged::animateNodesWithDynamics(const Node* node, const Animation& an
     for (unsigned int i = 0; i < node->children.size(); ++i) {
         animateNodesWithDynamics(node->children[i], animation, animationTime, modelMtx, dynamicBones, combinedTransform, boneTransforms);
     }
+}
+
+glm::vec3 ModelRigged::clampVec3WithinSphere(const glm::vec3& vec, const glm::vec3& origin, float radius) const {
+    glm::vec3 displacement = abs(vec - origin);    // Check if the displacement lies outside of the cube that is bounded within a sphere of the given radius.
+    if (displacement.x > radius / 2.0f || displacement.y > radius / 2.0f || displacement.z > radius / 2.0f) {
+        glm::vec3 deltaPos = vec - origin;
+        float deltaPosLength = glm::length(deltaPos);
+        if (deltaPosLength > radius) {
+            return origin + (deltaPos * radius / deltaPosLength);
+        }
+    }
+    return vec;
 }

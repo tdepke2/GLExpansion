@@ -24,7 +24,6 @@ class CharacterTest : public DrawableInterface {
     unordered_map<string, Animation> animations_;
     vector<glm::mat4> boneTransforms_;
     map<int, ModelRigged::DynamicBone> dynamicBones_;
-    vector<glm::vec3> activeForces_;
     
     void init();
     void update();
