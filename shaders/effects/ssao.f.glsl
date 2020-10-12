@@ -1,8 +1,8 @@
 #version 330 core
 
 const uint NUM_SAMPLES = 32u;
-const float RADIUS = 1.0;
-const float BIAS = 0.05;
+const float RADIUS = 0.2;
+const float BIAS = 0.02;
 
 layout (std140) uniform ViewProjectionMtx {
     uniform mat4 viewMtx;

@@ -6,7 +6,7 @@ void Animation::loadFile(const string& filename, unordered_map<string, Animation
     Assimp::Importer importer;
     const aiScene* scene = importer.ReadFile(filename, aiProcess_JoinIdenticalVertices | aiProcess_Triangulate);
     
-    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+    if (!scene || !scene->mRootNode) {
         cout << "Failed to load model file \"" << filename << "\": " << importer.GetErrorString() << "\n";
         return;
     }
@@ -30,11 +30,11 @@ void Animation::loadFromScene(const aiScene* scene, unsigned int index) {
     duration_ = scene->mAnimations[index]->mDuration;
     ticksPerSecond_ = (scene->mAnimations[index]->mTicksPerSecond != 0.0 ? scene->mAnimations[index]->mTicksPerSecond : 20.0);
     
-    cout << "Loading animation " << name_ << " with duration " << duration_ << "s at " << ticksPerSecond_ << " TPS.\n";
+    //cout << "Loading animation " << name_ << " with duration " << duration_ << "s at " << ticksPerSecond_ << " TPS.\n";
     
     for (unsigned int j = 0; j < scene->mAnimations[index]->mNumChannels; ++j) {
         const aiNodeAnim* nodeAnim = scene->mAnimations[index]->mChannels[j];
-        cout << "  Channel " << nodeAnim->mNodeName.C_Str() << " has " << nodeAnim->mNumPositionKeys << " position, " << nodeAnim->mNumRotationKeys << " rotation, and " << nodeAnim->mNumScalingKeys << " scaling keys.\n";
+        //cout << "  Channel " << nodeAnim->mNodeName.C_Str() << " has " << nodeAnim->mNumPositionKeys << " position, " << nodeAnim->mNumRotationKeys << " rotation, and " << nodeAnim->mNumScalingKeys << " scaling keys.\n";
         
         Animation::Channel channel;
         channel.translationKeys.reserve(nodeAnim->mNumPositionKeys);

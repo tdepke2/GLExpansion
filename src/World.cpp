@@ -12,7 +12,7 @@ World::World() :
     flashlightOn_(false),
     sunlightOn_(true),
     lampsOn_(false),
-    sunT_(-2.0f),
+    sunT_(-3.0f),
     sunSpeed_(0.0f) {
     
     lightCube_.generateCube(0.05f);
@@ -21,8 +21,10 @@ World::World() :
     cube1_.generateCube();
     
     //sceneTest_.loadFile("models/boot_camp/boot_camp.obj");
-    sceneTestTransform_.setScale(glm::vec3(0.025f, 0.025f, 0.025f));
-    sceneTestTransform_.setPitchYawRoll(glm::vec3(-glm::pi<float>() / 2.0f, 0.0f, 0.0f));
+    //sceneTestTransform_.setScale(glm::vec3(0.025f, 0.025f, 0.025f));
+    //sceneTestTransform_.setPitchYawRoll(glm::vec3(-glm::pi<float>() / 2.0f, 0.0f, 0.0f));
+    
+    sceneTest_.loadFile("models/rp_downtown/rp_downtown_v4_suburbs.obj");
     
     modelTest_.loadFile("models/bob_lamp_update/bob_lamp_update.md5mesh", &modelTestAnimations_);
     modelTest_.setArmatureRootInv(glm::inverse(glm::mat4({1.0, 0.0, 0.0, 0.0}, {0.0, 0.0, -1.0, 0.0}, {0.0, 1.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 1.0})));
@@ -121,7 +123,7 @@ void World::nextTick() {
     modelTest_.animate(modelTestAnimations_.at(""), glfwGetTime(), modelTestBoneTransforms_);
     characterTest_.update();
     
-    debugVectors_.resize(4);
+    debugVectors_.resize(5);
     const ModelRigged::Node* node = characterTest_.model_.findNode("Breast_R");
     if (node != nullptr) {
         debugVectors_[1] = characterTest_.transform_.getTransform();
@@ -133,11 +135,8 @@ void World::nextTick() {
         debugVectors_[3] = modelTestTransform_.getTransform() * glm::inverse(modelTest_.getArmatureRootInv()) * modelTestBoneTransforms_[node->boneIndex] * glm::inverse(modelTest_.boneOffsetMatrices_[node->boneIndex]);
     }
     
-    /*debugVectors_.resize(2);
-    int boneIndex = modelTest_.findNode("head");
-    if (boneIndex != -1) {
-        debugVectors_[1] = modelTestTransform_.getTransform() * glm::inverse(modelTest_.getArmatureRootInv()) * modelTestBoneTransforms_[boneIndex] * glm::inverse(modelTest_.boneOffsetMatrices_[boneIndex]);
-    }*/
+    node = characterTest_.model_.findNode("HairRibbonTip_R");
+    //debugVectors_[4] = characterTest_.transform_.getTransform() * glm::inverse(characterTest_.model_.getArmatureRootInv()) * characterTest_.boneTransforms_[node->boneIndex] * glm::inverse(characterTest_.model_.boneOffsetMatrices_[node->boneIndex]);
     
     glBindVertexArray(debugVectorsVAO_);
     glBindBuffer(GL_ARRAY_BUFFER, debugVectorsVBO_);

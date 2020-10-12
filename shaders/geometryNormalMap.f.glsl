@@ -15,6 +15,9 @@ layout (location = 2) out vec4 albedoSpec;
 void main() {
     position = fPosition;
     normal = normalize(fTBNMtx * (texture(texNormal, fTexCoords).rgb * 2.0 - 1.0));
-    albedoSpec.rgb = texture(texDiffuse, fTexCoords).rgb;
+    albedoSpec = texture(texDiffuse, fTexCoords);
+    //if (albedoSpec.a < 0.5) {
+        //discard;
+    //}
     albedoSpec.a = texture(texSpecular, fTexCoords).r;
 }

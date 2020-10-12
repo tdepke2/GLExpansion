@@ -1047,7 +1047,7 @@ void Renderer::renderScene(const Camera& camera, const World& world, const glm::
         shader->setInt("texDiffuse", 0);
         shader->setInt("texSpecular", 1);
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, whiteTexture_);
+        glBindTexture(GL_TEXTURE_2D, blackTexture_);
     }
     world.sceneTest_.draw(*shader, world.sceneTestTransform_.getTransform());
     

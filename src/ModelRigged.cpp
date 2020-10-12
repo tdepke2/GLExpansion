@@ -245,7 +245,7 @@ void ModelRigged::animateNodesWithDynamics(const Node* node, const Animation& an
         float scaleZ = glm::length(glm::vec3(modelMtx[2][0], modelMtx[2][1], modelMtx[2][2]));
         float scaleAvg = (scaleX + scaleY + scaleZ) / 3.0f;
         glm::mat4 localToWorldSpace = modelMtx * glm::inverse(armatureRootInv_) * combinedTransform * node->transform;
-        glm::mat4 worldToLocalSpace = glm::inverse(node->transform) * glm::inverse(combinedTransform) * armatureRootInv_ * glm::inverse(modelMtx);
+        glm::mat4 worldToLocalSpace = glm::inverse(localToWorldSpace);
         
         if (bone.maxDisplacement != 0.0f) {
             glm::vec3 equilibriumPos = glm::vec3(localToWorldSpace * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
@@ -266,7 +266,7 @@ void ModelRigged::animateNodesWithDynamics(const Node* node, const Animation& an
                 bone.lastPositionCOM = clampVec3WithinSphere(bone.lastPositionCOM, equilibriumPosCOM, bone.maxDisplacementCOM * scaleAvg);
             }
             
-            bone.springMotion.updateMotion(&bone.lastPositionCOM, &bone.linearVelCOM, equilibriumPosCOM);
+            bone.springMotionCOM.updateMotion(&bone.lastPositionCOM, &bone.linearVelCOM, equilibriumPosCOM);
             
             glm::vec3 equilibriumPosCOMLS = glm::vec3(worldToLocalSpace * glm::vec4(equilibriumPosCOM, 1.0f));
             glm::vec3 bonePosCOMLS = glm::vec3(worldToLocalSpace * glm::vec4(bone.lastPositionCOM, 1.0f));

@@ -43,6 +43,17 @@ class ModelRigged : public ModelAbstract {
             linearVel(0.0f),
             linearVelCOM(0.0f) {
         }
+        DynamicBone(float maxDisplacement, float maxDisplacementCOM, const glm::vec3& centerOfMassOffset, const DampedSpringMotion& springMotion, const DampedSpringMotion& springMotionCOM) :
+            maxDisplacement(maxDisplacement),
+            maxDisplacementCOM(maxDisplacementCOM),
+            centerOfMassOffset(centerOfMassOffset),
+            lastPosition(0.0f),
+            lastPositionCOM(0.0f),
+            linearVel(0.0f),
+            linearVelCOM(0.0f),
+            springMotion(springMotion),
+            springMotionCOM(springMotionCOM) {
+        }
     };
     
     static constexpr unsigned int MAX_NUM_BONES = 128;
