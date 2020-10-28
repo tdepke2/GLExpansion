@@ -221,13 +221,13 @@ void ModelRigged::animateNodes(const Node* node, const Animation& animation, dou
     
     combinedTransform *= nodeTransform;
     
-    if (node->boneIndex != -1) {
+    if (node->boneIndex != -1) {    // If this node corresponds to a bone, set the computed transform.
         //cout << "  setting bone transform.\n";
         boneTransforms[node->boneIndex] = combinedTransform * boneOffsetMatrices_[node->boneIndex];
     }
     
     //cout << "    evaluating " << node->children.size() << " children.\n";
-    for (unsigned int i = 0; i < node->children.size(); ++i) {
+    for (size_t i = 0; i < node->children.size(); ++i) {
         animateNodes(node->children[i], animation, animationTime, combinedTransform, boneTransforms);
     }
 }
@@ -243,7 +243,7 @@ void ModelRigged::animateNodesWithDynamics(const Node* node, const Animation& an
         float scaleX = glm::length(glm::vec3(modelMtx[0][0], modelMtx[0][1], modelMtx[0][2]));
         float scaleY = glm::length(glm::vec3(modelMtx[1][0], modelMtx[1][1], modelMtx[1][2]));
         float scaleZ = glm::length(glm::vec3(modelMtx[2][0], modelMtx[2][1], modelMtx[2][2]));
-        float scaleAvg = (scaleX + scaleY + scaleZ) / 3.0f;
+        float scaleAvg = (scaleX + scaleY + scaleZ) / 3.0f;    // Average scaling of the model used to approximate radial clamp in world space.
         glm::mat4 localToWorldSpace = modelMtx * glm::inverse(armatureRootInv_) * combinedTransform * node->transform;
         glm::mat4 worldToLocalSpace = glm::inverse(localToWorldSpace);
         
@@ -283,11 +283,11 @@ void ModelRigged::animateNodesWithDynamics(const Node* node, const Animation& an
     
     combinedTransform *= nodeTransform;
     
-    if (node->boneIndex != -1) {
+    if (node->boneIndex != -1) {    // If this node corresponds to a bone, set the computed transform.
         boneTransforms[node->boneIndex] = combinedTransform * boneOffsetMatrices_[node->boneIndex];
     }
     
-    for (unsigned int i = 0; i < node->children.size(); ++i) {
+    for (size_t i = 0; i < node->children.size(); ++i) {
         animateNodesWithDynamics(node->children[i], animation, animationTime, modelMtx, dynamicBones, combinedTransform, boneTransforms);
     }
 }

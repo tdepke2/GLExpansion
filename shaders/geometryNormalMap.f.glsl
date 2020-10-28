@@ -16,8 +16,8 @@ void main() {
     position = fPosition;
     normal = normalize(fTBNMtx * (texture(texNormal, fTexCoords).rgb * 2.0 - 1.0));
     albedoSpec = texture(texDiffuse, fTexCoords);
-    //if (albedoSpec.a < 0.5) {
-        //discard;
-    //}
+    if (albedoSpec.a < 0.1) {
+        discard;
+    }
     albedoSpec.a = texture(texSpecular, fTexCoords).r;
 }

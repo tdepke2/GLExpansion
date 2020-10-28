@@ -21,7 +21,7 @@ class CharacterTest : public DrawableInterface {
     public:
     ModelRigged model_;
     Transformable transform_;
-    unordered_map<string, Animation> animations_;
+    unordered_map<string, Animation> animations_, animations2_;
     vector<glm::mat4> boneTransforms_;
     map<int, ModelRigged::DynamicBone> dynamicBones_;
     

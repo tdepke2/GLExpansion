@@ -76,29 +76,28 @@ void processInput(Renderer& renderer, Camera& camera, World& world) {
     }
     
     if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_P) == GLFW_PRESS) {
-        world.characterTest_.transform_.move(glm::vec3(0.0f, 0.0f, -camera.moveSpeed_));
+        world.modelTestTransform_.move(glm::vec3(0.0f, 0.0f, -camera.moveSpeed_));
     }
     if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_SEMICOLON) == GLFW_PRESS) {
-        world.characterTest_.transform_.move(glm::vec3(0.0f, 0.0f, camera.moveSpeed_));
+        world.modelTestTransform_.move(glm::vec3(0.0f, 0.0f, camera.moveSpeed_));
     }
     if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_L) == GLFW_PRESS) {
-        world.characterTest_.transform_.move(glm::vec3(-camera.moveSpeed_, 0.0f, 0.0f));
+        world.modelTestTransform_.move(glm::vec3(-camera.moveSpeed_, 0.0f, 0.0f));
     }
     if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_APOSTROPHE) == GLFW_PRESS) {
-        world.characterTest_.transform_.move(glm::vec3(camera.moveSpeed_, 0.0f, 0.0f));
+        world.modelTestTransform_.move(glm::vec3(camera.moveSpeed_, 0.0f, 0.0f));
     }
     if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_COMMA) == GLFW_PRESS) {
-        world.characterTest_.transform_.move(glm::vec3(0.0f, -camera.moveSpeed_, 0.0f));
+        world.modelTestTransform_.move(glm::vec3(0.0f, -camera.moveSpeed_, 0.0f));
     }
     if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_PERIOD) == GLFW_PRESS) {
-        world.characterTest_.transform_.move(glm::vec3(0.0f, camera.moveSpeed_, 0.0f));
+        world.modelTestTransform_.move(glm::vec3(0.0f, camera.moveSpeed_, 0.0f));
     }
-    
     if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_O) == GLFW_PRESS) {
-        world.characterTest_.transform_.rotate(glm::vec3(0.0f, -camera.moveSpeed_, 0.0f));
+        world.modelTestTransform_.rotate(glm::vec3(0.0f, -camera.moveSpeed_, 0.0f));
     }
     if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_LEFT_BRACKET) == GLFW_PRESS) {
-        world.characterTest_.transform_.rotate(glm::vec3(0.0f, camera.moveSpeed_, 0.0f));
+        world.modelTestTransform_.rotate(glm::vec3(0.0f, camera.moveSpeed_, 0.0f));
     }
 }
 

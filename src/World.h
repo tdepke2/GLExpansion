@@ -2,7 +2,6 @@
 #define WORLD_H_
 
 #include "Animation.h"
-#include "CharacterTest.h"
 #include "ModelRigged.h"
 #include "ModelStatic.h"
 #include "Renderer.h"
@@ -49,7 +48,6 @@ class World {
     ModelRigged modelTest_;
     vector<glm::mat4> modelTestBoneTransforms_;
     unordered_map<string, Animation> modelTestAnimations_;
-    CharacterTest characterTest_;
     Transformable sceneTestTransform_, modelTestTransform_;
     DirectionalLight sunLight_;
     vector<PointLight> pointLights_;

@@ -7,8 +7,8 @@
 
 void CharacterTest::init() {
     model_.loadFile("models/miku/miku.fbx", &animations_);
+    //model_.loadFile("models/aiya/aiya.fbx", &animations2_);
     transform_.setPosition(glm::vec3(-2.0f, 0.0f, 2.0f));
-    //transform_.setPosition(glm::vec3(0.0f, 12.0f, 0.0f));
     //transform_.setPitchYawRoll(glm::vec3(glm::pi<float>() / 2.0f, 0.0f, 0.0f));
     transform_.setScale(glm::vec3(1.0f));
     
@@ -17,6 +17,8 @@ void CharacterTest::init() {
     Animation::loadFile("models/miku/animJumpingDown.fbx", &animations_);
     Animation::loadFile("models/miku/animShovedReactionWithSpin.fbx", &animations_);
     Animation::loadFile("models/miku/animWave.fbx", &animations_);
+    
+    Animation::loadFile("models/aiya/animWalkInCircle.fbx", &animations2_);
     
     Animation nullAnimation("null", 30.0, 20.0);
     animations_.insert({"null", nullAnimation});
@@ -31,6 +33,7 @@ void CharacterTest::init() {
     assert(model_.boneOffsetMatrices_.size() <= ModelRigged::MAX_NUM_BONES);
     boneTransforms_.resize(model_.boneOffsetMatrices_.size(), glm::mat4(1.0f));
     
+    ////////////// Miku bones //////////////
     ModelRigged::DynamicBone breastBone(0.03f, 1.9f, glm::vec3(0.0f, 1.0f, 0.0f), DampedSpringMotion(1.0f, 0.2f, 0.5f), DampedSpringMotion(1.0f, 0.2f, 0.5f));
     dynamicBones_[model_.findNode("Breast_R")->boneIndex] = breastBone;
     dynamicBones_[model_.findNode("Breast_L")->boneIndex] = breastBone;
@@ -83,14 +86,44 @@ void CharacterTest::init() {
     dynamicBones_[model_.findNode("RibbonBack2_L")->boneIndex] = ribbonBone;
     dynamicBones_[model_.findNode("RibbonLeg1_L")->boneIndex] = ribbonBone;
     dynamicBones_[model_.findNode("RibbonLeg2_L")->boneIndex] = ribbonBone;
+    
+    ////////////// Aiya bones //////////////
+    /*ModelRigged::DynamicBone breastBone(0.02f, 1.9f, glm::vec3(0.0f, 1.0f, 0.0f), DampedSpringMotion(1.0f, 0.2f, 0.5f), DampedSpringMotion(1.0f, 0.2f, 0.5f));
+    dynamicBones_[model_.findNode("Breast_R")->boneIndex] = breastBone;
+    dynamicBones_[model_.findNode("Breast_L")->boneIndex] = breastBone;
+    
+    ModelRigged::DynamicBone hairBone(0.0f, 2.0f, glm::vec3(0.0f, 1.0f, 0.0f), DampedSpringMotion(), DampedSpringMotion(1.0f, 0.2f, 0.5f));
+    dynamicBones_[model_.findNode("Ear_R.001")->boneIndex] = hairBone;
+    dynamicBones_[model_.findNode("Ear_R.002")->boneIndex] = hairBone;
+    dynamicBones_[model_.findNode("Ear_L.001")->boneIndex] = hairBone;
+    dynamicBones_[model_.findNode("Ear_L.002")->boneIndex] = hairBone;
+    dynamicBones_[model_.findNode("Tail.001")->boneIndex] = hairBone;
+    dynamicBones_[model_.findNode("Tail.002")->boneIndex] = hairBone;
+    dynamicBones_[model_.findNode("Tail.006")->boneIndex] = hairBone;
+    dynamicBones_[model_.findNode("Tail.003")->boneIndex] = hairBone;
+    
+    ModelRigged::DynamicBone clothesBone(0.0f, 0.05f, glm::vec3(0.0f, 1.0f, 0.0f), DampedSpringMotion(), DampedSpringMotion(1.0f, 0.1f, 0.7f));
+    dynamicBones_[model_.findNode("Jacket_Root_R.001")->boneIndex] = clothesBone;
+    dynamicBones_[model_.findNode("Jacket_Root_R.002")->boneIndex] = clothesBone;
+    dynamicBones_[model_.findNode("Skirt_Right")->boneIndex] = clothesBone;
+    dynamicBones_[model_.findNode("Jacket_Root_L.001")->boneIndex] = clothesBone;
+    dynamicBones_[model_.findNode("Jacket_Root_L.002")->boneIndex] = clothesBone;
+    dynamicBones_[model_.findNode("Skirt_Left")->boneIndex] = clothesBone;*/
 }
 
 void CharacterTest::update() {
     //model_.ragdoll(transform_.getTransform(), dynamicBones_, boneTransforms_);
     //model_.animate(animations_.at("Armature|Armature|mixamo.com|Layer0"), glfwGetTime(), boneTransforms_);
     //model_.animate(animations_.at("moveForward"), glfwGetTime(), boneTransforms_);
-    model_.animateWithDynamics(animations_.at("Armature|wave"), glfwGetTime(), transform_.getTransform(), dynamicBones_, boneTransforms_);
-    //model_.animateWithDynamics(animations_.at("null"), glfwGetTime(), transform_.getTransform(), dynamicBones_, boneTransforms_);
+    if (true) {
+        model_.animateWithDynamics(animations_.at("Armature|wave"), glfwGetTime(), transform_.getTransform(), dynamicBones_, boneTransforms_);
+        //model_.animateWithDynamics(animations2_.at("Armature|walkInCircle"), glfwGetTime(), transform_.getTransform(), dynamicBones_, boneTransforms_);
+        //model_.animateWithDynamics(animations_.at("null"), glfwGetTime(), transform_.getTransform(), dynamicBones_, boneTransforms_);
+    } else {
+        model_.animate(animations_.at("Armature|hipHopDancing"), glfwGetTime(), boneTransforms_);
+        //model_.animate(animations2_.at("Armature|walkInCircle"), glfwGetTime(), boneTransforms_);
+        //model_.animate(animations_.at("null"), glfwGetTime(), boneTransforms_);
+    }
 }
 
 void CharacterTest::draw(const Shader& shader, const glm::mat4& modelMtx) const {

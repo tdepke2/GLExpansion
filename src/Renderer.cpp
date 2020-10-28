@@ -366,7 +366,7 @@ void Renderer::setupOpenGL() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     
-    window_ = glfwCreateWindow(windowSize_.x, windowSize_.y, "LearnOpenGL", nullptr, nullptr);    // Create the window.
+    window_ = glfwCreateWindow(windowSize_.x, windowSize_.y, "GLExpansion", nullptr, nullptr);    // Create the window.
     if (window_ == nullptr) {
         throw runtime_error("Failed to create GLFW window.");
     }
@@ -1067,15 +1067,6 @@ void Renderer::renderScene(const Camera& camera, const World& world, const glm::
     
     shader->setMat4Array("boneTransforms", static_cast<unsigned int>(world.modelTestBoneTransforms_.size()), world.modelTestBoneTransforms_.data());
     world.modelTest_.draw(*shader, world.modelTestTransform_.getTransform());
-    
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, whiteTexture_);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, blackTexture_);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, blueTexture_);
-    
-    world.characterTest_.draw(*shader, glm::mat4(1.0f));
 }
 
 float Renderer::randomFloat(float min, float max) {
