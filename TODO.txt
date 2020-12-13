@@ -1,4 +1,6 @@
 Additions:
+    * Add PBR.
+    * Add anti-aliasing (apparently MSAA doesn't work with deferred pipeline).
     * Need a logger class for easier debugging, it should accept a message and type (graphics, physics, audio, etc).
     * Add procedural terrain generation.
     * Add water physics.
@@ -7,6 +9,8 @@ Additions:
     * Add better way to handle animations and transition between them.
 
 Fixes:
+    * Issue with pinpoint holes in geometry, possibly a triangle rasterization issue or related to skybox render.
+    * Should use more interface blocks https://learnopengl.com/Advanced-OpenGL/Advanced-GLSL
     * Transformable should just store one quaternion for rotation instead of Euler angles (same for Camera probably).
     * No need for the position map in g-buffer.
     * Look into reversing the z-buffer for better precision across scene.

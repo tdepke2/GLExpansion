@@ -47,7 +47,7 @@ class Renderer {
     Configuration config_;
     
     static GLenum glCheckError_(const char* file, int line);    // Error checking, https://learnopengl.com/In-Practice/Debugging
-    static unsigned int loadTexture(const string& filename, bool gammaCorrection, bool flip = true);    // consider changing to const char * for performance lookups.
+    static unsigned int loadTexture(const string& filename, bool gammaCorrection, bool flip = true);    // consider changing to const char * for performance lookups. ##############################################
     static unsigned int loadCubemap(const string& filename, bool gammaCorrection, bool flip = false);
     static unsigned int generateTexture(float r, float g, float b, float a = 1.0f);
     Renderer(mt19937* randNumGenerator);

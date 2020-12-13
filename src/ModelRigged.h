@@ -59,7 +59,6 @@ class ModelRigged : public ModelAbstract {
     static constexpr unsigned int MAX_NUM_BONES = 128;
     vector<glm::mat4> boneOffsetMatrices_;
     
-    static glm::quat findRotationBetweenVectors(glm::vec3 source, glm::vec3 destination);
     ModelRigged();
     ModelRigged(const string& filename, unordered_map<string, Animation>* animations = nullptr);
     ~ModelRigged();

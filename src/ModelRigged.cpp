@@ -1,28 +1,11 @@
 #include "Animation.h"
+#include "CommonMath.h"
 #include "ModelRigged.h"
 #include <glm/gtx/quaternion.hpp>
 #include <cassert>
 #include <iostream>
 #include <stack>
 #include <utility>
-
-glm::quat ModelRigged::findRotationBetweenVectors(glm::vec3 source, glm::vec3 destination) {
-    source = glm::normalize(source);
-    destination = glm::normalize(destination);
-    float cosTheta = glm::dot(source, destination);
-    
-    if (cosTheta < -1.0f + 0.001f) {    // Special case where vectors are in opposite direction.
-        glm::vec3 axis = glm::cross(source, glm::vec3(1.0f, 0.0f, 0.0f));
-        if (glm::length(axis) < 0.01f) {
-            axis = glm::cross(source, glm::vec3(0.0f, 1.0f, 0.0f));
-        }
-        return glm::rotate(glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::pi<float>(), axis);
-    }
-    
-    glm::vec3 axis = glm::cross(source, destination);
-    float s = sqrt((1.0f + cosTheta) * 2.0f);
-    return glm::quat(s / 2.0f, axis.x / s, axis.y / s, axis.z / s);
-}
 
 ModelRigged::ModelRigged() {
     rootNode_ = nullptr;
@@ -270,7 +253,7 @@ void ModelRigged::animateNodesWithDynamics(const Node* node, const Animation& an
             
             glm::vec3 equilibriumPosCOMLS = glm::vec3(worldToLocalSpace * glm::vec4(equilibriumPosCOM, 1.0f));
             glm::vec3 bonePosCOMLS = glm::vec3(worldToLocalSpace * glm::vec4(bone.lastPositionCOM, 1.0f));
-            rotateToCOM = findRotationBetweenVectors(equilibriumPosCOMLS - glm::vec3(0.0f), bonePosCOMLS - glm::vec3(0.0f));
+            rotateToCOM = CommonMath::findRotationBetweenVectors(equilibriumPosCOMLS - glm::vec3(0.0f), bonePosCOMLS - glm::vec3(0.0f));
         }
         
         nodeTransform = node->transform * glm::translate(glm::mat4(1.0f), bonePosLS) * glm::mat4_cast(rotateToCOM);

@@ -2,6 +2,7 @@
 #include "stb_image.h"
 
 #include "Camera.h"
+#include "CommonMath.h"
 #include "Font.h"
 #include "Framebuffer.h"
 #include "PerformanceMonitor.h"
@@ -9,6 +10,7 @@
 #include "Shader.h"
 #include "World.h"
 #include <cassert>
+#include <cmath>
 #include <iostream>
 #include <stdexcept>
 #include <utility>
@@ -825,9 +827,10 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
         spotLightShader_->setBool("applySSAO", config_.getSSAO());
         spotLightShader_->setVec2("renderSize", renderFBO_->getBufferSize());
         
-        //glm::mat4 flashlightModelMtx = glm::lookAt(camera.front_, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));// might work better with quaternions ################################################
-        glm::mat4 flashlightModelMtx = glm::translate(glm::mat4(1.0f), camera.position_);
-        flashlightModelMtx = glm::scale(flashlightModelMtx, glm::vec3(10.0f, 10.0f, World::calcLightRadius(world.spotLights_[0].color, world.spotLights_[0].attenuation)));
+        glm::mat4 flashlightModelMtx = CommonMath::orientAt(camera.position_, camera.position_ + camera.front_, camera.up_);    // Orient the flashlight to the camera direction, and set scale based on the larger cutoff angle.
+        float coneX = World::calcLightRadius(world.spotLights_[0].color, world.spotLights_[0].attenuation);
+        float coneY = sqrt(1 - world.spotLights_[0].cutOff.y * world.spotLights_[0].cutOff.y) / world.spotLights_[0].cutOff.y * coneX;
+        flashlightModelMtx = glm::scale(flashlightModelMtx, glm::vec3(coneY, coneY, coneX));
         
         //for (size_t i = 0; i < world.spotLights_.size(); ++i) {
             if (world.flashlightOn_) {
@@ -1033,7 +1036,9 @@ void Renderer::renderScene(const Camera& camera, const World& world, const glm::
     }
     world.cube1_.drawGeometry(*shader, glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0.5f, 3.0f)));
     
-    world.cube1_.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), camera.position_), glm::vec3(0.4f, 0.4f, 0.4f)));
+    if (shadowRender) {
+        world.cube1_.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), camera.position_), glm::vec3(0.4f, 0.4f, 0.4f)));
+    }
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, woodTexture_);
