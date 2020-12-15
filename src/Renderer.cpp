@@ -828,13 +828,13 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
         spotLightShader_->setVec2("renderSize", renderFBO_->getBufferSize());
         
         glm::mat4 flashlightModelMtx = CommonMath::orientAt(camera.position_, camera.position_ + camera.front_, camera.up_);    // Orient the flashlight to the camera direction, and set scale based on the larger cutoff angle.
-        float coneX = World::calcLightRadius(world.spotLights_[0].color, world.spotLights_[0].attenuation);
-        float coneY = sqrt(1 - world.spotLights_[0].cutOff.y * world.spotLights_[0].cutOff.y) / world.spotLights_[0].cutOff.y * coneX;
+        float coneX = World::calcLightRadius(world.spotLights_[0].color, world.spotLights_[0].attenuation);    // Length of the cone.
+        float coneY = sqrt(1 - world.spotLights_[0].cutOff.y * world.spotLights_[0].cutOff.y) / world.spotLights_[0].cutOff.y * coneX * 1.02f;    // Width of the cone computed from length and cutoff angle (the cosine of actual spotlight angle). Scales by a small bias so that border edges are not visible.
         flashlightModelMtx = glm::scale(flashlightModelMtx, glm::vec3(coneY, coneY, coneX));
         
         //for (size_t i = 0; i < world.spotLights_.size(); ++i) {
             if (world.flashlightOn_) {
-                glClear(GL_STENCIL_BUFFER_BIT);
+                glClear(GL_STENCIL_BUFFER_BIT);    // Same process used when drawing point lights.
                 nullLightShader_->use();
                 nullLightShader_->setMat4("modelMtx", flashlightModelMtx);
                 glStencilFunc(GL_ALWAYS, 1, 0xFF);

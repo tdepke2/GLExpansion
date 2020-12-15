@@ -12,7 +12,7 @@ uniform vec3 attenuation;
 uniform vec2 cutOff;
 
 in vec3 fLightPositionVS;
-out vec3 fLightDirectionVS;
+in vec3 fLightDirectionVS;
 
 out vec4 fragColor;
 
@@ -23,9 +23,9 @@ vec3 calculateLight(vec3 position, vec3 normal, vec3 albedoColor, float specular
     
     vec3 ambient = color * phongVals.x * albedoColor * lightScalar * ambientOcclusion;
     
-    //float theta = dot(lightDir, normalize(-fLightDirectionVS));
-    //float intensity = clamp((theta - cutOff.y) / (cutOff.x - cutOff.y), 0.0, 1.0);
-    //lightScalar *= intensity;
+    float theta = dot(lightDir, normalize(-fLightDirectionVS));
+    float intensity = clamp((theta - cutOff.y) / (cutOff.x - cutOff.y), 0.0, 1.0);
+    lightScalar *= intensity;
     
     float diffuseScalar = max(dot(normal, lightDir), 0.0);
     vec3 diffuse = color * phongVals.y * diffuseScalar * albedoColor * lightScalar;
