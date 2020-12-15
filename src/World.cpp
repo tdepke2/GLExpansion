@@ -5,7 +5,10 @@
 
 float World::calcLightRadius(const glm::vec3& color, const glm::vec3& attenuation) {
     float intensityMax = max(max(color.r, color.g), color.b);    // Equation derived from https://learnopengl.com/Advanced-Lighting/Deferred-Shading
-    return (-attenuation.y + sqrt(attenuation.y * attenuation.y - 4.0f * attenuation.z * (attenuation.x - (256.0f / 5.0f) * intensityMax))) / (2.0f * attenuation.z);
+    const float GAMMA = 2.2f;
+    float cutoffIntensity = pow(5.0f / 256.0f, GAMMA);
+    
+    return (-attenuation.y + sqrt(attenuation.y * attenuation.y - 4.0f * attenuation.z * (attenuation.x - intensityMax / cutoffIntensity))) / (2.0f * attenuation.z);
 }
 
 World::World() :
@@ -15,7 +18,7 @@ World::World() :
     sunT_(-3.0f),
     sunSpeed_(0.0f) {
     
-    lightCube_.generateCube(0.05f);
+    lightCube_.generateCube(0.01f);
     lightSphere_.generateSphere(1.0f, 16, 8);
     lightCone_.generateCylinder(0.0f, 1.0f, 1.0f, 16, 1, true);
     cube1_.generateCube();
@@ -43,22 +46,22 @@ World::World() :
     pointLights_.resize(4);
     pointLights_[0].color = glm::vec3(5.0f, 5.0f, 5.0f);
     pointLights_[0].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
-    pointLights_[0].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
+    pointLights_[0].attenuation = glm::vec3(1.0f, 8.0f, 16.0f);
     pointLights_[0].modelMtx = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.7f, 0.2f, 2.0f)), glm::vec3(calcLightRadius(pointLights_[0].color, pointLights_[0].attenuation)));
     
     pointLights_[1].color = glm::vec3(10.0f, 0.0f, 0.0f);
     pointLights_[1].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
-    pointLights_[1].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
+    pointLights_[1].attenuation = glm::vec3(1.0f, 8.0f, 16.0f);
     pointLights_[1].modelMtx = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(2.3f, -3.3f, -4.0f)), glm::vec3(calcLightRadius(pointLights_[1].color, pointLights_[1].attenuation)));
     
     pointLights_[2].color = glm::vec3(0.0f, 0.0f, 15.0f);
     pointLights_[2].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
-    pointLights_[2].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
+    pointLights_[2].attenuation = glm::vec3(1.0f, 8.0f, 16.0f);
     pointLights_[2].modelMtx = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(-4.0f, 2.0f, -12.0f)), glm::vec3(calcLightRadius(pointLights_[2].color, pointLights_[2].attenuation)));
     
     pointLights_[3].color = glm::vec3(0.0f, 5.0f, 0.0f);
     pointLights_[3].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
-    pointLights_[3].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
+    pointLights_[3].attenuation = glm::vec3(1.0f, 8.0f, 16.0f);
     pointLights_[3].modelMtx = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.1f, -3.0f)), glm::vec3(calcLightRadius(pointLights_[3].color, pointLights_[3].attenuation)));
     
     mt19937 rng;
@@ -71,15 +74,15 @@ World::World() :
         glm::vec3 position(randRange(rng), randRange(rng), randRange(rng));
         pointLights_[i].color = glm::vec3(randColor(rng), randColor(rng), randColor(rng));
         pointLights_[i].phongVals = glm::vec3(0.05f, 0.8f, 1.0f);
-        pointLights_[i].attenuation = glm::vec3(1.0f, 0.7f, 1.8f);
+        pointLights_[i].attenuation = glm::vec3(1.0f, 2.0f, 4.0f);
         pointLights_[i].modelMtx = glm::scale(glm::translate(glm::mat4(1.0f), position), glm::vec3(calcLightRadius(pointLights_[i].color, pointLights_[i].attenuation)));
     }
     
     spotLights_.resize(1);
-    spotLights_[0].color = glm::vec3(1.0f, 1.0f, 1.0f);
+    spotLights_[0].color = glm::vec3(2.0f, 2.0f, 2.0f);
     spotLights_[0].phongVals = glm::vec3(0.0f, 1.0f, 1.0f);
-    spotLights_[0].attenuation = glm::vec3(1.0f, 0.09f, 0.032f);
-    spotLights_[0].cutOff = glm::vec2(glm::cos(glm::radians(12.5f)), glm::cos(glm::radians(17.5f)));
+    spotLights_[0].attenuation = glm::vec3(1.0f, 2.0f, 4.0f);
+    spotLights_[0].cutOff = glm::vec2(glm::cos(glm::radians(12.5f)), glm::cos(glm::radians(25.0f)));
     
     debugVectors_.push_back(glm::mat4(1.0f));    // Set up data for debug vectors.
     glGenVertexArrays(1, &debugVectorsVAO_);

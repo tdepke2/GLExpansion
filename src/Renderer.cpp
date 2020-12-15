@@ -727,7 +727,7 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
         glEnable(GL_DEPTH_TEST);
     } else {
         glEnable(GL_BLEND);
-        glBlendFunc(GL_ONE, GL_ONE);
+        glBlendFunc(GL_ONE, GL_ONE);    // Lights are added together one at a time, so blending sums each color component.
         
         renderFBO_->bind();    // Render lighting (lighting pass).
         glViewport(0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y);
@@ -769,7 +769,7 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
         glDepthFunc(GL_GREATER);
         glDepthMask(false);
         glEnable(GL_STENCIL_TEST);
-        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);    // If stencil test and depth test pass (light volume occluded), set stencil value to glStencilFunc() ref value (prevents light from rendering at that spot).
         
         pointLightShader_->use();    // Draw scene point lights.
         pointLightShader_->setInt("texPosition", 0);
@@ -791,13 +791,13 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
         //world.lightSphere_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
         for (size_t i = 0; i < world.pointLights_.size(); ++i) {
             if (world.lightStates_[2] == 1) {
-                glClear(GL_STENCIL_BUFFER_BIT);
+                glClear(GL_STENCIL_BUFFER_BIT);    // First pass, render light mask (front face) for parts of the light volume that may be occluded.
                 nullLightShader_->use();
                 nullLightShader_->setMat4("modelMtx", world.pointLights_[i].modelMtx);
                 glStencilFunc(GL_ALWAYS, 1, 0xFF);
                 world.lightSphere_.drawGeometry();
                 
-                pointLightShader_->use();
+                pointLightShader_->use();    // Second pass, render light volume (back face) where the light is occluded by geometry and not masked by first pass.
                 pointLightShader_->setMat4("modelMtx", world.pointLights_[i].modelMtx);
                 pointLightShader_->setVec3("color", world.pointLights_[i].color);
                 pointLightShader_->setVec3("phongVals", world.pointLights_[i].phongVals);

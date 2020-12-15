@@ -13,9 +13,13 @@ Fixes:
     * Should use more interface blocks https://learnopengl.com/Advanced-OpenGL/Advanced-GLSL
     * Transformable should just store one quaternion for rotation instead of Euler angles (same for Camera probably).
     * No need for the position map in g-buffer.
-    * Look into reversing the z-buffer for better precision across scene.
+    * Look into reversing the z-buffer for better precision across scene. https://outerra.blogspot.com/2009/08/logarithmic-z-buffer.html
     * Need a better way to render models so that gl calls are minimized.
         - Possibly a scene graph with dirty flag optimization, or other method to group draw calls by shader/materials.
     * Renderer needs a better interface so that you can draw, for example, nothing.
     * Add NonCopyable interface for things like Mesh and Shader.
     * Figure out why DAE/FBX models aren't working (likely a blender issue).
+
+Rework:
+    * Look into OGRE 3D for some ideas at restructure https://ogrecave.github.io/ogre/api/latest/tutorials.html
+    

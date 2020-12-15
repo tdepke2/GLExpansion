@@ -1,6 +1,6 @@
 #version 330 core
 
-const float GAMMA = 2.2;
+const float GAMMA = 2.2;    // Gamma correction should match the implementation in World.cpp to compute light volumes correctly.
 
 uniform sampler2D image;
 uniform sampler2D bloomBlur;
