@@ -36,7 +36,6 @@ class Renderer {
     static constexpr glm::ivec2 INITIAL_WINDOW_SIZE = glm::ivec2(800, 600);
     static constexpr float NEAR_PLANE = 0.1f, FAR_PLANE = 100.0f;
     static constexpr unsigned int NUM_CASCADED_SHADOWS = 3;
-    static constexpr unsigned int NUM_LIGHTS = 64;
     static constexpr unsigned int ATTRIBUTE_LOCATION_V_POSITION = 0;
     static constexpr unsigned int ATTRIBUTE_LOCATION_V_NORMAL = 1;
     static constexpr unsigned int ATTRIBUTE_LOCATION_V_TEX_COORDS = 2;

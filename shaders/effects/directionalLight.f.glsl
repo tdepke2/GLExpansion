@@ -11,6 +11,7 @@ uniform bool applySSAO;
 uniform sampler2DShadow shadowMap[NUM_CASCADED_SHADOWS];
 uniform mat4 viewToLightSpace[NUM_CASCADED_SHADOWS];
 uniform float shadowZEnds[NUM_CASCADED_SHADOWS];
+uniform bool applyShadows;
 uniform vec3 lightDirectionVS;
 uniform vec3 color;
 uniform vec3 phongVals;
@@ -48,23 +49,25 @@ vec3 calculateLight(vec3 position, vec3 normal, vec3 albedoColor, float specular
     
     vec3 ambient = color * phongVals.x * albedoColor * lightScalar * ambientOcclusion;
     
-    uint cascadeIndex = 0u;
-    for (uint i = 0u; i < NUM_CASCADED_SHADOWS - 1u; ++i) {
-        cascadeIndex += (-position.z > shadowZEnds[i]) ? 1u : 0u;
-    }
-    
-    /*if (cascadeIndex == 0u) {    // Draw color for each cascade.
-        tempColor = vec3(1.0, 0.5, 0.5);
-    } else if (cascadeIndex == 1u) {
-        tempColor = vec3(0.5, 1.0, 0.5);
-    } else if (cascadeIndex == 2u) {
-        tempColor = vec3(0.5, 0.5, 1.0);
-    }*/
-    
-    if (cascadeIndex == NUM_CASCADED_SHADOWS - 1u || shadowZEnds[cascadeIndex] + position.z > SHADOW_BLUR_BAND) {    // Blur between cascades to remove seam between shadow maps.
-        lightScalar *= calculateShadow(cascadeIndex, position, normal, lightDir);
-    } else {
-        lightScalar *= mix(calculateShadow(cascadeIndex + 1u, position, normal, lightDir), calculateShadow(cascadeIndex, position, normal, lightDir), (shadowZEnds[cascadeIndex] + position.z) / SHADOW_BLUR_BAND);
+    if (applyShadows) {
+        uint cascadeIndex = 0u;
+        for (uint i = 0u; i < NUM_CASCADED_SHADOWS - 1u; ++i) {
+            cascadeIndex += (-position.z > shadowZEnds[i]) ? 1u : 0u;
+        }
+        
+        /*if (cascadeIndex == 0u) {    // Draw color for each cascade.
+            tempColor = vec3(1.0, 0.5, 0.5);
+        } else if (cascadeIndex == 1u) {
+            tempColor = vec3(0.5, 1.0, 0.5);
+        } else if (cascadeIndex == 2u) {
+            tempColor = vec3(0.5, 0.5, 1.0);
+        }*/
+        
+        if (cascadeIndex == NUM_CASCADED_SHADOWS - 1u || shadowZEnds[cascadeIndex] + position.z > SHADOW_BLUR_BAND) {    // Blur between cascades to remove seam between shadow maps.
+            lightScalar *= calculateShadow(cascadeIndex, position, normal, lightDir);
+        } else {
+            lightScalar *= mix(calculateShadow(cascadeIndex + 1u, position, normal, lightDir), calculateShadow(cascadeIndex, position, normal, lightDir), (shadowZEnds[cascadeIndex] + position.z) / SHADOW_BLUR_BAND);
+        }
     }
     
     float diffuseScalar = max(dot(normal, lightDir), 0.0);

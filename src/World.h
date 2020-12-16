@@ -49,10 +49,9 @@ class World {
     vector<glm::mat4> modelTestBoneTransforms_;
     unordered_map<string, Animation> modelTestAnimations_;
     Transformable sceneTestTransform_, modelTestTransform_;
-    DirectionalLight sunLight_;
+    DirectionalLight sunLight_, moonLight_;
     vector<PointLight> pointLights_;
     vector<SpotLight> spotLights_;
-    unsigned int lightStates_[Renderer::NUM_LIGHTS];
     bool flashlightOn_, sunlightOn_, lampsOn_;
     float sunT_, sunSpeed_;
     glm::vec3 sunPosition_;

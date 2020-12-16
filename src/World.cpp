@@ -41,7 +41,9 @@ World::World() :
     modelTestBoneTransforms_.resize(modelTest_.boneOffsetMatrices_.size(), glm::mat4(1.0f));
     
     sunLight_.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    sunLight_.phongVals =  glm::vec3(0.05f, 0.4f, 0.5f);
+    sunLight_.phongVals = glm::vec3(0.01f, 0.4f, 0.5f);
+    moonLight_.color = glm::vec3(1.0f, 1.0f, 1.0f);
+    moonLight_.phongVals = glm::vec3(0.0001f, 0.0f, 0.0f);
     
     pointLights_.resize(4);
     pointLights_[0].color = glm::vec3(5.0f, 5.0f, 5.0f);
@@ -69,7 +71,7 @@ World::World() :
     uniform_real_distribution<float> randRange(-40.0f, 40.0f);
     uniform_real_distribution<float> randColor(0.0f, 2.0f);
     
-    pointLights_.resize(Renderer::NUM_LIGHTS - 2);
+    pointLights_.resize(62);
     for (size_t i = 4; i < pointLights_.size(); ++i) {
         glm::vec3 position(randRange(rng), randRange(rng), randRange(rng));
         pointLights_[i].color = glm::vec3(randColor(rng), randColor(rng), randColor(rng));
@@ -109,14 +111,6 @@ World::~World() {
 void World::nextTick() {
     sunT_ += sunSpeed_;
     
-    lightStates_[0] = (sunlightOn_ ? 1u : 0u);
-    lightStates_[1] = (flashlightOn_ ? 1u : 0u);
-    for (size_t i = 2; i < pointLights_.size() + 2; ++i) {
-        lightStates_[i] = (lampsOn_ ? 1u : 0u);
-    }
-    for (size_t i = pointLights_.size() + 2; i < Renderer::NUM_LIGHTS; ++i) {
-        lightStates_[i] = 0;
-    }
     sunPosition_ = glm::vec3(glm::rotate(glm::mat4(1.0f), sunT_, glm::vec3(1.0f, 1.0f, 1.0f)) * glm::vec4(0.0f, 0.0f, Renderer::FAR_PLANE, 1.0f));
     if (sunPosition_.x == 0.0f && sunPosition_.z == 0.0f) {    // Fix edge case when directional light aligns with up vector.
         sunPosition_.x = 0.00001f;

@@ -478,10 +478,13 @@ void Renderer::setupShaders() {
     constexpr unsigned int SSAO_NUM_SAMPLES = 32;
     vector<glm::vec3> ssaoSampleKernel;
     ssaoSampleKernel.reserve(SSAO_NUM_SAMPLES);
-    for (unsigned int i = 0; i < SSAO_NUM_SAMPLES; ++i) {
+    for (unsigned int i = 0; i < SSAO_NUM_SAMPLES; ++i) {    // Generate random SSAO samples (used to sample depth values near each fragment to determine occlusion).
         glm::vec3 sample(randomFloat(-1.0f, 1.0f), randomFloat(-1.0f, 1.0f), randomFloat(0.0f, 1.0f));
-        float scale = 0.1f + (1.0f - 0.1f) * pow(static_cast<float>(i) / SSAO_NUM_SAMPLES, 2.0f);
-        sample = glm::normalize(sample) * randomFloat(0.0f, 1.0f) * scale;
+        while (glm::length(sample) > 1.0f) {    // Samples are uniformly distributed within a hemisphere, and scaled down with an accelerating interpolation function. This places more samples close to the center.
+            sample = glm::vec3(randomFloat(-1.0f, 1.0f), randomFloat(-1.0f, 1.0f), randomFloat(0.0f, 1.0f));
+        }
+        float scale = glm::mix(0.1f, 1.0f, pow(static_cast<float>(i) / SSAO_NUM_SAMPLES, 2.0f));
+        sample *= scale;
         ssaoSampleKernel.push_back(sample);
     }
     for (unsigned int i = 0; i < SSAO_NUM_SAMPLES; ++i) {
@@ -672,199 +675,149 @@ void Renderer::applySSAO() {
 }
 
 void Renderer::lightingPass(const Camera& camera, const World& world) {
-    if (glfwGetKey(window_, GLFW_KEY_LEFT_SHIFT) != GLFW_PRESS) {
-        renderFBO_->bind();    // Render lighting (lighting pass).
-        glViewport(0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glm::mat4 viewMtx = camera.getViewMatrix();
-        lightingPassShader_->use();
-        lightingPassShader_->setInt("texPosition", 0);
-        glActiveTexture(GL_TEXTURE0);
-        geometryFBO_->bindTexture(0);
-        lightingPassShader_->setInt("texNormal", 1);
-        glActiveTexture(GL_TEXTURE1);
-        geometryFBO_->bindTexture(1);
-        lightingPassShader_->setInt("texAlbedoSpec", 2);
-        glActiveTexture(GL_TEXTURE2);
-        geometryFBO_->bindTexture(2);
-        lightingPassShader_->setInt("texSSAO", 3);
-        if (config_.getSSAO()) {
-            glActiveTexture(GL_TEXTURE3);
-            ssaoBlurFBO_->bindTexture(0);
-        }
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);    // Lights are added together one at a time, so blending sums each color component.
+    
+    renderFBO_->bind();    // Render lighting (lighting pass).
+    glViewport(0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glm::mat4 viewMtx = camera.getViewMatrix();
+    directionalLightShader_->use();
+    directionalLightShader_->setInt("texPosition", 0);
+    glActiveTexture(GL_TEXTURE0);
+    geometryFBO_->bindTexture(0);
+    directionalLightShader_->setInt("texNormal", 1);
+    glActiveTexture(GL_TEXTURE1);
+    geometryFBO_->bindTexture(1);
+    directionalLightShader_->setInt("texAlbedoSpec", 2);
+    glActiveTexture(GL_TEXTURE2);
+    geometryFBO_->bindTexture(2);
+    directionalLightShader_->setInt("texSSAO", 3);
+    if (config_.getSSAO()) {
+        glActiveTexture(GL_TEXTURE3);
+        ssaoBlurFBO_->bindTexture(0);
+    }
+    directionalLightShader_->setBool("applySSAO", config_.getSSAO());
+    if (world.sunlightOn_) {
         for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {
-            lightingPassShader_->setInt("shadowMap[" + to_string(i) + "]", 4 + i);
+            directionalLightShader_->setInt("shadowMap[" + to_string(i) + "]", 4 + i);
             glActiveTexture(GL_TEXTURE4 + i);
             cascadedShadowFBO_[i]->bindTexture(0);
-            lightingPassShader_->setMat4("viewToLightSpace[" + to_string(i) + "]", shadowProjections_[i] * viewToLightSpace_);
-            lightingPassShader_->setFloat("shadowZEnds[" + to_string(i) + "]", shadowZBounds_[i + 1]);
+            directionalLightShader_->setMat4("viewToLightSpace[" + to_string(i) + "]", shadowProjections_[i] * viewToLightSpace_);
+            directionalLightShader_->setFloat("shadowZEnds[" + to_string(i) + "]", shadowZBounds_[i + 1]);
         }
-        lightingPassShader_->setBool("applySSAO", config_.getSSAO());
-        lightingPassShader_->setUnsignedIntArray("lightStates", NUM_LIGHTS, world.lightStates_);    // Need a better way to handle passing lights from world to shader #######################################################
-        lightingPassShader_->setUnsignedInt("lights[0].type", 0);
-        lightingPassShader_->setVec3("lights[0].directionViewSpace", viewMtx * glm::vec4(-world.sunPosition_, 0.0f));
-        lightingPassShader_->setVec3("lights[0].ambient", world.sunLight_.color * world.sunLight_.phongVals.x);
-        lightingPassShader_->setVec3("lights[0].diffuse", world.sunLight_.color * world.sunLight_.phongVals.y);
-        lightingPassShader_->setVec3("lights[0].specular", world.sunLight_.color * world.sunLight_.phongVals.z);
-        lightingPassShader_->setUnsignedInt("lights[1].type", 2);
-        lightingPassShader_->setVec3("lights[1].positionViewSpace", viewMtx * glm::vec4(camera.position_, 1.0f));
-        lightingPassShader_->setVec3("lights[1].directionViewSpace", viewMtx * glm::vec4(camera.front_, 0.0f));
-        lightingPassShader_->setVec3("lights[1].ambient", world.spotLights_[0].color * world.spotLights_[0].phongVals.x);
-        lightingPassShader_->setVec3("lights[1].diffuse", world.spotLights_[0].color * world.spotLights_[0].phongVals.y);
-        lightingPassShader_->setVec3("lights[1].specular", world.spotLights_[0].color * world.spotLights_[0].phongVals.z);
-        lightingPassShader_->setVec3("lights[1].attenuationVals", world.spotLights_[0].attenuation);
-        lightingPassShader_->setVec2("lights[1].cutOff", world.spotLights_[0].cutOff);
-        for (size_t i = 0; i < world.pointLights_.size(); ++i) {
-            lightingPassShader_->setUnsignedInt("lights[" + to_string(i + 2) + "].type", 1);
-            lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].positionViewSpace", viewMtx * glm::vec4(glm::vec3(world.pointLights_[i].modelMtx[3]), 1.0f));
-            lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].ambient", world.pointLights_[i].color * world.pointLights_[i].phongVals.x);
-            lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].diffuse", world.pointLights_[i].color * world.pointLights_[i].phongVals.y);
-            lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].specular", world.pointLights_[i].color * world.pointLights_[i].phongVals.z);
-            lightingPassShader_->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", world.pointLights_[i].attenuation);
-        }
-        windowQuad_.drawGeometry();
-        
-        glEnable(GL_DEPTH_TEST);
-    } else {
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_ONE, GL_ONE);    // Lights are added together one at a time, so blending sums each color component.
-        
-        renderFBO_->bind();    // Render lighting (lighting pass).
-        glViewport(0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glm::mat4 viewMtx = camera.getViewMatrix();
-        
-        if (world.sunlightOn_) {
-            directionalLightShader_->use();
-            directionalLightShader_->setInt("texPosition", 0);
-            glActiveTexture(GL_TEXTURE0);
-            geometryFBO_->bindTexture(0);
-            directionalLightShader_->setInt("texNormal", 1);
-            glActiveTexture(GL_TEXTURE1);
-            geometryFBO_->bindTexture(1);
-            directionalLightShader_->setInt("texAlbedoSpec", 2);
-            glActiveTexture(GL_TEXTURE2);
-            geometryFBO_->bindTexture(2);
-            directionalLightShader_->setInt("texSSAO", 3);
-            if (config_.getSSAO()) {
-                glActiveTexture(GL_TEXTURE3);
-                ssaoBlurFBO_->bindTexture(0);
-            }
-            directionalLightShader_->setBool("applySSAO", config_.getSSAO());
-            for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {
-                directionalLightShader_->setInt("shadowMap[" + to_string(i) + "]", 4 + i);
-                glActiveTexture(GL_TEXTURE4 + i);
-                cascadedShadowFBO_[i]->bindTexture(0);
-                directionalLightShader_->setMat4("viewToLightSpace[" + to_string(i) + "]", shadowProjections_[i] * viewToLightSpace_);
-                directionalLightShader_->setFloat("shadowZEnds[" + to_string(i) + "]", shadowZBounds_[i + 1]);
-            }
-            directionalLightShader_->setVec3("lightDirectionVS", viewMtx * glm::vec4(-world.sunPosition_, 0.0f));
-            directionalLightShader_->setVec3("color", world.sunLight_.color);
-            directionalLightShader_->setVec3("phongVals", world.sunLight_.phongVals);
-            
-            windowQuad_.drawGeometry();
-        }
-        
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_GREATER);
-        glDepthMask(false);
-        glEnable(GL_STENCIL_TEST);
-        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);    // If stencil test and depth test pass (light volume occluded), set stencil value to glStencilFunc() ref value (prevents light from rendering at that spot).
-        
-        pointLightShader_->use();    // Draw scene point lights.
-        pointLightShader_->setInt("texPosition", 0);
-        glActiveTexture(GL_TEXTURE0);
-        geometryFBO_->bindTexture(0);
-        pointLightShader_->setInt("texNormal", 1);
-        glActiveTexture(GL_TEXTURE1);
-        geometryFBO_->bindTexture(1);
-        pointLightShader_->setInt("texAlbedoSpec", 2);
-        glActiveTexture(GL_TEXTURE2);
-        geometryFBO_->bindTexture(2);
-        pointLightShader_->setInt("texSSAO", 3);    // SSAO shouldn't be required in point lights or spotlights. ###########################################################
-        if (config_.getSSAO()) {
-            glActiveTexture(GL_TEXTURE3);
-            ssaoBlurFBO_->bindTexture(0);
-        }
-        pointLightShader_->setBool("applySSAO", config_.getSSAO());
-        pointLightShader_->setVec2("renderSize", renderFBO_->getBufferSize());
-        //world.lightSphere_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
-        for (size_t i = 0; i < world.pointLights_.size(); ++i) {
-            if (world.lightStates_[2] == 1) {
-                glClear(GL_STENCIL_BUFFER_BIT);    // First pass, render light mask (front face) for parts of the light volume that may be occluded.
-                nullLightShader_->use();
-                nullLightShader_->setMat4("modelMtx", world.pointLights_[i].modelMtx);
-                glStencilFunc(GL_ALWAYS, 1, 0xFF);
-                world.lightSphere_.drawGeometry();
-                
-                pointLightShader_->use();    // Second pass, render light volume (back face) where the light is occluded by geometry and not masked by first pass.
-                pointLightShader_->setMat4("modelMtx", world.pointLights_[i].modelMtx);
-                pointLightShader_->setVec3("color", world.pointLights_[i].color);
-                pointLightShader_->setVec3("phongVals", world.pointLights_[i].phongVals);
-                pointLightShader_->setVec3("attenuation", world.pointLights_[i].attenuation);
-                glCullFace(GL_FRONT);
-                glStencilFunc(GL_EQUAL, 0, 0xFF);
-                world.lightSphere_.drawGeometry();
-                glCullFace(GL_BACK);
-            }
-        }
-        
-        spotLightShader_->use();    // Draw scene spotlights.
-        spotLightShader_->setInt("texPosition", 0);
-        glActiveTexture(GL_TEXTURE0);
-        geometryFBO_->bindTexture(0);
-        spotLightShader_->setInt("texNormal", 1);
-        glActiveTexture(GL_TEXTURE1);
-        geometryFBO_->bindTexture(1);
-        spotLightShader_->setInt("texAlbedoSpec", 2);
-        glActiveTexture(GL_TEXTURE2);
-        geometryFBO_->bindTexture(2);
-        spotLightShader_->setInt("texSSAO", 3);
-        if (config_.getSSAO()) {
-            glActiveTexture(GL_TEXTURE3);
-            ssaoBlurFBO_->bindTexture(0);
-        }
-        spotLightShader_->setBool("applySSAO", config_.getSSAO());
-        spotLightShader_->setVec2("renderSize", renderFBO_->getBufferSize());
-        
-        glm::mat4 flashlightModelMtx = CommonMath::orientAt(camera.position_, camera.position_ + camera.front_, camera.up_);    // Orient the flashlight to the camera direction, and set scale based on the larger cutoff angle.
-        float coneX = World::calcLightRadius(world.spotLights_[0].color, world.spotLights_[0].attenuation);    // Length of the cone.
-        float coneY = sqrt(1 - world.spotLights_[0].cutOff.y * world.spotLights_[0].cutOff.y) / world.spotLights_[0].cutOff.y * coneX * 1.02f;    // Width of the cone computed from length and cutoff angle (the cosine of actual spotlight angle). Scales by a small bias so that border edges are not visible.
-        flashlightModelMtx = glm::scale(flashlightModelMtx, glm::vec3(coneY, coneY, coneX));
-        
-        //for (size_t i = 0; i < world.spotLights_.size(); ++i) {
-            if (world.flashlightOn_) {
-                glClear(GL_STENCIL_BUFFER_BIT);    // Same process used when drawing point lights.
-                nullLightShader_->use();
-                nullLightShader_->setMat4("modelMtx", flashlightModelMtx);
-                glStencilFunc(GL_ALWAYS, 1, 0xFF);
-                world.lightCone_.drawGeometry();
-                
-                spotLightShader_->use();
-                spotLightShader_->setMat4("modelMtx", flashlightModelMtx);
-                spotLightShader_->setVec3("color", world.spotLights_[0].color);
-                spotLightShader_->setVec3("phongVals", world.spotLights_[0].phongVals);
-                spotLightShader_->setVec3("attenuation", world.spotLights_[0].attenuation);
-                spotLightShader_->setVec2("cutOff", world.spotLights_[0].cutOff);
-                glCullFace(GL_FRONT);
-                glStencilFunc(GL_EQUAL, 0, 0xFF);
-                world.lightCone_.drawGeometry();
-                glCullFace(GL_BACK);
-            }
-        //}
-        
-        glDepthFunc(GL_LESS);
-        glDepthMask(true);
-        glDisable(GL_STENCIL_TEST);
-        glDisable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
+    directionalLightShader_->setBool("applyShadows", world.sunlightOn_);
+    directionalLightShader_->setVec3("lightDirectionVS", viewMtx * glm::vec4(-world.sunPosition_, 0.0f));
+    if (world.sunlightOn_) {
+        directionalLightShader_->setVec3("color", world.sunLight_.color);
+        directionalLightShader_->setVec3("phongVals", world.sunLight_.phongVals);
+    } else {
+        directionalLightShader_->setVec3("color", world.moonLight_.color);
+        directionalLightShader_->setVec3("phongVals", world.moonLight_.phongVals);
+    }
+    
+    windowQuad_.drawGeometry();
+    
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_GREATER);
+    glDepthMask(false);
+    glEnable(GL_STENCIL_TEST);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);    // If stencil test and depth test pass (light volume occluded), set stencil value to glStencilFunc() ref value (prevents light from rendering at that spot).
+    
+    pointLightShader_->use();    // Draw scene point lights.
+    pointLightShader_->setInt("texPosition", 0);
+    glActiveTexture(GL_TEXTURE0);
+    geometryFBO_->bindTexture(0);
+    pointLightShader_->setInt("texNormal", 1);
+    glActiveTexture(GL_TEXTURE1);
+    geometryFBO_->bindTexture(1);
+    pointLightShader_->setInt("texAlbedoSpec", 2);
+    glActiveTexture(GL_TEXTURE2);
+    geometryFBO_->bindTexture(2);
+    pointLightShader_->setInt("texSSAO", 3);    // SSAO shouldn't be required in point lights or spotlights. ###########################################################
+    if (config_.getSSAO()) {
+        glActiveTexture(GL_TEXTURE3);
+        ssaoBlurFBO_->bindTexture(0);
+    }
+    pointLightShader_->setBool("applySSAO", config_.getSSAO());
+    pointLightShader_->setVec2("renderSize", renderFBO_->getBufferSize());
+    //world.lightSphere_.drawGeometryInstanced(static_cast<unsigned int>(world.pointLights_.size()));
+    if (world.lampsOn_) {
+        for (size_t i = 0; i < world.pointLights_.size(); ++i) {
+            glClear(GL_STENCIL_BUFFER_BIT);    // First pass, render light mask (front face) for parts of the light volume that may be occluded.
+            nullLightShader_->use();
+            nullLightShader_->setMat4("modelMtx", world.pointLights_[i].modelMtx);
+            glStencilFunc(GL_ALWAYS, 1, 0xFF);
+            world.lightSphere_.drawGeometry();
+            
+            pointLightShader_->use();    // Second pass, render light volume (back face) where the light is occluded by geometry and not masked by first pass.
+            pointLightShader_->setMat4("modelMtx", world.pointLights_[i].modelMtx);
+            pointLightShader_->setVec3("color", world.pointLights_[i].color);
+            pointLightShader_->setVec3("phongVals", world.pointLights_[i].phongVals);
+            pointLightShader_->setVec3("attenuation", world.pointLights_[i].attenuation);
+            glCullFace(GL_FRONT);
+            glStencilFunc(GL_EQUAL, 0, 0xFF);
+            world.lightSphere_.drawGeometry();
+            glCullFace(GL_BACK);
+        }
+    }
+    
+    spotLightShader_->use();    // Draw scene spotlights.
+    spotLightShader_->setInt("texPosition", 0);
+    glActiveTexture(GL_TEXTURE0);
+    geometryFBO_->bindTexture(0);
+    spotLightShader_->setInt("texNormal", 1);
+    glActiveTexture(GL_TEXTURE1);
+    geometryFBO_->bindTexture(1);
+    spotLightShader_->setInt("texAlbedoSpec", 2);
+    glActiveTexture(GL_TEXTURE2);
+    geometryFBO_->bindTexture(2);
+    spotLightShader_->setInt("texSSAO", 3);
+    if (config_.getSSAO()) {
+        glActiveTexture(GL_TEXTURE3);
+        ssaoBlurFBO_->bindTexture(0);
+    }
+    spotLightShader_->setBool("applySSAO", config_.getSSAO());
+    spotLightShader_->setVec2("renderSize", renderFBO_->getBufferSize());
+    
+    glm::mat4 flashlightModelMtx = CommonMath::orientAt(camera.position_, camera.position_ + camera.front_, camera.up_);    // Orient the flashlight to the camera direction, and set scale based on the larger cutoff angle.
+    float coneX = World::calcLightRadius(world.spotLights_[0].color, world.spotLights_[0].attenuation);    // Length of the cone.
+    float coneY = sqrt(1 - world.spotLights_[0].cutOff.y * world.spotLights_[0].cutOff.y) / world.spotLights_[0].cutOff.y * coneX * 1.02f;    // Width of the cone computed from length and cutoff angle (the cosine of actual spotlight angle). Scales by a small bias so that border edges are not visible.
+    flashlightModelMtx = glm::scale(flashlightModelMtx, glm::vec3(coneY, coneY, coneX));
+    
+    //for (size_t i = 0; i < world.spotLights_.size(); ++i) {
+        if (world.flashlightOn_) {
+            glClear(GL_STENCIL_BUFFER_BIT);    // Same process used when drawing point lights.
+            nullLightShader_->use();
+            nullLightShader_->setMat4("modelMtx", flashlightModelMtx);
+            glStencilFunc(GL_ALWAYS, 1, 0xFF);
+            world.lightCone_.drawGeometry();
+            
+            spotLightShader_->use();
+            spotLightShader_->setMat4("modelMtx", flashlightModelMtx);
+            spotLightShader_->setVec3("color", world.spotLights_[0].color);
+            spotLightShader_->setVec3("phongVals", world.spotLights_[0].phongVals);
+            spotLightShader_->setVec3("attenuation", world.spotLights_[0].attenuation);
+            spotLightShader_->setVec2("cutOff", world.spotLights_[0].cutOff);
+            glCullFace(GL_FRONT);
+            glStencilFunc(GL_EQUAL, 0, 0xFF);
+            world.lightCone_.drawGeometry();
+            glCullFace(GL_BACK);
+        }
+    //}
+    
+    glDepthFunc(GL_LESS);
+    glDepthMask(true);
+    glDisable(GL_STENCIL_TEST);
+    glDisable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void Renderer::drawLamps(const Camera& camera, const World& world) {
     lampShader_->use();    // Draw lamps.
-    for (size_t i = 0; i < world.pointLights_.size(); ++i) {
-        if (world.lightStates_[2] == 1) {
+    if (world.lampsOn_) {
+        for (size_t i = 0; i < world.pointLights_.size(); ++i) {
             lampShader_->setVec3("color", world.pointLights_[i].color);
             world.lightCube_.drawGeometry(*lampShader_, world.pointLights_[i].modelMtx);
         }
