@@ -220,7 +220,6 @@ Renderer::~Renderer() {
     geometryShader_.reset();
     geometryNormalMapShader_.reset();
     geometrySkinningShader_.reset();
-    lightingPassShader_.reset();
     skyboxShader_.reset();
     lampShader_.reset();
     shadowMapShader_.reset();
@@ -439,8 +438,6 @@ void Renderer::setupShaders() {
     
     geometrySkinningShader_ = make_unique<Shader>("shaders/geometrySkinning.v.glsl", "shaders/geometryNormalMap.f.glsl");
     geometrySkinningShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
-    
-    lightingPassShader_ = make_unique<Shader>("shaders/effects/postProcess.v.glsl", "shaders/effects/lightingPass.f.glsl");
     
     skyboxShader_ = make_unique<Shader>("shaders/skybox.v.glsl", "shaders/skybox.f.glsl");
     skyboxShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
@@ -735,7 +732,7 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
     pointLightShader_->setInt("texAlbedoSpec", 2);
     glActiveTexture(GL_TEXTURE2);
     geometryFBO_->bindTexture(2);
-    pointLightShader_->setInt("texSSAO", 3);    // SSAO shouldn't be required in point lights or spotlights. ###########################################################
+    pointLightShader_->setInt("texSSAO", 3);
     if (config_.getSSAO()) {
         glActiveTexture(GL_TEXTURE3);
         ssaoBlurFBO_->bindTexture(0);
