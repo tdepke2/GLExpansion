@@ -9,11 +9,12 @@ Additions:
     * Add better way to handle animations and transition between them.
 
 Fixes:
+    * Need a better way to handle GL state calls, possibly with a class that manages them and only switches when necessary.
+    * No need for the position map in g-buffer. http://ogldev.atspace.co.uk/www/tutorial46/tutorial46.html  https://mynameismjp.wordpress.com/2010/09/05/position-from-depth-3/
+    * Look into reversing the z-buffer for better precision across scene. https://outerra.blogspot.com/2009/08/logarithmic-z-buffer.html
     * Issue with pinpoint holes in geometry, possibly a triangle rasterization issue or related to skybox render.
     * Should use more interface blocks https://learnopengl.com/Advanced-OpenGL/Advanced-GLSL
     * Transformable should just store one quaternion for rotation instead of Euler angles (same for Camera probably).
-    * No need for the position map in g-buffer.
-    * Look into reversing the z-buffer for better precision across scene. https://outerra.blogspot.com/2009/08/logarithmic-z-buffer.html
     * Need a better way to render models so that gl calls are minimized.
         - Possibly a scene graph with dirty flag optimization, or other method to group draw calls by shader/materials.
     * Renderer needs a better interface so that you can draw, for example, nothing.
