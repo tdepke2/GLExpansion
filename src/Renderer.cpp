@@ -226,6 +226,7 @@ Renderer::~Renderer() {
     shadowMapSkinningShader_.reset();
     debugVectorsShader_.reset();
     forwardRenderShader_.reset();
+    forwardPBRShader_.reset();
     
     nullLightShader_.reset();
     directionalLightShader_.reset();
@@ -283,7 +284,7 @@ void Renderer::drawWorld(const Camera& camera, const World& world) {
     applyBloom();
     drawPostProcessing();*/
     forwardLightingPass(camera, world);
-    drawGUI();
+    //drawGUI();
     endFrame();
 }
 
@@ -456,6 +457,9 @@ void Renderer::setupShaders() {
     
     forwardRenderShader_ = make_unique<Shader>("shaders/forwardRender.v.glsl", "shaders/forwardRender.f.glsl");
     forwardRenderShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
+    
+    forwardPBRShader_ = make_unique<Shader>("shaders/forwardRender.v.glsl", "shaders/forwardPBR.f.glsl");
+    forwardPBRShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
     
     nullLightShader_ = make_unique<Shader>("shaders/effects/nullLight.v.glsl", "shaders/effects/nullLight.f.glsl");
     nullLightShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
@@ -905,13 +909,22 @@ void Renderer::drawPostProcessing() {
 
 void Renderer::forwardLightingPass(const Camera& camera, const World& world) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glViewport(0, 0, windowSize_.x, windowSize_.y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glm::mat4 viewMtx = camera.getViewMatrix();
     glm::mat4 projectionMtx = glm::perspective(glm::radians(camera.fov_), static_cast<float>(windowSize_.x) / windowSize_.y, NEAR_PLANE, FAR_PLANE);
     
-    forwardRenderShader_->use();
-    constexpr unsigned int NUM_LIGHTS = 64;
+    //Shader* shader = forwardRenderShader_.get();
+    Shader* shader = forwardPBRShader_.get();
+    shader->use();
+    
+    shader->setVec3("albedo", glm::vec3(0.5f, 0.0f, 0.0f));
+    shader->setFloat("metallic", 0.5);
+    shader->setFloat("roughness", 0.5);
+    shader->setFloat("ambientOcclusion", 1.0);
+    
+    /*constexpr unsigned int NUM_LIGHTS = 64;
     unsigned int lightStates[NUM_LIGHTS];
     lightStates[0] = (world.sunlightOn_ ? 1 : 0);
     lightStates[1] = (world.flashlightOn_ ? 1 : 0);
@@ -919,41 +932,61 @@ void Renderer::forwardLightingPass(const Camera& camera, const World& world) {
     for (size_t i = 0; i < world.pointLights_.size(); ++i) {
         lightStates[i + 2] = (world.lampsOn_ ? 1 : 0);
     }
-    forwardRenderShader_->setUnsignedIntArray("lightStates", NUM_LIGHTS, lightStates);
-    forwardRenderShader_->setUnsignedInt("lights[0].type", 0);
-    forwardRenderShader_->setVec3("lights[0].directionViewSpace", viewMtx * glm::vec4(-world.sunPosition_, 0.0f));
-    forwardRenderShader_->setVec3("lights[0].ambient", world.sunLight_.color * world.sunLight_.phongVals.x);
-    forwardRenderShader_->setVec3("lights[0].diffuse", world.sunLight_.color * world.sunLight_.phongVals.y);
-    forwardRenderShader_->setVec3("lights[0].specular", world.sunLight_.color * world.sunLight_.phongVals.z);
-    forwardRenderShader_->setUnsignedInt("lights[1].type", 2);
-    forwardRenderShader_->setVec3("lights[1].positionViewSpace", viewMtx * glm::vec4(camera.position_, 1.0f));
-    forwardRenderShader_->setVec3("lights[1].directionViewSpace", viewMtx * glm::vec4(camera.front_, 0.0f));
-    forwardRenderShader_->setVec3("lights[1].ambient", world.spotLights_[0].color * world.spotLights_[0].phongVals.x);
-    forwardRenderShader_->setVec3("lights[1].diffuse", world.spotLights_[0].color * world.spotLights_[0].phongVals.y);
-    forwardRenderShader_->setVec3("lights[1].specular", world.spotLights_[0].color * world.spotLights_[0].phongVals.z);
-    forwardRenderShader_->setVec3("lights[1].attenuationVals", world.spotLights_[0].attenuation);
-    forwardRenderShader_->setVec2("lights[1].cutOff", world.spotLights_[0].cutOff);
+    shader->setUnsignedIntArray("lightStates", NUM_LIGHTS, lightStates);
+    shader->setUnsignedInt("lights[0].type", 0);
+    shader->setVec3("lights[0].directionViewSpace", viewMtx * glm::vec4(-world.sunPosition_, 0.0f));
+    shader->setVec3("lights[0].ambient", world.sunLight_.color * world.sunLight_.phongVals.x);
+    shader->setVec3("lights[0].diffuse", world.sunLight_.color * world.sunLight_.phongVals.y);
+    shader->setVec3("lights[0].specular", world.sunLight_.color * world.sunLight_.phongVals.z);
+    shader->setUnsignedInt("lights[1].type", 2);
+    shader->setVec3("lights[1].positionViewSpace", viewMtx * glm::vec4(camera.position_, 1.0f));
+    shader->setVec3("lights[1].directionViewSpace", viewMtx * glm::vec4(camera.front_, 0.0f));
+    shader->setVec3("lights[1].ambient", world.spotLights_[0].color * world.spotLights_[0].phongVals.x);
+    shader->setVec3("lights[1].diffuse", world.spotLights_[0].color * world.spotLights_[0].phongVals.y);
+    shader->setVec3("lights[1].specular", world.spotLights_[0].color * world.spotLights_[0].phongVals.z);
+    shader->setVec3("lights[1].attenuationVals", world.spotLights_[0].attenuation);
+    shader->setVec2("lights[1].cutOff", world.spotLights_[0].cutOff);
     for (size_t i = 0; i < world.pointLights_.size(); ++i) {
-        forwardRenderShader_->setUnsignedInt("lights[" + to_string(i + 2) + "].type", 1);
-        forwardRenderShader_->setVec3("lights[" + to_string(i + 2) + "].positionViewSpace", viewMtx * glm::vec4(glm::vec3(world.pointLights_[i].modelMtx[3]), 1.0f));
-        forwardRenderShader_->setVec3("lights[" + to_string(i + 2) + "].ambient", world.pointLights_[i].color * world.pointLights_[i].phongVals.x);
-        forwardRenderShader_->setVec3("lights[" + to_string(i + 2) + "].diffuse", world.pointLights_[i].color * world.pointLights_[i].phongVals.y);
-        forwardRenderShader_->setVec3("lights[" + to_string(i + 2) + "].specular", world.pointLights_[i].color * world.pointLights_[i].phongVals.z);
-        forwardRenderShader_->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", world.pointLights_[i].attenuation);
+        shader->setUnsignedInt("lights[" + to_string(i + 2) + "].type", 1);
+        shader->setVec3("lights[" + to_string(i + 2) + "].positionViewSpace", viewMtx * glm::vec4(glm::vec3(world.pointLights_[i].modelMtx[3]), 1.0f));
+        shader->setVec3("lights[" + to_string(i + 2) + "].ambient", world.pointLights_[i].color * world.pointLights_[i].phongVals.x);
+        shader->setVec3("lights[" + to_string(i + 2) + "].diffuse", world.pointLights_[i].color) * world.pointLights_[i].phongVals.y);
+        shader->setVec3("lights[" + to_string(i + 2) + "].specular", world.pointLights_[i].color * world.pointLights_[i].phongVals.z);
+        shader->setVec3("lights[" + to_string(i + 2) + "].attenuationVals", world.pointLights_[i].attenuation);
+    }*/
+    
+    constexpr unsigned int NUM_LIGHTS = 4;
+    unsigned int lightStates[NUM_LIGHTS];
+    for (size_t i = 0; i < NUM_LIGHTS; ++i) {
+        lightStates[i] = (world.lampsOn_ ? 1 : 0);
+    }
+    shader->setUnsignedIntArray("lightStates", NUM_LIGHTS, lightStates);
+    glm::vec3 lightPositions[] = {
+        glm::vec3(-10.0f,  10.0f, 10.0f),
+        glm::vec3( 10.0f,  10.0f, 10.0f),
+        glm::vec3(-10.0f, -10.0f, 10.0f),
+        glm::vec3( 10.0f, -10.0f, 10.0f)
+    };
+    glm::vec3 lightColors[] = {
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f)
+    };
+    for (size_t i = 0; i < NUM_LIGHTS; ++i) {
+        shader->setUnsignedInt("lights[" + to_string(i) + "].type", 1);
+        shader->setVec3("lights[" + to_string(i) + "].positionViewSpace", viewMtx * glm::vec4(lightPositions[i], 1.0f));
+        shader->setVec3("lights[" + to_string(i) + "].diffuse", lightColors[i]);
     }
     
     renderScene2(camera, world, viewMtx, projectionMtx);
     
     lampShader_->use();    // Draw lamps.
     if (world.lampsOn_) {
-        for (size_t i = 0; i < world.pointLights_.size(); ++i) {
-            lampShader_->setVec3("color", world.pointLights_[i].color);
-            world.lightCube_.drawGeometry(*lampShader_, world.pointLights_[i].modelMtx);
+        for (size_t i = 0; i < NUM_LIGHTS; ++i) {
+            lampShader_->setVec3("color", lightColors[i]);
+            world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), lightPositions[i]), glm::vec3(100.0f)));
         }
-    }
-    if (world.sunlightOn_) {
-        lampShader_->setVec3("color", glm::vec3(1.0f, 1.0f, 0.0f));    // Draw the sun.
-        world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), world.sunPosition_ + camera.position_), glm::vec3(50.0f)));
     }
     
     debugVectorsShader_->use();
@@ -963,13 +996,13 @@ void Renderer::forwardLightingPass(const Camera& camera, const World& world) {
     glDepthFunc(GL_LEQUAL);
     glDisable(GL_CULL_FACE);
     
-    skyboxShader_->use();    // Draw the skybox.
+    /*skyboxShader_->use();    // Draw the skybox.
     skyboxShader_->setInt("skybox", 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxCubemap_);
-    skybox_.drawGeometry();
+    skybox_.drawGeometry();*/
     
-    glDisable(GL_DEPTH_TEST);
+    //glDisable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glEnable(GL_CULL_FACE);
 }
@@ -1101,54 +1134,28 @@ void Renderer::renderScene(const Camera& camera, const World& world, const glm::
 }
 
 void Renderer::renderScene2(const Camera& camera, const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx) {
-    Shader* shader;
     glBindBuffer(GL_UNIFORM_BUFFER, viewProjectionMtxUBO_);    // Update uniform buffer.
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(viewMtx));
     glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projectionMtx));
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
     
-    shader = forwardRenderShader_.get();
+    //Shader* shader = forwardRenderShader_.get();
+    Shader* shader = forwardPBRShader_.get();
     shader->use();
-    shader->setInt("texDiffuse", 0);
-    shader->setInt("texSpecular", 1);
+    //shader->setInt("texDiffuse", 0);
+    //shader->setInt("texSpecular", 1);
     shader->setInt("texNormal", 2);
-    //shader->setFloat("material.shininess", 64.0f);
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, blueTexture_);
     
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, cubeDiffuseMap_);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, cubeSpecularMap_);
-    vector<glm::vec3> cubePositions = {
-        glm::vec3( 0.0f,  0.0f,  0.0f),
-        glm::vec3( 2.0f,  5.0f, -15.0f),
-        glm::vec3(-1.5f, -2.2f, -2.5f),
-        glm::vec3(-3.8f, -2.0f, -12.3f),
-        glm::vec3( 2.4f, -0.4f, -3.5f),
-        glm::vec3(-1.7f,  3.0f, -7.5f),
-        glm::vec3( 1.3f, -2.0f, -2.5f),
-        glm::vec3( 1.5f,  2.0f, -2.5f),
-        glm::vec3( 1.5f,  0.2f, -1.5f),
-        glm::vec3(-1.3f,  1.0f, -1.5f)
-    };
-    for (unsigned int i = 0; i < cubePositions.size(); ++i) {
-        glm::mat4 modelMtx = glm::translate(glm::mat4(1.0f), cubePositions[i]);
-        float angle = 20.0f * i;
-        modelMtx = glm::rotate(modelMtx, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-        world.cube1_.drawGeometry(*shader, modelMtx);
+    for (int row = 0; row < 7; ++row) {
+        shader->setFloat("metallic", row / 7.0f);
+        for (int col = 0; col < 7; ++col) {
+            shader->setFloat("roughness", glm::clamp(col / 7.0f, 0.05f, 1.0f));
+            glm::mat4 modelMtx = glm::translate(glm::mat4(1.0f), glm::vec3((col - 7.0f / 2.0f) * 2.5f, (row - 7.0f / 2.0f) * 2.5f, 0.0f));
+            world.sphere1_.drawGeometry(*shader, modelMtx);
+        }
     }
-    world.cube1_.drawGeometry(*shader, glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0.5f, 3.0f)));
-    
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, woodTexture_);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, woodTexture_);
-    world.cube1_.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.1f, 0.0f)), glm::vec3(15.0f, 0.2f, 15.0f)));
-    
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, blackTexture_);
-    world.sceneTest_.draw(*shader, world.sceneTestTransform_.getTransform());
 }
 
 float Renderer::randomFloat(float min, float max) {

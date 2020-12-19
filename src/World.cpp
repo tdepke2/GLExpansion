@@ -22,6 +22,7 @@ World::World() :
     lightSphere_.generateSphere(1.0f, 16, 8);
     lightCone_.generateCylinder(0.0f, 1.0f, 1.0f, 16, 1, true);
     cube1_.generateCube();
+    sphere1_.generateSphere(1.0f, 128, 64);
     
     //sceneTest_.loadFile("models/boot_camp/boot_camp.obj");
     //sceneTestTransform_.setScale(glm::vec3(0.025f, 0.025f, 0.025f));
@@ -41,7 +42,8 @@ World::World() :
     modelTestBoneTransforms_.resize(modelTest_.boneOffsetMatrices_.size(), glm::mat4(1.0f));
     
     sunLight_.color = glm::vec3(1.0f, 1.0f, 1.0f);
-    sunLight_.phongVals = glm::vec3(0.01f, 0.4f, 0.5f);
+    //sunLight_.phongVals = glm::vec3(0.01f, 0.4f, 0.5f);
+    sunLight_.phongVals = glm::vec3(0.2f, 0.5f, 0.6f);
     moonLight_.color = glm::vec3(1.0f, 1.0f, 1.0f);
     moonLight_.phongVals = glm::vec3(0.0001f, 0.0f, 0.0f);
     
