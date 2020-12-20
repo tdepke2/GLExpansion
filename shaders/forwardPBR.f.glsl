@@ -8,13 +8,11 @@ const uint SPOT_LIGHT = 2u;
 const float AMBIENT = 0.03;
 const float GAMMA = 2.2;
 
-uniform sampler2D texDiffuse;
-uniform sampler2D texSpecular;
+uniform sampler2D texAlbedo;
+uniform sampler2D texMetallic;
 uniform sampler2D texNormal;
-uniform vec3 albedo;
-uniform float metallic;
-uniform float roughness;
-uniform float ambientOcclusion;
+uniform sampler2D texRoughness;
+uniform sampler2D texAO;
 uniform bool lightStates[NUM_LIGHTS];
 
 struct Light {
@@ -59,7 +57,11 @@ vec3 fresnelSchlick(float dotHV, vec3 F0) {
 }
 
 void main() {
+    vec3 albedo = texture(texAlbedo, fTexCoords).rgb;
+    float metallic = texture(texMetallic, fTexCoords).r;
     vec3 N = normalize(fTBNMtx * (texture(texNormal, fTexCoords).rgb * 2.0 - 1.0));
+    float roughness = texture(texRoughness, fTexCoords).r;
+    float ambientOcclusion = texture(texAO, fTexCoords).r;
     vec3 V = normalize(-fPosition);
     float dotNV = max(dot(N, V), 0.0);
     

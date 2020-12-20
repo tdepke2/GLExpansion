@@ -412,6 +412,10 @@ void Renderer::setupTextures() {
     brickDiffuseMap_ = loadTexture("textures/grid512.bmp", true);
     brickNormalMap_ = loadTexture("textures/bricks2_normal.jpg", false);
     monitorGridTexture_ = loadTexture("textures/monitorGrid.png", true);
+    rustedIronAlbedo_ = loadTexture("textures/rusted_iron/rustediron2_basecolor.png", true);
+    rustedIronNormal_ = loadTexture("textures/rusted_iron/rustediron2_normal.png", false);
+    rustedIronMetallic_ = loadTexture("textures/rusted_iron/rustediron2_metallic.png", false);
+    rustedIronRoughness_ = loadTexture("textures/rusted_iron/rustediron2_roughness.png", false);
     
     glGenTextures(1, &ssaoNoiseTexture_);
     glBindTexture(GL_TEXTURE_2D, ssaoNoiseTexture_);
@@ -919,10 +923,8 @@ void Renderer::forwardLightingPass(const Camera& camera, const World& world) {
     Shader* shader = forwardPBRShader_.get();
     shader->use();
     
-    shader->setVec3("albedo", glm::vec3(0.5f, 0.0f, 0.0f));
-    shader->setFloat("metallic", 0.5);
-    shader->setFloat("roughness", 0.5);
-    shader->setFloat("ambientOcclusion", 1.0);
+    //shader->setVec3("albedo", glm::vec3(0.5f, 0.0f, 0.0f));
+    //shader->setFloat("ambientOcclusion", 1.0);
     
     /*constexpr unsigned int NUM_LIGHTS = 64;
     unsigned int lightStates[NUM_LIGHTS];
@@ -1144,14 +1146,30 @@ void Renderer::renderScene2(const Camera& camera, const World& world, const glm:
     shader->use();
     //shader->setInt("texDiffuse", 0);
     //shader->setInt("texSpecular", 1);
+    //shader->setInt("texNormal", 2);
+    //glActiveTexture(GL_TEXTURE2);
+    //glBindTexture(GL_TEXTURE_2D, blueTexture_);
+    
+    shader->setInt("texAlbedo", 0);
+    shader->setInt("texMetallic", 1);
     shader->setInt("texNormal", 2);
+    shader->setInt("texRoughness", 3);
+    shader->setInt("texAO", 4);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, rustedIronAlbedo_);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, rustedIronMetallic_);
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, blueTexture_);
+    glBindTexture(GL_TEXTURE_2D, rustedIronNormal_);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, rustedIronRoughness_);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, whiteTexture_);
     
     for (int row = 0; row < 7; ++row) {
-        shader->setFloat("metallic", row / 7.0f);
+        //shader->setFloat("metallic", row / 7.0f);
         for (int col = 0; col < 7; ++col) {
-            shader->setFloat("roughness", glm::clamp(col / 7.0f, 0.05f, 1.0f));
+            //shader->setFloat("roughness", glm::clamp(col / 7.0f, 0.05f, 1.0f));
             glm::mat4 modelMtx = glm::translate(glm::mat4(1.0f), glm::vec3((col - 7.0f / 2.0f) * 2.5f, (row - 7.0f / 2.0f) * 2.5f, 0.0f));
             world.sphere1_.drawGeometry(*shader, modelMtx);
         }

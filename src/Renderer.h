@@ -72,7 +72,7 @@ class Renderer {
     unique_ptr<Shader> textShader_, shapeShader_;
     unique_ptr<Framebuffer> geometryFBO_, renderFBO_, cascadedShadowFBO_[NUM_CASCADED_SHADOWS];
     unique_ptr<Framebuffer> bloom1FBO_, bloom2FBO_, ssaoFBO_, ssaoBlurFBO_;
-    unsigned int blackTexture_, whiteTexture_, blueTexture_, cubeDiffuseMap_, cubeSpecularMap_, woodTexture_, skyboxCubemap_, brickDiffuseMap_, brickNormalMap_, ssaoNoiseTexture_, monitorGridTexture_;
+    unsigned int blackTexture_, whiteTexture_, blueTexture_, cubeDiffuseMap_, cubeSpecularMap_, woodTexture_, skyboxCubemap_, brickDiffuseMap_, brickNormalMap_, ssaoNoiseTexture_, monitorGridTexture_, rustedIronAlbedo_, rustedIronNormal_, rustedIronMetallic_, rustedIronRoughness_;
     unsigned int viewProjectionMtxUBO_;
     Mesh windowQuad_, skybox_;
     float shadowZBounds_[NUM_CASCADED_SHADOWS + 1];
