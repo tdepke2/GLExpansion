@@ -83,6 +83,37 @@ unsigned int Renderer::loadTexture(const string& filename, bool gammaCorrection,
     return texHandle;
 }
 
+unsigned int Renderer::loadTextureHDR(const string& filename, bool flip) {
+    string textureName = filename + (flip ? "-f" : "");
+    auto findResult = loadedTextures_.find(textureName);
+    if (findResult != loadedTextures_.end()) {
+        return findResult->second;
+    }
+    
+    stbi_set_flip_vertically_on_load(flip);
+    //cout << "Loading texture \"" << textureName << "\".\n";
+    unsigned int texHandle;
+    glGenTextures(1, &texHandle);
+    glBindTexture(GL_TEXTURE_2D, texHandle);
+    int width, height, numChannels = 1;
+    float* imageData = stbi_loadf(filename.c_str(), &width, &height, &numChannels, 0);
+    
+    if (imageData) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, imageData);
+        
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    } else {
+        cout << "Error: Unable to load texture.\n";
+    }
+    stbi_image_free(imageData);
+    
+    loadedTextures_[textureName] = texHandle;
+    return texHandle;
+}
+
 unsigned int Renderer::loadCubemap(const string& filename, bool gammaCorrection, bool flip) {
     string textureName = filename + (gammaCorrection ? "-g" : "") + (flip ? "-f" : "");
     auto findResult = loadedTextures_.find(textureName);
@@ -412,6 +443,19 @@ void Renderer::setupTextures() {
     brickDiffuseMap_ = loadTexture("textures/grid512.bmp", true);
     brickNormalMap_ = loadTexture("textures/bricks2_normal.jpg", false);
     monitorGridTexture_ = loadTexture("textures/monitorGrid.png", true);
+    
+    skyboxHDRTexture_ = loadTextureHDR("textures/newport_loft.hdr");
+    glGenTextures(1, &skyboxHDRCubemap_);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxHDRCubemap_);
+    for (unsigned int i = 0; i < 6; ++i) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    
     rustedIronAlbedo_ = loadTexture("textures/rusted_iron/rustediron2_basecolor.png", true);
     rustedIronNormal_ = loadTexture("textures/rusted_iron/rustediron2_normal.png", false);
     rustedIronMetallic_ = loadTexture("textures/rusted_iron/rustediron2_metallic.png", false);
@@ -506,6 +550,8 @@ void Renderer::setupShaders() {
     textShader_ = make_unique<Shader>("shaders/ui/shape.v.glsl", "shaders/ui/text.f.glsl");
     
     shapeShader_ = make_unique<Shader>("shaders/ui/shape.v.glsl", "shaders/ui/shape.f.glsl");
+    
+    equirectToCubeShader_ = make_unique<Shader>("shaders/pbr/equirectToCube.v.glsl", "shaders/pbr/equirectToCube.f.glsl");
 }
 
 void Renderer::setupBuffers() {
@@ -564,6 +610,40 @@ void Renderer::setupRender() {
     windowQuad_.generateMesh(move(windowQuadVertices), move(windowQuadIndices));
     
     skybox_.generateCube(2.0f);
+    
+    Framebuffer captureHDREnvironmentFBO(glm::ivec2(512, 512));    // Create a temporary FBO to render the HDR skybox to a cubemap.
+    captureHDREnvironmentFBO.attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT24);
+    
+    glm::mat4 captureViews[] = {
+        {{0.0f, 0.0f, -1.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, { 1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // posx
+        {{0.0f, 0.0f,  1.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // negx
+        
+        {{ 1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // posy
+        {{ 1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f,  1.0f, 0.0f}, {0.0f,  1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // negy
+        
+        {{ 1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {0.0f, 0.0f,  1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // posz
+        {{-1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}}     // negz
+    };
+    glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    
+    glDisable(GL_CULL_FACE);
+    
+    equirectToCubeShader_->use();
+    equirectToCubeShader_->setMat4("projectionMtx", captureProjection);
+    equirectToCubeShader_->setInt("texEquirectangular", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, skyboxHDRTexture_);
+    glViewport(0, 0, 512, 512);
+    captureHDREnvironmentFBO.bind();
+    for (unsigned int i = 0; i < 6; ++i) {
+        equirectToCubeShader_->setMat4("viewMtx", captureViews[i]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, skyboxHDRCubemap_, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        skybox_.drawGeometry();
+    }
+    
+    glEnable(GL_CULL_FACE);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Renderer::beginFrame(const World& world) {
@@ -998,11 +1078,11 @@ void Renderer::forwardLightingPass(const Camera& camera, const World& world) {
     glDepthFunc(GL_LEQUAL);
     glDisable(GL_CULL_FACE);
     
-    /*skyboxShader_->use();    // Draw the skybox.
+    skyboxShader_->use();    // Draw the skybox.
     skyboxShader_->setInt("skybox", 0);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxCubemap_);
-    skybox_.drawGeometry();*/
+    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxHDRCubemap_);
+    skybox_.drawGeometry();
     
     //glDisable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);

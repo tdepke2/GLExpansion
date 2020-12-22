@@ -47,6 +47,7 @@ class Renderer {
     
     static GLenum glCheckError_(const char* file, int line);    // Error checking, https://learnopengl.com/In-Practice/Debugging
     static unsigned int loadTexture(const string& filename, bool gammaCorrection, bool flip = true);    // consider changing to const char * for performance lookups. ##############################################
+    static unsigned int loadTextureHDR(const string& filename, bool flip = true);
     static unsigned int loadCubemap(const string& filename, bool gammaCorrection, bool flip = false);
     static unsigned int generateTexture(float r, float g, float b, float a = 1.0f);
     Renderer(mt19937* randNumGenerator);
@@ -70,9 +71,11 @@ class Renderer {
     unique_ptr<Shader> geometryShader_, geometryNormalMapShader_, geometrySkinningShader_, skyboxShader_, lampShader_, shadowMapShader_, shadowMapSkinningShader_, debugVectorsShader_, forwardRenderShader_, forwardPBRShader_;
     unique_ptr<Shader> nullLightShader_, directionalLightShader_, pointLightShader_, spotLightShader_, postProcessShader_, bloomShader_, gaussianBlurShader_, ssaoShader_, ssaoBlurShader_;
     unique_ptr<Shader> textShader_, shapeShader_;
+    unique_ptr<Shader> equirectToCubeShader_;
     unique_ptr<Framebuffer> geometryFBO_, renderFBO_, cascadedShadowFBO_[NUM_CASCADED_SHADOWS];
     unique_ptr<Framebuffer> bloom1FBO_, bloom2FBO_, ssaoFBO_, ssaoBlurFBO_;
-    unsigned int blackTexture_, whiteTexture_, blueTexture_, cubeDiffuseMap_, cubeSpecularMap_, woodTexture_, skyboxCubemap_, brickDiffuseMap_, brickNormalMap_, ssaoNoiseTexture_, monitorGridTexture_, rustedIronAlbedo_, rustedIronNormal_, rustedIronMetallic_, rustedIronRoughness_;
+    unsigned int blackTexture_, whiteTexture_, blueTexture_, cubeDiffuseMap_, cubeSpecularMap_, woodTexture_, skyboxCubemap_, brickDiffuseMap_, brickNormalMap_, ssaoNoiseTexture_, monitorGridTexture_;
+    unsigned int skyboxHDRTexture_, skyboxHDRCubemap_, rustedIronAlbedo_, rustedIronNormal_, rustedIronMetallic_, rustedIronRoughness_;
     unsigned int viewProjectionMtxUBO_;
     Mesh windowQuad_, skybox_;
     float shadowZBounds_[NUM_CASCADED_SHADOWS + 1];

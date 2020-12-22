@@ -11,7 +11,7 @@ out vec3 fTexCoords;
 
 void main() {
     fTexCoords = vPosition;
-    fTexCoords.x = -fTexCoords.x;
+    fTexCoords.z = -fTexCoords.z;    // Cubemaps operate in a left-handed coordinate system.
     
     vec4 position = projectionMtx * vec4(mat3(viewMtx) * vPosition, 1.0);
     gl_Position = position.xyww;
