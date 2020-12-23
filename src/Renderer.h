@@ -71,11 +71,11 @@ class Renderer {
     unique_ptr<Shader> geometryShader_, geometryNormalMapShader_, geometrySkinningShader_, skyboxShader_, lampShader_, shadowMapShader_, shadowMapSkinningShader_, debugVectorsShader_, forwardRenderShader_, forwardPBRShader_;
     unique_ptr<Shader> nullLightShader_, directionalLightShader_, pointLightShader_, spotLightShader_, postProcessShader_, bloomShader_, gaussianBlurShader_, ssaoShader_, ssaoBlurShader_;
     unique_ptr<Shader> textShader_, shapeShader_;
-    unique_ptr<Shader> equirectToCubeShader_;
+    unique_ptr<Shader> equirectToCubeShader_, radianceConvolutionShader_;
     unique_ptr<Framebuffer> geometryFBO_, renderFBO_, cascadedShadowFBO_[NUM_CASCADED_SHADOWS];
     unique_ptr<Framebuffer> bloom1FBO_, bloom2FBO_, ssaoFBO_, ssaoBlurFBO_;
     unsigned int blackTexture_, whiteTexture_, blueTexture_, cubeDiffuseMap_, cubeSpecularMap_, woodTexture_, skyboxCubemap_, brickDiffuseMap_, brickNormalMap_, ssaoNoiseTexture_, monitorGridTexture_;
-    unsigned int skyboxHDRTexture_, skyboxHDRCubemap_, rustedIronAlbedo_, rustedIronNormal_, rustedIronMetallic_, rustedIronRoughness_;
+    unsigned int skyboxHDRTexture_, skyboxHDRCubemap_, irradianceCubemap_, rustedIronAlbedo_, rustedIronNormal_, rustedIronMetallic_, rustedIronRoughness_;
     unsigned int viewProjectionMtxUBO_;
     Mesh windowQuad_, skybox_;
     float shadowZBounds_[NUM_CASCADED_SHADOWS + 1];

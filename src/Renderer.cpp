@@ -271,6 +271,9 @@ Renderer::~Renderer() {
     textShader_.reset();
     shapeShader_.reset();
     
+    equirectToCubeShader_.reset();
+    radianceConvolutionShader_.reset();
+    
     geometryFBO_.reset();
     renderFBO_.reset();
     for (unsigned int i = 0; i < NUM_CASCADED_SHADOWS; ++i) {
@@ -444,11 +447,23 @@ void Renderer::setupTextures() {
     brickNormalMap_ = loadTexture("textures/bricks2_normal.jpg", false);
     monitorGridTexture_ = loadTexture("textures/monitorGrid.png", true);
     
-    skyboxHDRTexture_ = loadTextureHDR("textures/newport_loft.hdr");
+    skyboxHDRTexture_ = loadTextureHDR("textures/Alexs_Apt_2k.hdr");//newport_loft.hdr");
+    
     glGenTextures(1, &skyboxHDRCubemap_);
     glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxHDRCubemap_);
     for (unsigned int i = 0; i < 6; ++i) {
         glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    
+    glGenTextures(1, &irradianceCubemap_);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap_);
+    for (unsigned int i = 0; i < 6; ++i) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, nullptr);
     }
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -551,7 +566,9 @@ void Renderer::setupShaders() {
     
     shapeShader_ = make_unique<Shader>("shaders/ui/shape.v.glsl", "shaders/ui/shape.f.glsl");
     
-    equirectToCubeShader_ = make_unique<Shader>("shaders/pbr/equirectToCube.v.glsl", "shaders/pbr/equirectToCube.f.glsl");
+    equirectToCubeShader_ = make_unique<Shader>("shaders/pbr/cubemap.v.glsl", "shaders/pbr/equirectToCube.f.glsl");
+    
+    radianceConvolutionShader_ = make_unique<Shader>("shaders/pbr/cubemap.v.glsl", "shaders/pbr/radianceConvolution.f.glsl");
 }
 
 void Renderer::setupBuffers() {
@@ -611,33 +628,48 @@ void Renderer::setupRender() {
     
     skybox_.generateCube(2.0f);
     
-    Framebuffer captureHDREnvironmentFBO(glm::ivec2(512, 512));    // Create a temporary FBO to render the HDR skybox to a cubemap.
-    captureHDREnvironmentFBO.attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT24);
+    Framebuffer captureFBO(glm::ivec2(512, 512));    // Create a temporary FBO to render the HDR skybox as cubemap and compute the irradiance convolution.
+    captureFBO.attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT24);
     
     glm::mat4 captureViews[] = {
-        {{0.0f, 0.0f, -1.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, { 1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // posx
-        {{0.0f, 0.0f,  1.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // negx
+        {{0.0f, 0.0f, -1.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // posx (at (0, 0, 0) looking at ( 1, 0, 0) with up vec (0, -1, 0)).
+        {{0.0f, 0.0f,  1.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, { 1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // negx (at (0, 0, 0) looking at (-1, 0, 0) with up vec (0, -1, 0)).
         
-        {{ 1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // posy
-        {{ 1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f,  1.0f, 0.0f}, {0.0f,  1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // negy
+        {{ 1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f, 0.0f}, {0.0f,  1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // posy (at (0, 0, 0) looking at (0,  1, 0) with up vec (0, 0,  1)).
+        {{ 1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f,  1.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // negy (at (0, 0, 0) looking at (0, -1, 0) with up vec (0, 0, -1)).
         
-        {{ 1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {0.0f, 0.0f,  1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // posz
-        {{-1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}}     // negz
+        {{ 1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // posz (at (0, 0, 0) looking at (0, 0,  1) with up vec (0, -1, 0)).
+        {{-1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {0.0f, 0.0f,  1.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}}     // negz (at (0, 0, 0) looking at (0, 0, -1) with up vec (0, -1, 0)).
     };
     glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
     
     glDisable(GL_CULL_FACE);
     
+    captureFBO.bind();    // Render HDR skybox to cubemap.
     equirectToCubeShader_->use();
     equirectToCubeShader_->setMat4("projectionMtx", captureProjection);
     equirectToCubeShader_->setInt("texEquirectangular", 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, skyboxHDRTexture_);
-    glViewport(0, 0, 512, 512);
-    captureHDREnvironmentFBO.bind();
+    glViewport(0, 0, captureFBO.getBufferSize().x, captureFBO.getBufferSize().y);
     for (unsigned int i = 0; i < 6; ++i) {
         equirectToCubeShader_->setMat4("viewMtx", captureViews[i]);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, skyboxHDRCubemap_, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        skybox_.drawGeometry();
+    }
+    
+    captureFBO.bind();
+    captureFBO.setBufferSize(glm::ivec2(32, 32));    // Render irradiance convolution map.
+    radianceConvolutionShader_->use();
+    radianceConvolutionShader_->setMat4("projectionMtx", captureProjection);
+    radianceConvolutionShader_->setInt("environmentCubemap", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxHDRCubemap_);
+    glViewport(0, 0, captureFBO.getBufferSize().x, captureFBO.getBufferSize().y);
+    for (unsigned int i = 0; i < 6; ++i) {
+        radianceConvolutionShader_->setMat4("viewMtx", captureViews[i]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceCubemap_, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         skybox_.drawGeometry();
     }
@@ -1003,7 +1035,7 @@ void Renderer::forwardLightingPass(const Camera& camera, const World& world) {
     Shader* shader = forwardPBRShader_.get();
     shader->use();
     
-    //shader->setVec3("albedo", glm::vec3(0.5f, 0.0f, 0.0f));
+    shader->setVec3("albedo", glm::vec3(0.5f, 0.0f, 0.0f));
     //shader->setFloat("ambientOcclusion", 1.0);
     
     /*constexpr unsigned int NUM_LIGHTS = 64;
@@ -1081,7 +1113,7 @@ void Renderer::forwardLightingPass(const Camera& camera, const World& world) {
     skyboxShader_->use();    // Draw the skybox.
     skyboxShader_->setInt("skybox", 0);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxHDRCubemap_);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, (glfwGetKey(window_, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) ? irradianceCubemap_ : skyboxHDRCubemap_);
     skybox_.drawGeometry();
     
     //glDisable(GL_DEPTH_TEST);
@@ -1230,26 +1262,29 @@ void Renderer::renderScene2(const Camera& camera, const World& world, const glm:
     //glActiveTexture(GL_TEXTURE2);
     //glBindTexture(GL_TEXTURE_2D, blueTexture_);
     
-    shader->setInt("texAlbedo", 0);
-    shader->setInt("texMetallic", 1);
+    //shader->setInt("texAlbedo", 0);
+    //shader->setInt("texMetallic", 1);
     shader->setInt("texNormal", 2);
-    shader->setInt("texRoughness", 3);
+    //shader->setInt("texRoughness", 3);
     shader->setInt("texAO", 4);
+    shader->setInt("irradianceCubemap", 5);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, rustedIronAlbedo_);
+    //glBindTexture(GL_TEXTURE_2D, rustedIronAlbedo_);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, rustedIronMetallic_);
+    //glBindTexture(GL_TEXTURE_2D, rustedIronMetallic_);
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, rustedIronNormal_);
     glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, rustedIronRoughness_);
+    //glBindTexture(GL_TEXTURE_2D, rustedIronRoughness_);
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, whiteTexture_);
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap_);
     
     for (int row = 0; row < 7; ++row) {
-        //shader->setFloat("metallic", row / 7.0f);
+        shader->setFloat("metallic", row / 7.0f);
         for (int col = 0; col < 7; ++col) {
-            //shader->setFloat("roughness", glm::clamp(col / 7.0f, 0.05f, 1.0f));
+            shader->setFloat("roughness", glm::clamp(col / 7.0f, 0.05f, 1.0f));
             glm::mat4 modelMtx = glm::translate(glm::mat4(1.0f), glm::vec3((col - 7.0f / 2.0f) * 2.5f, (row - 7.0f / 2.0f) * 2.5f, 0.0f));
             world.sphere1_.drawGeometry(*shader, modelMtx);
         }
