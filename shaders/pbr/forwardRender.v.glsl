@@ -18,7 +18,7 @@ out vec2 fTexCoords;
 
 void main() {
     fPosition = vec3(viewMtx * modelMtx * vec4(vPosition, 1.0));    // Fragment position in view space.
-    mat3 normalMtx = transpose(inverse(mat3(viewMtx * modelMtx)));
+    mat3 normalMtx = transpose(inverse(mat3(viewMtx * modelMtx)));    // Note that inverse operation is expensive and this should be passed in as a uniform ########################################################
     fTBNMtx = mat3(normalize(normalMtx * vTangent), normalize(normalMtx * vBitangent), normalize(normalMtx * vNormal));    // Need to put the normal into view space too.
     fTexCoords = vTexCoords;
     

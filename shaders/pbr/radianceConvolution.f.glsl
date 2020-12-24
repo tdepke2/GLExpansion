@@ -30,7 +30,5 @@ void main() {
     
     irradiance = PI * irradiance / numSamples;
     
-    irradiance = texture(environmentCubemap, fPosition).rgb;    // temp for testing only #######################################
-    
     fragColor = vec4(irradiance, 1.0);
 }

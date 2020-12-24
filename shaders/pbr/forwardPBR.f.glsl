@@ -7,6 +7,10 @@ const uint POINT_LIGHT = 1u;
 const uint SPOT_LIGHT = 2u;
 const float GAMMA = 2.2;
 
+layout (std140) uniform ViewProjectionMtx {
+    uniform mat4 viewMtx;
+    uniform mat4 projectionMtx;
+};
 uniform bool lightStates[NUM_LIGHTS];
 uniform sampler2D texAlbedo;
 uniform sampler2D texMetallic;
@@ -60,6 +64,10 @@ vec3 fresnelSchlick(float dotHV, vec3 F0) {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - dotHV, 0.0, 1.0), 5.0);
 }
 
+vec3 fresnelSchlickRoughness(float dotHV, vec3 F0, float roughness) {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - dotHV, 0.0, 1.0), 5.0);
+}
+
 void main() {
     //vec3 albedo = texture(texAlbedo, fTexCoords).rgb;
     //float metallic = texture(texMetallic, fTexCoords).r;
@@ -95,10 +103,12 @@ void main() {
         }
     }
     
-    vec3 kS = fresnelSchlick(dot(N, V), F0);    // Use IBL to compute ambient lighting component.
+    vec3 kS = fresnelSchlickRoughness(dot(N, V), F0, roughness);    // Use IBL to compute ambient lighting component.
     vec3 kD = vec3(1.0) - kS;
     kD *= 1.0 - metallic;
-    vec3 irradiance = texture(irradianceCubemap, N).rgb;
+    vec3 normalWorldSpace = transpose(mat3(viewMtx)) * N;
+    normalWorldSpace.z = -normalWorldSpace.z;
+    vec3 irradiance = texture(irradianceCubemap, normalWorldSpace).rgb;
     vec3 diffuse = irradiance * albedo;
     vec3 ambient = (kD * diffuse) * ambientOcclusion;
     

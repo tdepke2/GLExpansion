@@ -447,7 +447,7 @@ void Renderer::setupTextures() {
     brickNormalMap_ = loadTexture("textures/bricks2_normal.jpg", false);
     monitorGridTexture_ = loadTexture("textures/monitorGrid.png", true);
     
-    skyboxHDRTexture_ = loadTextureHDR("textures/Alexs_Apt_2k.hdr");//newport_loft.hdr");
+    skyboxHDRTexture_ = loadTextureHDR("textures/newport_loft.hdr");
     
     glGenTextures(1, &skyboxHDRCubemap_);
     glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxHDRCubemap_);
@@ -518,10 +518,10 @@ void Renderer::setupShaders() {
     debugVectorsShader_ = make_unique<Shader>("shaders/debugVectors.v.glsl", "shaders/debugVectors.g.glsl", "shaders/debugVectors.f.glsl");
     debugVectorsShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
     
-    forwardRenderShader_ = make_unique<Shader>("shaders/forwardRender.v.glsl", "shaders/forwardRender.f.glsl");
+    forwardRenderShader_ = make_unique<Shader>("shaders/pbr/forwardRender.v.glsl", "shaders/pbr/forwardRender.f.glsl");
     forwardRenderShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
     
-    forwardPBRShader_ = make_unique<Shader>("shaders/forwardRender.v.glsl", "shaders/forwardPBR.f.glsl");
+    forwardPBRShader_ = make_unique<Shader>("shaders/pbr/forwardRender.v.glsl", "shaders/pbr/forwardPBR.f.glsl");
     forwardPBRShader_->setUniformBlockBinding("ViewProjectionMtx", 0);
     
     nullLightShader_ = make_unique<Shader>("shaders/effects/nullLight.v.glsl", "shaders/effects/nullLight.f.glsl");
