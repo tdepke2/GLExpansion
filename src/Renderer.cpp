@@ -69,11 +69,11 @@ unsigned int Renderer::loadTexture(const string& filename, bool gammaCorrection,
     if (imageData) {
         glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, imageData);
         
-        glGenerateMipmap(GL_TEXTURE_2D);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glGenerateMipmap(GL_TEXTURE_2D);
     } else {
         cout << "Error: Unable to load texture.\n";
     }
@@ -273,6 +273,8 @@ Renderer::~Renderer() {
     
     equirectToCubeShader_.reset();
     radianceConvolutionShader_.reset();
+    prefilterEnvShader_.reset();
+    integrateBRDFShader_.reset();
     
     geometryFBO_.reset();
     renderFBO_.reset();
@@ -430,6 +432,7 @@ void Renderer::setupOpenGL() {
     glFrontFace(GL_CCW);
     glCullFace(GL_BACK);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
     
     glfwSetCursorPos(window_, windowSize_.x / 2.0f, windowSize_.y / 2.0f);
     glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -457,8 +460,9 @@ void Renderer::setupTextures() {
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Mipmaps will be generated later once skybox is rendered.
     
     glGenTextures(1, &irradianceCubemap_);
     glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap_);
@@ -470,6 +474,26 @@ void Renderer::setupTextures() {
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    
+    glGenTextures(1, &prefilterEnvCubemap_);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterEnvCubemap_);
+    for (unsigned int i = 0; i < 6; ++i) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+    
+    glGenTextures(1, &lookupBRDFTexture_);
+    glBindTexture(GL_TEXTURE_2D, lookupBRDFTexture_);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, 512, 512, 0, GL_RG, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     
     rustedIronAlbedo_ = loadTexture("textures/rusted_iron/rustediron2_basecolor.png", true);
     rustedIronNormal_ = loadTexture("textures/rusted_iron/rustediron2_normal.png", false);
@@ -569,6 +593,10 @@ void Renderer::setupShaders() {
     equirectToCubeShader_ = make_unique<Shader>("shaders/pbr/cubemap.v.glsl", "shaders/pbr/equirectToCube.f.glsl");
     
     radianceConvolutionShader_ = make_unique<Shader>("shaders/pbr/cubemap.v.glsl", "shaders/pbr/radianceConvolution.f.glsl");
+    
+    prefilterEnvShader_ = make_unique<Shader>("shaders/pbr/cubemap.v.glsl", "shaders/pbr/prefilterEnv.f.glsl");
+    
+    integrateBRDFShader_ = make_unique<Shader>("shaders/pbr/integrateBRDF.v.glsl", "shaders/pbr/integrateBRDF.f.glsl");
 }
 
 void Renderer::setupBuffers() {
@@ -628,9 +656,6 @@ void Renderer::setupRender() {
     
     skybox_.generateCube(2.0f);
     
-    Framebuffer captureFBO(glm::ivec2(512, 512));    // Create a temporary FBO to render the HDR skybox as cubemap and compute the irradiance convolution.
-    captureFBO.attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT24);
-    
     glm::mat4 captureViews[] = {
         {{0.0f, 0.0f, -1.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // posx (at (0, 0, 0) looking at ( 1, 0, 0) with up vec (0, -1, 0)).
         {{0.0f, 0.0f,  1.0f, 0.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, { 1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}},    // negx (at (0, 0, 0) looking at (-1, 0, 0) with up vec (0, -1, 0)).
@@ -645,6 +670,9 @@ void Renderer::setupRender() {
     
     glDisable(GL_CULL_FACE);
     
+    Framebuffer captureFBO(glm::ivec2(512, 512));    // Create a temporary FBO to compute some texture objects used in PBR with IBL.
+    captureFBO.attachRenderbuffer(GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT24);
+    
     captureFBO.bind();    // Render HDR skybox to cubemap.
     equirectToCubeShader_->use();
     equirectToCubeShader_->setMat4("projectionMtx", captureProjection);
@@ -658,9 +686,11 @@ void Renderer::setupRender() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         skybox_.drawGeometry();
     }
+    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxHDRCubemap_);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
     
-    captureFBO.bind();
-    captureFBO.setBufferSize(glm::ivec2(32, 32));    // Render irradiance convolution map.
+    captureFBO.bind();    // Render irradiance convolution map.
+    captureFBO.setBufferSize(glm::ivec2(32, 32));
     radianceConvolutionShader_->use();
     radianceConvolutionShader_->setMat4("projectionMtx", captureProjection);
     radianceConvolutionShader_->setInt("environmentCubemap", 0);
@@ -673,6 +703,37 @@ void Renderer::setupRender() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         skybox_.drawGeometry();
     }
+    
+    captureFBO.bind();    // Render pre-filter environment for various roughness values and store into mipmap levels of the cubemap.
+    prefilterEnvShader_->use();
+    prefilterEnvShader_->setMat4("projectionMtx", captureProjection);
+    prefilterEnvShader_->setInt("environmentCubemap", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxHDRCubemap_);
+    const unsigned int MAX_MIPMAP_LEVELS = 5;
+    for (unsigned int mip = 0; mip < MAX_MIPMAP_LEVELS; ++mip) {
+        captureFBO.setBufferSize(glm::ivec2(128 >> mip));
+        glViewport(0, 0, captureFBO.getBufferSize().x, captureFBO.getBufferSize().y);
+        
+        float roughness = static_cast<float>(mip) / (MAX_MIPMAP_LEVELS - 1);
+        prefilterEnvShader_->setFloat("roughness", roughness);
+        for (unsigned int i = 0; i < 6; ++i) {
+            prefilterEnvShader_->setMat4("viewMtx", captureViews[i]);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterEnvCubemap_, mip);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            skybox_.drawGeometry();
+        }
+    }
+    
+    captureFBO.bind();    // Render BRDF lookup table for use in the split sum method of IBL specular.
+    captureFBO.setBufferSize(glm::ivec2(512, 512));
+    integrateBRDFShader_->use();
+    glViewport(0, 0, captureFBO.getBufferSize().x, captureFBO.getBufferSize().y);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, lookupBRDFTexture_, 0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glDisable(GL_DEPTH_TEST);
+    windowQuad_.drawGeometry();
+    glEnable(GL_DEPTH_TEST);
     
     glEnable(GL_CULL_FACE);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
