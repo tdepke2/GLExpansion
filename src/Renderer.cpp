@@ -1086,7 +1086,6 @@ void Renderer::drawPostProcessing() {
 
 void Renderer::forwardLightingPass(const Camera& camera, const World& world) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glViewport(0, 0, windowSize_.x, windowSize_.y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glm::mat4 viewMtx = camera.getViewMatrix();
@@ -1096,7 +1095,7 @@ void Renderer::forwardLightingPass(const Camera& camera, const World& world) {
     Shader* shader = forwardPBRShader_.get();
     shader->use();
     
-    shader->setVec3("albedo", glm::vec3(0.5f, 0.0f, 0.0f));
+    //shader->setVec3("albedo", glm::vec3(0.5f, 0.0f, 0.0f));
     //shader->setFloat("ambientOcclusion", 1.0);
     
     /*constexpr unsigned int NUM_LIGHTS = 64;
@@ -1323,29 +1322,35 @@ void Renderer::renderScene2(const Camera& camera, const World& world, const glm:
     //glActiveTexture(GL_TEXTURE2);
     //glBindTexture(GL_TEXTURE_2D, blueTexture_);
     
-    //shader->setInt("texAlbedo", 0);
-    //shader->setInt("texMetallic", 1);
+    shader->setInt("texAlbedo", 0);
+    shader->setInt("texMetallic", 1);
     shader->setInt("texNormal", 2);
-    //shader->setInt("texRoughness", 3);
+    shader->setInt("texRoughness", 3);
     shader->setInt("texAO", 4);
     shader->setInt("irradianceCubemap", 5);
+    shader->setInt("prefilterCubemap", 6);
+    shader->setInt("lookupBRDF", 7);
     glActiveTexture(GL_TEXTURE0);
-    //glBindTexture(GL_TEXTURE_2D, rustedIronAlbedo_);
+    glBindTexture(GL_TEXTURE_2D, rustedIronAlbedo_);
     glActiveTexture(GL_TEXTURE1);
-    //glBindTexture(GL_TEXTURE_2D, rustedIronMetallic_);
+    glBindTexture(GL_TEXTURE_2D, rustedIronMetallic_);
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, rustedIronNormal_);
     glActiveTexture(GL_TEXTURE3);
-    //glBindTexture(GL_TEXTURE_2D, rustedIronRoughness_);
+    glBindTexture(GL_TEXTURE_2D, rustedIronRoughness_);
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, whiteTexture_);
     glActiveTexture(GL_TEXTURE5);
     glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceCubemap_);
+    glActiveTexture(GL_TEXTURE6);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterEnvCubemap_);
+    glActiveTexture(GL_TEXTURE7);
+    glBindTexture(GL_TEXTURE_2D, lookupBRDFTexture_);
     
     for (int row = 0; row < 7; ++row) {
-        shader->setFloat("metallic", row / 7.0f);
+        //shader->setFloat("metallic", row / 7.0f);
         for (int col = 0; col < 7; ++col) {
-            shader->setFloat("roughness", glm::clamp(col / 7.0f, 0.05f, 1.0f));
+            //shader->setFloat("roughness", glm::clamp(col / 7.0f, 0.05f, 1.0f));
             glm::mat4 modelMtx = glm::translate(glm::mat4(1.0f), glm::vec3((col - 7.0f / 2.0f) * 2.5f, (row - 7.0f / 2.0f) * 2.5f, 0.0f));
             world.sphere1_.drawGeometry(*shader, modelMtx);
         }

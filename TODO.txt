@@ -9,6 +9,7 @@ Additions:
     * Add better way to handle animations and transition between them.
 
 Fixes:
+    * Loading textures should create texture object after texture is successfully loaded.
     * Need a better way to handle GL state calls, possibly with a class that manages them and only switches when necessary.
     * No need for the position map in g-buffer. http://ogldev.atspace.co.uk/www/tutorial46/tutorial46.html  https://mynameismjp.wordpress.com/2010/09/05/position-from-depth-3/
     * Look into reversing the z-buffer for better precision across scene. https://outerra.blogspot.com/2009/08/logarithmic-z-buffer.html

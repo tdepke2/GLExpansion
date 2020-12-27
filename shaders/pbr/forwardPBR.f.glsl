@@ -6,6 +6,7 @@ const uint DIRECTIONAL_LIGHT = 0u;
 const uint POINT_LIGHT = 1u;
 const uint SPOT_LIGHT = 2u;
 const float GAMMA = 2.2;
+const float MAX_REFLECTION_LOD = 4.0;
 
 layout (std140) uniform ViewProjectionMtx {
     uniform mat4 viewMtx;
@@ -18,10 +19,8 @@ uniform sampler2D texNormal;
 uniform sampler2D texRoughness;
 uniform sampler2D texAO;
 uniform samplerCube irradianceCubemap;
-
-uniform vec3 albedo;
-uniform float metallic;
-uniform float roughness;
+uniform samplerCube prefilterCubemap;
+uniform sampler2D lookupBRDF;
 
 struct Light {
     uint type;
@@ -60,19 +59,19 @@ float geometrySmith(float dotNV, float dotNL, float a) {
     return ggx1 * ggx2;
 }
 
-vec3 fresnelSchlick(float dotHV, vec3 F0) {
-    return F0 + (1.0 - F0) * pow(clamp(1.0 - dotHV, 0.0, 1.0), 5.0);
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
-vec3 fresnelSchlickRoughness(float dotHV, vec3 F0, float roughness) {
-    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - dotHV, 0.0, 1.0), 5.0);
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
 void main() {
-    //vec3 albedo = texture(texAlbedo, fTexCoords).rgb;
-    //float metallic = texture(texMetallic, fTexCoords).r;
+    vec3 albedo = texture(texAlbedo, fTexCoords).rgb;
+    float metallic = texture(texMetallic, fTexCoords).r;
     vec3 N = normalize(fTBNMtx * (texture(texNormal, fTexCoords).rgb * 2.0 - 1.0));
-    //float roughness = texture(texRoughness, fTexCoords).r;
+    float roughness = texture(texRoughness, fTexCoords).r;
     float ambientOcclusion = texture(texAO, fTexCoords).r;
     vec3 V = normalize(-fPosition);
     float dotNV = max(dot(N, V), 0.0);
@@ -90,15 +89,14 @@ void main() {
             float attenuation = 1.0 / (distanceFragToLight * distanceFragToLight);
             vec3 radiance = lights[i].diffuse * attenuation;
             
-            // Cook-Torrance BRDF.
-            float NDF = distributionGGX(max(dot(N, H), 0.0), roughness * roughness);
+            float NDF = distributionGGX(max(dot(N, H), 0.0), roughness * roughness);    // Cook-Torrance BRDF.
             float G = geometrySmith(dotNV, dotNL, roughness * roughness);
             vec3 F = fresnelSchlick(dot(H, V), F0);
             
             vec3 kD = vec3(1.0) - F;    // The diffuse light component is the remaining light after specular (given by Fresnel) leaves the surface.
             kD *= 1.0 - metallic;    // Metallic surfaces absorb the diffuse light.
             vec3 specular = NDF * G * F / max(4.0 * dotNV * dotNL, 0.001);    // Compute finalized Cook-Torrance specular (includes kS from Fresnel equation).
-            
+            // check above, the bias may need to be directly added ######################################
             radianceOut += (kD * albedo / PI + specular) * radiance * dotNL;
         }
     }
@@ -110,8 +108,14 @@ void main() {
     normalWorldSpace.z = -normalWorldSpace.z;
     vec3 irradiance = texture(irradianceCubemap, normalWorldSpace).rgb;
     vec3 diffuse = irradiance * albedo;
-    vec3 ambient = (kD * diffuse) * ambientOcclusion;
     
+    vec3 reflectionWorldSpace = transpose(mat3(viewMtx)) * reflect(-V, N);
+    reflectionWorldSpace.z = -reflectionWorldSpace.z;
+    vec3 prefilteredColor = textureLod(prefilterCubemap, reflectionWorldSpace, roughness * MAX_REFLECTION_LOD).rgb;
+    vec2 resultBRDF = texture(lookupBRDF, vec2(dotNV, roughness)).rg;
+    vec3 specular = prefilteredColor * (kS * resultBRDF.x + resultBRDF.y);
+    
+    vec3 ambient = (kD * diffuse + specular) * ambientOcclusion;
     vec3 color = ambient + radianceOut;
     
     vec3 mappedColor = color / (color + vec3(1.0));    // Reinhard tone mapping.
