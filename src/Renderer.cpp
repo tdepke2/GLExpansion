@@ -61,7 +61,7 @@ unsigned int Renderer::loadTexture(const string& filename, bool gammaCorrection,
         internalFormat = (gammaCorrection ? GL_SRGB_ALPHA : GL_RGBA);
         format = GL_RGBA;
     } else {
-        cout << "Error: Unsupported channel number.\n";
+        cout << "Error: Unsupported number of channels (" << numChannels << ").\n";
         stbi_image_free(imageData);
         imageData = nullptr;
     }
@@ -97,6 +97,11 @@ unsigned int Renderer::loadTextureHDR(const string& filename, bool flip) {
     glBindTexture(GL_TEXTURE_2D, texHandle);
     int width, height, numChannels = 1;
     float* imageData = stbi_loadf(filename.c_str(), &width, &height, &numChannels, 0);
+    if (numChannels != 3) {
+        cout << "Error: Unsupported number of channels (" << numChannels << ").\n";
+        stbi_image_free(imageData);
+        imageData = nullptr;
+    }
     
     if (imageData) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, imageData);
@@ -129,7 +134,6 @@ unsigned int Renderer::loadCubemap(const string& filename, bool gammaCorrection,
     glGenTextures(1, &texHandle);
     glBindTexture(GL_TEXTURE_CUBE_MAP, texHandle);
     
-    int width, height, numChannels = 1;
     for (unsigned int i = 0; i < 6; ++i) {
         string faceFilename = prefix + (i % 2 == 0 ? "pos" : "neg");
         if (i < 2) {
@@ -141,6 +145,7 @@ unsigned int Renderer::loadCubemap(const string& filename, bool gammaCorrection,
         }
         //cout << "  Face " << i << ": \"" << faceFilename << "\".\n";
         
+        int width, height, numChannels = 1;
         unsigned char* imageData = stbi_load(faceFilename.c_str(), &width, &height, &numChannels, 0);
         GLenum internalFormat, format;
         if (numChannels == 1) {
@@ -153,10 +158,11 @@ unsigned int Renderer::loadCubemap(const string& filename, bool gammaCorrection,
             internalFormat = (gammaCorrection ? GL_SRGB_ALPHA : GL_RGBA);
             format = GL_RGBA;
         } else {
-            cout << "Error: Unsupported channel number.\n";
+            cout << "Error: Unsupported number of channels (" << numChannels << ").\n";
             stbi_image_free(imageData);
             imageData = nullptr;
         }
+        
         if (imageData) {
             glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, imageData);
         } else {
