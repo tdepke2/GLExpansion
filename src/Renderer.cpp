@@ -1179,7 +1179,7 @@ void Renderer::forwardLightingPass(const Camera& camera, const World& world) {
     skyboxShader_->use();    // Draw the skybox.
     skyboxShader_->setInt("skybox", 0);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, (glfwGetKey(window_, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) ? irradianceCubemap_ : skyboxHDRCubemap_);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxHDRCubemap_);
     skybox_.drawGeometry();
     
     //glDisable(GL_DEPTH_TEST);

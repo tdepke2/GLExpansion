@@ -9,7 +9,7 @@ in vec3 fPosition;
 
 out vec4 fragColor;
 
-float radicalInverseVanDerCorpus(uint bits) {
+float radicalInverseVanDerCorpus(uint bits) {    // Efficient VDC calculation http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
     bits = (bits << 16u) | (bits >> 16u);
     bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
     bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
@@ -43,41 +43,41 @@ vec2 hammersleyNoBitOps(uint i, uint N) {    // Alternative Hammersley function 
     return vec2(float(i) / float(N), vanDerCorpus(i, 2u));
 }
 
-vec3 importanceSampleGGX(vec2 Xi, vec3 N, float a) {
+vec3 importanceSampleGGX(vec2 Xi, vec3 N, float alpha) {
     float phi = 2.0 * PI * Xi.x;
-    float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (a * a - 1.0) * Xi.y));
+    float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (alpha * alpha - 1.0) * Xi.y));
     float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
     
-    vec3 H = vec3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);    // Spherical to cartesian.
+    vec3 tangentSample = vec3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);    // Spherical to cartesian.
     
     vec3 upVec = (abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0));    // Find tangent-space vectors.
     vec3 tangentVec = normalize(cross(upVec, N));
     vec3 bitangentVec = cross(N, tangentVec);
     
-    return normalize(vec3(tangentVec * H.x + bitangentVec * H.y + N * H.z));    // Sample in world-space.
+    return normalize(vec3(tangentSample.x * tangentVec + tangentSample.y * bitangentVec + tangentSample.z * N));    // Sample in world-space.
 }
 
-float distributionGGX(float dotNH, float a) {
-    float a2 = a * a;
-    float denom = dotNH * dotNH * (a2 - 1.0) + 1.0;
-    denom = PI * denom * denom;
-    return a2 / denom;
+float distributionGGX(float dotNH, float alpha) {    // Normal distribution function used to approximate surface microfacets (Trowbridge-Reitz GGX).
+    float alpha2 = alpha * alpha;
+    float x = dotNH * dotNH * (alpha2 - 1.0) + 1.0;
+    return alpha2 / (PI * x * x);
 }
 
 void main() {
-    vec3 N = normalize(fPosition);    // Assume view direction equals the normal.
+    vec3 N = normalize(fPosition);    // Assume view and reflection direction equals the normal.
+    float alpha = roughness * roughness;
     
     const uint NUM_SAMPLES = 1024u;
     float totalWeight = 0.0;
     vec3 prefilteredColor = vec3(0.0);
     for (uint i = 0u; i < NUM_SAMPLES; ++i) {
-        vec2 Xi = hammersley(i, NUM_SAMPLES);
-        vec3 H = importanceSampleGGX(Xi, N, roughness * roughness);
+        vec2 Xi = hammersley(i, NUM_SAMPLES);    // Generate sample vector that's biased towards the normal.
+        vec3 H = importanceSampleGGX(Xi, N, alpha);
         vec3 L = normalize(2.0 * dot(N, H) * H - N);
         
         float dotNL = dot(N, L);
         if (dotNL > 0.0) {
-            float NDF = distributionGGX(max(dot(N, H), 0.0), roughness * roughness);    // Sample environmentCubemap mip level based on roughness/pdf.
+            float NDF = distributionGGX(max(dot(N, H), 0.0), alpha);    // Sample environmentCubemap mip level based on roughness/pdf.
             float dotNH = max(dot(N, H), 0.0);
             float pdf = NDF * dotNH / (4.0 * dotNH) + 0.0001;
             

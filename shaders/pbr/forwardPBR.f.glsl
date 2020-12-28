@@ -40,30 +40,29 @@ in vec2 fTexCoords;
 
 out vec4 fragColor;
 
-float distributionGGX(float dotNH, float a) {
-    float a2 = a * a;
-    float denom = dotNH * dotNH * (a2 - 1.0) + 1.0;
-    denom = PI * denom * denom;
-    return a2 / denom;
+float distributionGGX(float dotNH, float alpha) {    // Normal distribution function used to approximate surface microfacets (Trowbridge-Reitz GGX).
+    float alpha2 = alpha * alpha;
+    float x = dotNH * dotNH * (alpha2 - 1.0) + 1.0;
+    return alpha2 / (PI * x * x);
 }
 
-float geometrySchlickGGX(float dotNV, float a) {
-    float r = (a + 1.0);
+float geometrySchlickGGXAL(float dotNV, float roughness) {    // Partial geometry function for analytical lights (Schlick-GGX).
+    float r = (roughness + 1.0);
     float k = (r * r) / 8.0;
     return dotNV / (dotNV * (1.0 - k) + k);
 }
 
-float geometrySmith(float dotNV, float dotNL, float a) {
-    float ggx2 = geometrySchlickGGX(dotNV, a);
-    float ggx1 = geometrySchlickGGX(dotNL, a);
+float geometrySmithAL(float dotNV, float dotNL, float roughness) {    // Geometry function used to approximate surface shadowing for analytical lights (Smith's method).
+    float ggx2 = geometrySchlickGGXAL(dotNV, roughness);
+    float ggx1 = geometrySchlickGGXAL(dotNL, roughness);
     return ggx1 * ggx2;
 }
 
-vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {    // Fresnel equation used to determine percentage of light that gets reflected (Fresnel-Schlick).
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
-vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {    // Alternate Fresnel equation for improved reflections on rough surfaces with IBL.
     return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
@@ -75,6 +74,7 @@ void main() {
     float ambientOcclusion = texture(texAO, fTexCoords).r;
     vec3 V = normalize(-fPosition);
     float dotNV = max(dot(N, V), 0.0);
+    float alpha = roughness * roughness;
     
     vec3 F0 = vec3(0.04);    // Initialize surface reflection at zero incidence to the average of dielectric (non-metallic) surfaces.
     F0 = mix(F0, albedo, metallic);
@@ -89,8 +89,8 @@ void main() {
             float attenuation = 1.0 / (distanceFragToLight * distanceFragToLight);
             vec3 radiance = lights[i].diffuse * attenuation;
             
-            float NDF = distributionGGX(max(dot(N, H), 0.0), roughness * roughness);    // Cook-Torrance BRDF.
-            float G = geometrySmith(dotNV, dotNL, roughness * roughness);
+            float NDF = distributionGGX(max(dot(N, H), 0.0), alpha);    // Cook-Torrance BRDF.
+            float G = geometrySmithAL(dotNV, dotNL, roughness);
             vec3 F = fresnelSchlick(dot(H, V), F0);
             
             vec3 kD = vec3(1.0) - F;    // The diffuse light component is the remaining light after specular (given by Fresnel) leaves the surface.
