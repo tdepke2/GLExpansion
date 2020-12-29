@@ -78,7 +78,7 @@ void main() {
         float dotNL = dot(N, L);
         if (dotNL > 0.0) {
             float NDF = distributionGGX(max(dot(N, H), 0.0), alpha);    // Sample environmentCubemap mip level based on roughness/pdf.
-            float dotNH = max(dot(N, H), 0.0);
+            float dotNH = max(dot(N, H), 0.0);    // Based on implementation by https://chetanjags.wordpress.com/2015/08/26/image-based-lighting/
             float pdf = NDF * dotNH / (4.0 * dotNH) + 0.0001;
             
             float resolution = textureSize(environmentCubemap, 0).x;

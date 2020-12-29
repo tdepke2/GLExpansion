@@ -1,5 +1,5 @@
 Additions:
-    * Add PBR.
+    * Add UE4 attenuation option for lights, see https://github.com/JoeyDeVries/Cell/blob/master/build/shaders/deferred/point.fs and http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf
     * Add anti-aliasing (apparently MSAA doesn't work with deferred pipeline).
     * Need a logger class for easier debugging, it should accept a message and type (graphics, physics, audio, etc).
     * Add procedural terrain generation.

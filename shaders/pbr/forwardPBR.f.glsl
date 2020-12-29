@@ -96,7 +96,7 @@ void main() {
             vec3 kD = vec3(1.0) - F;    // The diffuse light component is the remaining light after specular (given by Fresnel) leaves the surface.
             kD *= 1.0 - metallic;    // Metallic surfaces absorb the diffuse light.
             vec3 specular = NDF * G * F / max(4.0 * dotNV * dotNL, 0.001);    // Compute finalized Cook-Torrance specular (includes kS from Fresnel equation).
-            // check above, the bias may need to be directly added ######################################
+            
             radianceOut += (kD * albedo / PI + specular) * radiance * dotNL;
         }
     }
