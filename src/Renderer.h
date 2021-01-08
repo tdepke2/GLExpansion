@@ -4,6 +4,7 @@
 class Camera;
 class Framebuffer;
 class PerformanceMonitor;
+class Scene;
 class Shader;
 class World;
 
@@ -29,7 +30,7 @@ using namespace std;
 
 class Renderer {
     public:
-    enum State {
+    enum State {    // why not enum class like RenderState::Uninitialized? ####################################################################
         Uninitialized, Running, Paused, Exiting
     };
     
@@ -50,23 +51,30 @@ class Renderer {
     static unsigned int loadTextureHDR(const string& filename, bool flip = true);
     static unsigned int loadCubemap(const string& filename, bool gammaCorrection, bool flip = false);
     static unsigned int generateTexture(float r, float g, float b, float a = 1.0f);
-    Renderer(mt19937* randNumGenerator);
+    Renderer();
     ~Renderer();
     State getState() const;
     void setState(State state);
     GLFWwindow* getWindowHandle() const;
-    void drawWorld(const Camera& camera, const World& world);    // Applies each stage of the rendering pipeline to draw the scene.
+    Scene* getScene() const;
+    void init();
+    Scene* createScene();
+    void startRenderThread();
+    void tempRender();
+    void drawWorld();    // Applies each stage of the rendering pipeline to draw the scene.
     bool pollEvent(Event& e);    // Grab the next event from the event queue.
     void resizeBuffers(int width, int height);    // Resize the internal render buffers used for drawing to the window.
+    void close();    // Clean up attached objects and destroy window.
     
     private:
     static bool instantiated_;
     static unordered_map<string, unsigned int> loadedTextures_;
     static queue<Event> eventQueue_;
     atomic<State> state_;
-    mt19937* randNumGenerator_;
+    mt19937 randNumGenerator_;
     GLFWwindow* window_;
     glm::ivec2 windowSize_;
+    unique_ptr<Scene> scene_;
     unordered_map<const char*, PerformanceMonitor*> performanceMonitors_;
     unique_ptr<Shader> geometryShader_, geometryNormalMapShader_, geometrySkinningShader_, skyboxShader_, lampShader_, shadowMapShader_, shadowMapSkinningShader_, debugVectorsShader_, forwardRenderShader_, forwardPBRShader_;
     unique_ptr<Shader> nullLightShader_, directionalLightShader_, pointLightShader_, spotLightShader_, postProcessShader_, bloomShader_, gaussianBlurShader_, ssaoShader_, ssaoBlurShader_;
@@ -94,7 +102,7 @@ class Renderer {
     void setupShaders();
     void setupBuffers();
     void setupRender();
-    void beginFrame(const World& world);    // Stages of the rendering pipeline.
+    void beginFrame();    // Stages of the rendering pipeline.
     void drawShadowMaps(const Camera& camera, const World& world);
     void geometryPass(const Camera& camera, const World& world);
     void applySSAO();
@@ -103,7 +111,7 @@ class Renderer {
     void drawSkybox();
     void applyBloom();
     void drawPostProcessing();
-    void forwardLightingPass(const Camera& camera, const World& world);
+    void forwardLightingPass();
     void drawGUI();
     void endFrame();
     void renderScene(const Camera& camera, const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender);

@@ -7,9 +7,12 @@
 #include "Framebuffer.h"
 #include "PerformanceMonitor.h"
 #include "Renderer.h"
+#include "Scene.h"
+#include "SceneNode.h"
 #include "Shader.h"
 #include "World.h"
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -207,14 +210,14 @@ unsigned int Renderer::generateTexture(float r, float g, float b, float a) {
     return texHandle;
 }
 
-Renderer::Renderer(mt19937* randNumGenerator) :// always use this style for uniform init #############################################################
+Renderer::Renderer() :// always use this style for uniform init #############################################################
     state_(Uninitialized),
-    randNumGenerator_(randNumGenerator),
     windowSize_(INITIAL_WINDOW_SIZE) {
     
     assert(!instantiated_);    // Ensure only one instance of Renderer.
     instantiated_ = true;
     state_ = Running;
+    randNumGenerator_.seed(static_cast<unsigned long>(chrono::high_resolution_clock::now().time_since_epoch().count()));    // need a better way to handle RNG, use a class ######################################################
     
     setupOpenGL();
     setupTextures();
@@ -315,8 +318,30 @@ GLFWwindow* Renderer::getWindowHandle() const {
     return window_;
 }
 
-void Renderer::drawWorld(const Camera& camera, const World& world) {
-    beginFrame(world);
+Scene* Renderer::getScene() const {
+    return scene_.get();
+}
+
+void Renderer::init() {
+    // TODO should perform all GL setup ########################################################
+}
+
+Scene* Renderer::createScene() {
+    assert(!scene_);
+    scene_ = unique_ptr<Scene>(new Scene());
+    return scene_.get();
+}
+
+void Renderer::startRenderThread() {
+    //  TODO should kick up a separate thread for scene rendering ##########################################
+}
+
+void Renderer::tempRender() {    // temporary, used until render gets it's own thread #######################################
+    drawWorld();
+}
+
+void Renderer::drawWorld() {
+    beginFrame();
     /*drawShadowMaps(camera, world);
     geometryPass(camera, world);
     applySSAO();
@@ -325,8 +350,8 @@ void Renderer::drawWorld(const Camera& camera, const World& world) {
     drawSkybox();
     applyBloom();
     drawPostProcessing();*/
-    forwardLightingPass(camera, world);
-    //drawGUI();
+    forwardLightingPass();
+    drawGUI();
     endFrame();
 }
 
@@ -349,6 +374,10 @@ void Renderer::resizeBuffers(int width, int height) {
     bloom2FBO_->setBufferSize(windowSize_);
     ssaoFBO_->setBufferSize(windowSize_ / 2);
     ssaoBlurFBO_->setBufferSize(windowSize_ / 2);
+}
+
+void Renderer::close() {
+    // TODO should perform destruction ##########################################################################
 }
 
 void Renderer::windowCloseCallback(GLFWwindow* window) {
@@ -745,7 +774,7 @@ void Renderer::setupRender() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Renderer::beginFrame(const World& world) {
+void Renderer::beginFrame() {
     double currentTime = glfwGetTime();
     float deltaTime = static_cast<float>(currentTime - lastTime_);
     lastTime_ = currentTime;
@@ -970,7 +999,7 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
     spotLightShader_->setBool("applySSAO", config_.getSSAO());
     spotLightShader_->setVec2("renderSize", renderFBO_->getBufferSize());
     
-    glm::mat4 flashlightModelMtx = CommonMath::orientAt(camera.position_, camera.position_ + camera.front_, camera.up_);    // Orient the flashlight to the camera direction, and set scale based on the larger cutoff angle.
+    glm::mat4 flashlightModelMtx = CommonMath::orientAt(camera.getSceneNode()->getPosition(), camera.getSceneNode()->getPosition() + camera.front_, camera.up_);    // Orient the flashlight to the camera direction, and set scale based on the larger cutoff angle.
     float coneX = World::calcLightRadius(world.spotLights_[0].color, world.spotLights_[0].attenuation);    // Length of the cone.
     float coneY = sqrt(1 - world.spotLights_[0].cutOff.y * world.spotLights_[0].cutOff.y) / world.spotLights_[0].cutOff.y * coneX * 1.02f;    // Width of the cone computed from length and cutoff angle (the cosine of actual spotlight angle). Scales by a small bias so that border edges are not visible.
     flashlightModelMtx = glm::scale(flashlightModelMtx, glm::vec3(coneY, coneY, coneX));
@@ -1013,7 +1042,7 @@ void Renderer::drawLamps(const Camera& camera, const World& world) {
     }
     if (world.sunlightOn_) {
         lampShader_->setVec3("color", glm::vec3(1.0f, 1.0f, 0.0f));    // Draw the sun.
-        world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), world.sunPosition_ + camera.position_), glm::vec3(50.0f)));
+        world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), world.sunPosition_ + camera.getSceneNode()->getPosition()), glm::vec3(50.0f)));
     }
     
     // extra debugging stuff
@@ -1090,12 +1119,19 @@ void Renderer::drawPostProcessing() {
     windowQuad_.drawGeometry();
 }
 
-void Renderer::forwardLightingPass(const Camera& camera, const World& world) {
+void Renderer::forwardLightingPass() {
+    Camera* camera = scene_->cam_.get();
+    
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, windowSize_.x, windowSize_.y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glm::mat4 viewMtx = camera.getViewMatrix();
-    glm::mat4 projectionMtx = glm::perspective(glm::radians(camera.fov_), static_cast<float>(windowSize_.x) / windowSize_.y, NEAR_PLANE, FAR_PLANE);
+    glm::mat4 viewMtx = camera->getViewMatrix();
+    glm::mat4 projectionMtx = glm::perspective(glm::radians(camera->fov_), static_cast<float>(windowSize_.x) / windowSize_.y, NEAR_PLANE, FAR_PLANE);
+    
+    glBindBuffer(GL_UNIFORM_BUFFER, viewProjectionMtxUBO_);    // Update uniform buffer.
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(viewMtx));
+    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projectionMtx));
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
     
     //Shader* shader = forwardRenderShader_.get();
     Shader* shader = forwardPBRShader_.get();
@@ -1138,7 +1174,7 @@ void Renderer::forwardLightingPass(const Camera& camera, const World& world) {
     constexpr unsigned int NUM_LIGHTS = 4;
     unsigned int lightStates[NUM_LIGHTS];
     for (size_t i = 0; i < NUM_LIGHTS; ++i) {
-        lightStates[i] = (world.lampsOn_ ? 1 : 0);
+        //lightStates[i] = (world.lampsOn_ ? 1 : 0);
     }
     shader->setUnsignedIntArray("lightStates", NUM_LIGHTS, lightStates);
     glm::vec3 lightPositions[] = {
@@ -1159,19 +1195,19 @@ void Renderer::forwardLightingPass(const Camera& camera, const World& world) {
         shader->setVec3("lights[" + to_string(i) + "].diffuse", lightColors[i]);
     }
     
-    renderScene2(camera, world, viewMtx, projectionMtx);
+    //renderScene2(camera, world, viewMtx, projectionMtx);
     
     lampShader_->use();    // Draw lamps.
-    if (world.lampsOn_) {
-        for (size_t i = 0; i < NUM_LIGHTS; ++i) {
-            lampShader_->setVec3("color", lightColors[i]);
-            world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), lightPositions[i]), glm::vec3(100.0f)));
-        }
-    }
+    //if (world.lampsOn_) {
+    //    for (size_t i = 0; i < NUM_LIGHTS; ++i) {
+    //        lampShader_->setVec3("color", lightColors[i]);
+    //        world.lightCube_.drawGeometry(*lampShader_, glm::scale(glm::translate(glm::mat4(1.0f), lightPositions[i]), glm::vec3(100.0f)));
+    //    }
+    //}
     
     debugVectorsShader_->use();
-    glBindVertexArray(world.debugVectorsVAO_);
-    glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(world.debugVectors_.size()));
+    //glBindVertexArray(world.debugVectorsVAO_);
+    //glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(world.debugVectors_.size()));
     
     glDepthFunc(GL_LEQUAL);
     glDisable(GL_CULL_FACE);
@@ -1182,7 +1218,7 @@ void Renderer::forwardLightingPass(const Camera& camera, const World& world) {
     glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxHDRCubemap_);
     skybox_.drawGeometry();
     
-    //glDisable(GL_DEPTH_TEST);
+    glDisable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glEnable(GL_CULL_FACE);
 }
@@ -1276,7 +1312,7 @@ void Renderer::renderScene(const Camera& camera, const World& world, const glm::
     world.cube1_.drawGeometry(*shader, glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0.5f, 3.0f)));
     
     if (shadowRender) {
-        world.cube1_.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), camera.position_), glm::vec3(0.4f, 0.4f, 0.4f)));
+        world.cube1_.drawGeometry(*shader, glm::scale(glm::translate(glm::mat4(1.0f), camera.getSceneNode()->getPosition()), glm::vec3(0.4f, 0.4f, 0.4f)));
     }
     
     glActiveTexture(GL_TEXTURE0);
@@ -1314,11 +1350,6 @@ void Renderer::renderScene(const Camera& camera, const World& world, const glm::
 }
 
 void Renderer::renderScene2(const Camera& camera, const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx) {
-    glBindBuffer(GL_UNIFORM_BUFFER, viewProjectionMtxUBO_);    // Update uniform buffer.
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(viewMtx));
-    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projectionMtx));
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    
     //Shader* shader = forwardRenderShader_.get();
     Shader* shader = forwardPBRShader_.get();
     shader->use();
@@ -1365,10 +1396,10 @@ void Renderer::renderScene2(const Camera& camera, const World& world, const glm:
 
 float Renderer::randomFloat(float min, float max) {
     uniform_real_distribution<float> minMaxRange(min, max);
-    return minMaxRange(*randNumGenerator_);
+    return minMaxRange(randNumGenerator_);
 }
 
 int Renderer::randomInt(int min, int max) {
     uniform_int_distribution<int> minMaxRange(min, max);
-    return minMaxRange(*randNumGenerator_);
+    return minMaxRange(randNumGenerator_);
 }

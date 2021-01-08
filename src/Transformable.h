@@ -10,24 +10,21 @@ using namespace std;
 class Transformable {
     public:
     Transformable();
-    virtual ~Transformable();
-    const glm::vec3& getOrigin() const;
-    void setOrigin(const glm::vec3& origin);
     const glm::vec3& getPosition() const;
     void setPosition(const glm::vec3& position);
-    const glm::vec3& getPitchYawRoll() const;
-    void setPitchYawRoll(const glm::vec3& pitchYawRoll);
+    const glm::quat& getOrientation() const;
+    void setOrientation(const glm::quat& orientation);
     const glm::vec3& getScale() const;
     void setScale(const glm::vec3& scale);
     const glm::mat4& getTransform() const;
     void move(const glm::vec3& distance);
-    void rotate(const glm::vec3& pitchYawRoll);
+    void rotate(const glm::quat& rotation);
     void scale(const glm::vec3& factor);
+    void lookAt(const glm::vec3& point, const glm::vec3& upVec);
     
     private:
-    glm::vec3 origin_;
     glm::vec3 position_;
-    glm::vec3 pitchYawRoll_;
+    glm::quat orientation_;
     glm::vec3 scale_;
     mutable glm::mat4 transform_;
     mutable bool transformChanged_;

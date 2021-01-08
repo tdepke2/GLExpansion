@@ -1,24 +1,25 @@
 #include "Camera.h"
+#include "SceneNode.h"
 
-Camera::Camera(const glm::vec3& position, const glm::vec3& worldUp, float yaw, float pitch) {
-    position_ = position;
-    worldUp_ = worldUp;
-    yaw_ = yaw;
-    pitch_ = pitch;
-    moveSpeed_ = 2.5f * 0.016f;
-    mouseSensistivity_ = 0.1f;
-    fov_ = 90.0f;
+Camera::Camera(const glm::vec3& worldUp, float yaw, float pitch) :
+    worldUp_(worldUp),
+    yaw_(yaw),
+    pitch_(pitch),
+    moveSpeed_(2.5f * 0.016f),
+    mouseSensistivity_(0.1f),
+    fov_(90.0f) {
+    
     updateRotation();
 }
 
 glm::mat4 Camera::getViewMatrix() const {
-    return glm::lookAt(position_, position_ + front_, up_);
+    return glm::lookAt(getSceneNode()->getPosition(), getSceneNode()->getPosition() + front_, up_);
 }
 
 void Camera::processKeyboard(const glm::vec3& direction) {
-    position_ += direction.x * right_ * moveSpeed_;
-    position_ += direction.y * up_ * moveSpeed_;
-    position_ += direction.z * -front_ * moveSpeed_;
+    getSceneNode()->move(direction.x * right_ * moveSpeed_);
+    getSceneNode()->move(direction.y * up_ * moveSpeed_);
+    getSceneNode()->move(direction.z * -front_ * moveSpeed_);
 }
 
 void Camera::processMouseMove(float xoffset, float yoffset, bool constrainPitch) {
