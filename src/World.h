@@ -4,7 +4,7 @@
 #include "Animation.h"
 #include "ModelRigged.h"
 #include "ModelStatic.h"
-#include "Renderer.h"
+#include "RenderApp.h"
 #include "Transformable.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>

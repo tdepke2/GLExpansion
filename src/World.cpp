@@ -113,7 +113,7 @@ World::~World() {
 void World::nextTick() {
     sunT_ += sunSpeed_;
     
-    sunPosition_ = glm::vec3(glm::rotate(glm::mat4(1.0f), sunT_, glm::vec3(1.0f, 1.0f, 1.0f)) * glm::vec4(0.0f, 0.0f, Renderer::FAR_PLANE, 1.0f));
+    sunPosition_ = glm::vec3(glm::rotate(glm::mat4(1.0f), sunT_, glm::vec3(1.0f, 1.0f, 1.0f)) * glm::vec4(0.0f, 0.0f, RenderApp::FAR_PLANE, 1.0f));
     if (sunPosition_.x == 0.0f && sunPosition_.z == 0.0f) {    // Fix edge case when directional light aligns with up vector.
         sunPosition_.x = 0.00001f;
     }

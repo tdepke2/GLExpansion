@@ -6,7 +6,7 @@
 #include "Font.h"
 #include "Framebuffer.h"
 #include "PerformanceMonitor.h"
-#include "Renderer.h"
+#include "RenderApp.h"
 #include "Scene.h"
 #include "SceneNode.h"
 #include "Shader.h"
@@ -18,11 +18,11 @@
 #include <stdexcept>
 #include <utility>
 
-bool Renderer::instantiated_ = false;
-unordered_map<string, unsigned int> Renderer::loadedTextures_;
-queue<Event> Renderer::eventQueue_;
+bool RenderApp::instantiated_ = false;
+unordered_map<string, unsigned int> RenderApp::loadedTextures_;
+queue<Event> RenderApp::eventQueue_;
 
-GLenum Renderer::glCheckError_(const char* file, int line) {
+GLenum RenderApp::glCheckError_(const char* file, int line) {
     GLenum errorCode;
     while ((errorCode = glGetError()) != GL_NO_ERROR) {
         string error;
@@ -39,7 +39,7 @@ GLenum Renderer::glCheckError_(const char* file, int line) {
     return errorCode;
 }
 
-unsigned int Renderer::loadTexture(const string& filename, bool gammaCorrection, bool flip) {
+unsigned int RenderApp::loadTexture(const string& filename, bool gammaCorrection, bool flip) {
     string textureName = filename + (gammaCorrection ? "-g" : "") + (flip ? "-f" : "");
     auto findResult = loadedTextures_.find(textureName);
     if (findResult != loadedTextures_.end()) {
@@ -86,7 +86,7 @@ unsigned int Renderer::loadTexture(const string& filename, bool gammaCorrection,
     return texHandle;
 }
 
-unsigned int Renderer::loadTextureHDR(const string& filename, bool flip) {
+unsigned int RenderApp::loadTextureHDR(const string& filename, bool flip) {
     string textureName = filename + (flip ? "-f" : "");
     auto findResult = loadedTextures_.find(textureName);
     if (findResult != loadedTextures_.end()) {
@@ -122,7 +122,7 @@ unsigned int Renderer::loadTextureHDR(const string& filename, bool flip) {
     return texHandle;
 }
 
-unsigned int Renderer::loadCubemap(const string& filename, bool gammaCorrection, bool flip) {
+unsigned int RenderApp::loadCubemap(const string& filename, bool gammaCorrection, bool flip) {
     string textureName = filename + (gammaCorrection ? "-g" : "") + (flip ? "-f" : "");
     auto findResult = loadedTextures_.find(textureName);
     if (findResult != loadedTextures_.end()) {
@@ -183,7 +183,7 @@ unsigned int Renderer::loadCubemap(const string& filename, bool gammaCorrection,
     return texHandle;
 }
 
-unsigned int Renderer::generateTexture(float r, float g, float b, float a) {
+unsigned int RenderApp::generateTexture(float r, float g, float b, float a) {
     string textureName = "color " + to_string(r) + " " + to_string(g) + " " + to_string(b) + " " + to_string(a);
     auto findResult = loadedTextures_.find(textureName);
     if (findResult != loadedTextures_.end()) {
@@ -210,11 +210,11 @@ unsigned int Renderer::generateTexture(float r, float g, float b, float a) {
     return texHandle;
 }
 
-Renderer::Renderer() :// always use this style for uniform init #############################################################
+RenderApp::RenderApp() :// always use this style for uniform init #############################################################
     state_(Uninitialized),
     windowSize_(INITIAL_WINDOW_SIZE) {
     
-    assert(!instantiated_);    // Ensure only one instance of Renderer.
+    assert(!instantiated_);    // Ensure only one instance of RenderApp.
     instantiated_ = true;
     state_ = Running;
     randNumGenerator_.seed(static_cast<unsigned long>(chrono::high_resolution_clock::now().time_since_epoch().count()));    // need a better way to handle RNG, use a class ######################################################
@@ -249,7 +249,7 @@ Renderer::Renderer() :// always use this style for uniform init ################
     frameCounter_ = 0;
 }
 
-Renderer::~Renderer() {
+RenderApp::~RenderApp() {
     instantiated_ = false;
     
     for (auto& m : performanceMonitors_) {
@@ -300,11 +300,11 @@ Renderer::~Renderer() {
     glfwTerminate();
 }
 
-Renderer::State Renderer::getState() const {
+RenderApp::State RenderApp::getState() const {
     return state_;
 }
 
-void Renderer::setState(State state) {
+void RenderApp::setState(State state) {
     state_ = state;
     if (state == Running) {
         glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -314,33 +314,33 @@ void Renderer::setState(State state) {
     }
 }
 
-GLFWwindow* Renderer::getWindowHandle() const {
+GLFWwindow* RenderApp::getWindowHandle() const {
     return window_;
 }
 
-Scene* Renderer::getScene() const {
+Scene* RenderApp::getScene() const {
     return scene_.get();
 }
 
-void Renderer::init() {
+void RenderApp::init() {
     // TODO should perform all GL setup ########################################################
 }
 
-Scene* Renderer::createScene() {
+Scene* RenderApp::createScene() {
     assert(!scene_);
     scene_ = unique_ptr<Scene>(new Scene());
     return scene_.get();
 }
 
-void Renderer::startRenderThread() {
+void RenderApp::startRenderThread() {
     //  TODO should kick up a separate thread for scene rendering ##########################################
 }
 
-void Renderer::tempRender() {    // temporary, used until render gets it's own thread #######################################
+void RenderApp::tempRender() {    // temporary, used until render gets it's own thread #######################################
     drawWorld();
 }
 
-void Renderer::drawWorld() {
+void RenderApp::drawWorld() {
     beginFrame();
     /*drawShadowMaps(camera, world);
     geometryPass(camera, world);
@@ -355,7 +355,7 @@ void Renderer::drawWorld() {
     endFrame();
 }
 
-bool Renderer::pollEvent(Event& e) {
+bool RenderApp::pollEvent(Event& e) {
     if (eventQueue_.empty()) {
         return false;
     }
@@ -365,7 +365,7 @@ bool Renderer::pollEvent(Event& e) {
     return true;
 }
 
-void Renderer::resizeBuffers(int width, int height) {
+void RenderApp::resizeBuffers(int width, int height) {
     windowSize_.x = width;
     windowSize_.y = height;
     geometryFBO_->setBufferSize(windowSize_);
@@ -376,17 +376,17 @@ void Renderer::resizeBuffers(int width, int height) {
     ssaoBlurFBO_->setBufferSize(windowSize_ / 2);
 }
 
-void Renderer::close() {
+void RenderApp::close() {
     // TODO should perform destruction ##########################################################################
 }
 
-void Renderer::windowCloseCallback(GLFWwindow* window) {
+void RenderApp::windowCloseCallback(GLFWwindow* window) {
     Event e;
     e.type = Event::Close;
     eventQueue_.push(e);
 }
 
-void Renderer::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
+void RenderApp::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
     Event e;
     e.type = Event::Resize;
     e.size.width = width;
@@ -394,7 +394,7 @@ void Renderer::framebufferSizeCallback(GLFWwindow* window, int width, int height
     eventQueue_.push(e);
 }
 
-void Renderer::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+void RenderApp::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     Event e;
     if (action != GLFW_RELEASE) {
         e.type = Event::KeyPress;
@@ -407,7 +407,7 @@ void Renderer::keyCallback(GLFWwindow* window, int key, int scancode, int action
     eventQueue_.push(e);
 }
 
-void Renderer::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+void RenderApp::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
     Event e;
     if (action != GLFW_RELEASE) {
         e.type = Event::MouseButtonPress;
@@ -419,7 +419,7 @@ void Renderer::mouseButtonCallback(GLFWwindow* window, int button, int action, i
     eventQueue_.push(e);
 }
 
-void Renderer::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
+void RenderApp::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
     Event e;
     e.type = Event::MouseMove;
     e.mouseMove.xpos = xpos;
@@ -427,7 +427,7 @@ void Renderer::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
     eventQueue_.push(e);
 }
 
-void Renderer::scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+void RenderApp::scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
     Event e;
     e.type = Event::MouseScroll;
     e.mouseScroll.xoffset = xoffset;
@@ -435,7 +435,7 @@ void Renderer::scrollCallback(GLFWwindow* window, double xoffset, double yoffset
     eventQueue_.push(e);
 }
 
-void Renderer::setupOpenGL() {
+void RenderApp::setupOpenGL() {
     glfwInit();    // Initialize GLFW and set version.
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -473,7 +473,7 @@ void Renderer::setupOpenGL() {
     glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
 
-void Renderer::setupTextures() {
+void RenderApp::setupTextures() {
     blackTexture_ = generateTexture(0.0f, 0.0f, 0.0f);
     whiteTexture_ = generateTexture(1.0f, 1.0f, 1.0f);
     blueTexture_ = generateTexture(0.5f, 0.5f, 1.0f);
@@ -548,7 +548,7 @@ void Renderer::setupTextures() {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 4, 4, 0, GL_RGB, GL_FLOAT, ssaoNoise.data());
 }
 
-void Renderer::setupShaders() {
+void RenderApp::setupShaders() {
     glGenBuffers(1, &viewProjectionMtxUBO_);    // Create a uniform buffer for ViewProjectionMtx.
     glBindBuffer(GL_UNIFORM_BUFFER, viewProjectionMtxUBO_);
     glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
@@ -634,7 +634,7 @@ void Renderer::setupShaders() {
     integrateBRDFShader_ = make_unique<Shader>("shaders/pbr/integrateBRDF.v.glsl", "shaders/pbr/integrateBRDF.f.glsl");
 }
 
-void Renderer::setupBuffers() {
+void RenderApp::setupBuffers() {
     geometryFBO_ = make_unique<Framebuffer>(windowSize_);
     geometryFBO_->attachTexture(GL_COLOR_ATTACHMENT0, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Position color buffer.
     geometryFBO_->attachTexture(GL_COLOR_ATTACHMENT1, GL_RGBA16F, GL_RGBA, GL_FLOAT, GL_NEAREST, GL_CLAMP_TO_EDGE);    // Normal color buffer.
@@ -677,7 +677,7 @@ void Renderer::setupBuffers() {
     ssaoBlurFBO_->validate();
 }
 
-void Renderer::setupRender() {
+void RenderApp::setupRender() {
     vector<Mesh::Vertex> windowQuadVertices = {
         {{ 1.0f,  1.0f,  0.0f}, { 1.0f, 1.0f}},
         {{-1.0f,  1.0f,  0.0f}, { 0.0f, 1.0f}},
@@ -774,7 +774,7 @@ void Renderer::setupRender() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Renderer::beginFrame() {
+void RenderApp::beginFrame() {
     double currentTime = glfwGetTime();
     float deltaTime = static_cast<float>(currentTime - lastTime_);
     lastTime_ = currentTime;
@@ -793,7 +793,7 @@ void Renderer::beginFrame() {
     }
 }
 
-void Renderer::drawShadowMaps(const Camera& camera, const World& world) {
+void RenderApp::drawShadowMaps(const Camera& camera, const World& world) {
     glCullFace(GL_FRONT);
     
     glm::vec2 tanHalfFOV(tan(glm::radians(camera.fov_ / 2.0f)) * (static_cast<float>(windowSize_.x) / windowSize_.y), tan(glm::radians(camera.fov_ / 2.0f)));
@@ -846,7 +846,7 @@ void Renderer::drawShadowMaps(const Camera& camera, const World& world) {
     glCullFace(GL_BACK);
 }
 
-void Renderer::geometryPass(const Camera& camera, const World& world) {
+void RenderApp::geometryPass(const Camera& camera, const World& world) {
     geometryFBO_->bind();    // Render to geometry buffer (geometry pass).
     glViewport(0, 0, geometryFBO_->getBufferSize().x, geometryFBO_->getBufferSize().y);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -859,7 +859,7 @@ void Renderer::geometryPass(const Camera& camera, const World& world) {
     glBlitFramebuffer(0, 0, geometryFBO_->getBufferSize().x, geometryFBO_->getBufferSize().y, 0, 0, renderFBO_->getBufferSize().x, renderFBO_->getBufferSize().y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 }
 
-void Renderer::applySSAO() {
+void RenderApp::applySSAO() {
     performanceMonitors_.at("SSAO")->startGPUTimer();
     glDisable(GL_DEPTH_TEST);
     
@@ -892,7 +892,7 @@ void Renderer::applySSAO() {
     performanceMonitors_.at("SSAO")->stopGPUTimer();
 }
 
-void Renderer::lightingPass(const Camera& camera, const World& world) {
+void RenderApp::lightingPass(const Camera& camera, const World& world) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE);    // Lights are added together one at a time, so blending sums each color component.
     
@@ -1032,7 +1032,7 @@ void Renderer::lightingPass(const Camera& camera, const World& world) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-void Renderer::drawLamps(const Camera& camera, const World& world) {
+void RenderApp::drawLamps(const Camera& camera, const World& world) {
     lampShader_->use();    // Draw lamps.
     if (world.lampsOn_) {
         for (size_t i = 0; i < world.pointLights_.size(); ++i) {
@@ -1056,7 +1056,7 @@ void Renderer::drawLamps(const Camera& camera, const World& world) {
     glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(world.debugVectors_.size()));
 }
 
-void Renderer::drawSkybox() {
+void RenderApp::drawSkybox() {
     glDepthFunc(GL_LEQUAL);
     glDisable(GL_CULL_FACE);
     
@@ -1070,7 +1070,7 @@ void Renderer::drawSkybox() {
     glEnable(GL_CULL_FACE);
 }
 
-void Renderer::applyBloom() {
+void RenderApp::applyBloom() {
     performanceMonitors_.at("BLOOM")->startGPUTimer();
     glDisable(GL_DEPTH_TEST);
     
@@ -1101,7 +1101,7 @@ void Renderer::applyBloom() {
     performanceMonitors_.at("BLOOM")->stopGPUTimer();
 }
 
-void Renderer::drawPostProcessing() {
+void RenderApp::drawPostProcessing() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);    // Apply post-processing and render to window.
     glViewport(0, 0, windowSize_.x, windowSize_.y);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -1119,7 +1119,7 @@ void Renderer::drawPostProcessing() {
     windowQuad_.drawGeometry();
 }
 
-void Renderer::forwardLightingPass() {
+void RenderApp::forwardLightingPass() {
     Camera* camera = scene_->cam_.get();
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1223,7 +1223,7 @@ void Renderer::forwardLightingPass() {
     glEnable(GL_CULL_FACE);
 }
 
-void Renderer::drawGUI() {
+void RenderApp::drawGUI() {
     glEnable(GL_BLEND);
     
     shapeShader_->use();    // Render GUI.
@@ -1253,7 +1253,7 @@ void Renderer::drawGUI() {
     glEnable(GL_DEPTH_TEST);
 }
 
-void Renderer::endFrame() {
+void RenderApp::endFrame() {
     performanceMonitors_.at("FRAME")->stopGPUTimer();
     
     for (const auto& m : performanceMonitors_) {    // Monitor update must occur after drawing.
@@ -1265,7 +1265,7 @@ void Renderer::endFrame() {
     glCheckError();
 }
 
-void Renderer::renderScene(const Camera& camera, const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender) {
+void RenderApp::renderScene(const Camera& camera, const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender) {
     Shader* shader;
     if (shadowRender) {
         shader = shadowMapShader_.get();
@@ -1349,7 +1349,7 @@ void Renderer::renderScene(const Camera& camera, const World& world, const glm::
     world.modelTest_.draw(*shader, world.modelTestTransform_.getTransform());
 }
 
-void Renderer::renderScene2(const Camera& camera, const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx) {
+void RenderApp::renderScene2(const Camera& camera, const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx) {
     //Shader* shader = forwardRenderShader_.get();
     Shader* shader = forwardPBRShader_.get();
     shader->use();
@@ -1394,12 +1394,12 @@ void Renderer::renderScene2(const Camera& camera, const World& world, const glm:
     }
 }
 
-float Renderer::randomFloat(float min, float max) {
+float RenderApp::randomFloat(float min, float max) {
     uniform_real_distribution<float> minMaxRange(min, max);
     return minMaxRange(randNumGenerator_);
 }
 
-int Renderer::randomInt(int min, int max) {
+int RenderApp::randomInt(int min, int max) {
     uniform_int_distribution<int> minMaxRange(min, max);
     return minMaxRange(randNumGenerator_);
 }

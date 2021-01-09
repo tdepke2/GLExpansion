@@ -1,6 +1,6 @@
 #include "../Camera.h"
 #include "../Event.h"
-#include "../Renderer.h"
+#include "../RenderApp.h"
 #include "../Scene.h"
 #include "../SceneNode.h"
 #include <glad/glad.h>
@@ -12,12 +12,12 @@
 
 using namespace std;
 
-void processInput(Renderer& app, Camera* camera);
-void processEvent(Renderer& app, Camera* camera, const Event& e);
+void processInput(RenderApp& app, Camera* camera);
+void processEvent(RenderApp& app, Camera* camera, const Event& e);
 
 int main(int argc, char** argv) {
     cout << "Initializing setup...\n";
-    Renderer app;    // refactor to RenderApp ################################################
+    RenderApp app;
     app.init();
     cout << "Setup complete.\n";
     
@@ -28,7 +28,7 @@ int main(int argc, char** argv) {
     cameraNode->attachObject(camera);
     
     app.startRenderThread();
-    while (app.getState() != Renderer::Exiting) {    // Tick loop.
+    while (app.getState() != RenderApp::Exiting) {    // Tick loop.
         app.tempRender();
         
         processInput(app, camera);
@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-void processInput(Renderer& app, Camera* camera) {
+void processInput(RenderApp& app, Camera* camera) {
     glm::vec3 moveDirection(0.0f, 0.0f, 0.0f);
     if (glfwGetKey(app.getWindowHandle(), GLFW_KEY_W) == GLFW_PRESS) {
         moveDirection.z -= 1.0f;
@@ -65,43 +65,43 @@ void processInput(Renderer& app, Camera* camera) {
         camera->processKeyboard(glm::normalize(moveDirection));
     }
     
-    /*if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_P) == GLFW_PRESS) {
+    /*if (glfwGetKey(app.getWindowHandle(), GLFW_KEY_P) == GLFW_PRESS) {
         world.modelTestTransform_.move(glm::vec3(0.0f, 0.0f, -camera.moveSpeed_));
     }
-    if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_SEMICOLON) == GLFW_PRESS) {
+    if (glfwGetKey(app.getWindowHandle(), GLFW_KEY_SEMICOLON) == GLFW_PRESS) {
         world.modelTestTransform_.move(glm::vec3(0.0f, 0.0f, camera.moveSpeed_));
     }
-    if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_L) == GLFW_PRESS) {
+    if (glfwGetKey(app.getWindowHandle(), GLFW_KEY_L) == GLFW_PRESS) {
         world.modelTestTransform_.move(glm::vec3(-camera.moveSpeed_, 0.0f, 0.0f));
     }
-    if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_APOSTROPHE) == GLFW_PRESS) {
+    if (glfwGetKey(app.getWindowHandle(), GLFW_KEY_APOSTROPHE) == GLFW_PRESS) {
         world.modelTestTransform_.move(glm::vec3(camera.moveSpeed_, 0.0f, 0.0f));
     }
-    if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_COMMA) == GLFW_PRESS) {
+    if (glfwGetKey(app.getWindowHandle(), GLFW_KEY_COMMA) == GLFW_PRESS) {
         world.modelTestTransform_.move(glm::vec3(0.0f, -camera.moveSpeed_, 0.0f));
     }
-    if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_PERIOD) == GLFW_PRESS) {
+    if (glfwGetKey(app.getWindowHandle(), GLFW_KEY_PERIOD) == GLFW_PRESS) {
         world.modelTestTransform_.move(glm::vec3(0.0f, camera.moveSpeed_, 0.0f));
     }
-    if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_O) == GLFW_PRESS) {
+    if (glfwGetKey(app.getWindowHandle(), GLFW_KEY_O) == GLFW_PRESS) {
         world.modelTestTransform_.rotate(glm::vec3(0.0f, -camera.moveSpeed_, 0.0f));
     }
-    if (glfwGetKey(renderer.getWindowHandle(), GLFW_KEY_LEFT_BRACKET) == GLFW_PRESS) {
+    if (glfwGetKey(app.getWindowHandle(), GLFW_KEY_LEFT_BRACKET) == GLFW_PRESS) {
         world.modelTestTransform_.rotate(glm::vec3(0.0f, camera.moveSpeed_, 0.0f));
     }*/
 }
 
-void processEvent(Renderer& app, Camera* camera, const Event& e) {
+void processEvent(RenderApp& app, Camera* camera, const Event& e) {
     if (e.type == Event::Close) {
-        app.setState(Renderer::Exiting);
+        app.setState(RenderApp::Exiting);
     } else if (e.type == Event::Resize) {
         app.resizeBuffers(e.size.width, e.size.height);
     } else if (e.type == Event::KeyPress) {
         if (e.key.code == GLFW_KEY_ESCAPE) {
-            if (app.getState() == Renderer::Running) {
-                app.setState(Renderer::Paused);
-            } else if (app.getState() == Renderer::Paused) {
-                app.setState(Renderer::Running);
+            if (app.getState() == RenderApp::Running) {
+                app.setState(RenderApp::Paused);
+            } else if (app.getState() == RenderApp::Paused) {
+                app.setState(RenderApp::Running);
             }
         } else if (e.key.code == GLFW_KEY_UP) {
             camera->moveSpeed_ *= 2.0f;
@@ -129,15 +129,15 @@ void processEvent(Renderer& app, Camera* camera, const Event& e) {
             app.config_.setSSAO(!app.config_.getSSAO());
         }
     } else if (e.type == Event::MouseMove) {
-        static glm::vec2 lastMousePos(Renderer::INITIAL_WINDOW_SIZE.x / 2.0f, Renderer::INITIAL_WINDOW_SIZE.y / 2.0f);
+        static glm::vec2 lastMousePos(RenderApp::INITIAL_WINDOW_SIZE.x / 2.0f, RenderApp::INITIAL_WINDOW_SIZE.y / 2.0f);
         
-        if (app.getState() == Renderer::Running) {
+        if (app.getState() == RenderApp::Running) {
             camera->processMouseMove(static_cast<float>(e.mouseMove.xpos) - lastMousePos.x, lastMousePos.y - static_cast<float>(e.mouseMove.ypos));
         }
         lastMousePos.x = static_cast<float>(e.mouseMove.xpos);
         lastMousePos.y = static_cast<float>(e.mouseMove.ypos);
     } else if (e.type == Event::MouseScroll) {
-        if (app.getState() == Renderer::Running) {
+        if (app.getState() == RenderApp::Running) {
             camera->processMouseScroll(static_cast<float>(e.mouseScroll.xoffset), static_cast<float>(e.mouseScroll.yoffset));
         }
     }

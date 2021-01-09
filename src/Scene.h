@@ -30,7 +30,7 @@ class Scene {
     
     Scene(const string& name = "");
     
-    friend class Renderer;
+    friend class RenderApp;
 };
 
 #endif

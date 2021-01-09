@@ -1,5 +1,5 @@
-#ifndef RENDERER_H_
-#define RENDERER_H_
+#ifndef RENDER_APP_H_
+#define RENDER_APP_H_
 
 class Camera;
 class Framebuffer;
@@ -13,7 +13,7 @@ class World;
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#define glCheckError() Renderer::glCheckError_(__FILE__, __LINE__)
+#define glCheckError() RenderApp::glCheckError_(__FILE__, __LINE__)
 
 #include "Configuration.h"
 #include "Event.h"
@@ -28,7 +28,7 @@ class World;
 
 using namespace std;
 
-class Renderer {
+class RenderApp {
     public:
     enum State {    // why not enum class like RenderState::Uninitialized? ####################################################################
         Uninitialized, Running, Paused, Exiting
@@ -51,8 +51,8 @@ class Renderer {
     static unsigned int loadTextureHDR(const string& filename, bool flip = true);
     static unsigned int loadCubemap(const string& filename, bool gammaCorrection, bool flip = false);
     static unsigned int generateTexture(float r, float g, float b, float a = 1.0f);
-    Renderer();
-    ~Renderer();
+    RenderApp();
+    ~RenderApp();
     State getState() const;
     void setState(State state);
     GLFWwindow* getWindowHandle() const;
