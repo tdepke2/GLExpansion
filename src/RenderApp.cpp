@@ -1174,7 +1174,7 @@ void RenderApp::forwardLightingPass() {
     constexpr unsigned int NUM_LIGHTS = 4;
     unsigned int lightStates[NUM_LIGHTS];
     for (size_t i = 0; i < NUM_LIGHTS; ++i) {
-        //lightStates[i] = (world.lampsOn_ ? 1 : 0);
+        lightStates[i] = 1;//(world.lampsOn_ ? 1 : 0);
     }
     shader->setUnsignedIntArray("lightStates", NUM_LIGHTS, lightStates);
     glm::vec3 lightPositions[] = {
@@ -1195,7 +1195,7 @@ void RenderApp::forwardLightingPass() {
         shader->setVec3("lights[" + to_string(i) + "].diffuse", lightColors[i]);
     }
     
-    //renderScene2(camera, world, viewMtx, projectionMtx);
+    renderScene2(viewMtx, projectionMtx);
     
     lampShader_->use();    // Draw lamps.
     //if (world.lampsOn_) {
@@ -1349,7 +1349,7 @@ void RenderApp::renderScene(const Camera& camera, const World& world, const glm:
     world.modelTest_.draw(*shader, world.modelTestTransform_.getTransform());
 }
 
-void RenderApp::renderScene2(const Camera& camera, const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx) {
+void RenderApp::renderScene2(const glm::mat4& viewMtx, const glm::mat4& projectionMtx) {
     //Shader* shader = forwardRenderShader_.get();
     Shader* shader = forwardPBRShader_.get();
     shader->use();
@@ -1384,14 +1384,15 @@ void RenderApp::renderScene2(const Camera& camera, const World& world, const glm
     glActiveTexture(GL_TEXTURE7);
     glBindTexture(GL_TEXTURE_2D, lookupBRDFTexture_);
     
-    for (int row = 0; row < 7; ++row) {
+    /*for (int row = 0; row < 7; ++row) {
         //shader->setFloat("metallic", row / 7.0f);
         for (int col = 0; col < 7; ++col) {
             //shader->setFloat("roughness", glm::clamp(col / 7.0f, 0.05f, 1.0f));
             glm::mat4 modelMtx = glm::translate(glm::mat4(1.0f), glm::vec3((col - 7.0f / 2.0f) * 2.5f, (row - 7.0f / 2.0f) * 2.5f, 0.0f));
             world.sphere1_.drawGeometry(*shader, modelMtx);
         }
-    }
+    }*/
+    scene_->draw(*shader, glm::mat4(1.0f));
 }
 
 float RenderApp::randomFloat(float min, float max) {

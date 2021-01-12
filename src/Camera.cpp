@@ -1,17 +1,6 @@
 #include "Camera.h"
 #include "SceneNode.h"
 
-Camera::Camera(const glm::vec3& worldUp, float yaw, float pitch) :
-    worldUp_(worldUp),
-    yaw_(yaw),
-    pitch_(pitch),
-    moveSpeed_(2.5f * 0.016f),
-    mouseSensistivity_(0.1f),
-    fov_(90.0f) {
-    
-    updateRotation();
-}
-
 glm::mat4 Camera::getViewMatrix() const {
     return glm::lookAt(getSceneNode()->getPosition(), getSceneNode()->getPosition() + front_, up_);
 }
@@ -48,6 +37,20 @@ void Camera::processMouseScroll(float xoffset, float yoffset) {
     } else if (fov_ < 1.0f) {
         fov_ = 1.0f;
     }
+}
+
+void Camera::draw() const {}
+
+Camera::Camera(const string& name, const glm::vec3& worldUp, float yaw, float pitch) :
+    SceneObject(name),
+    worldUp_(worldUp),
+    yaw_(yaw),
+    pitch_(pitch),
+    moveSpeed_(2.5f * 0.016f),
+    mouseSensistivity_(0.1f),
+    fov_(90.0f) {
+    
+    updateRotation();
 }
 
 void Camera::updateRotation() {

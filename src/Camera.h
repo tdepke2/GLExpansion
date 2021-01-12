@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <string>
 
 using namespace std;
 
@@ -18,8 +19,11 @@ class Camera : public SceneObject {
     void processMouseMove(float xoffset, float yoffset, bool constrainPitch = true);
     void processMouseScroll(float xoffset, float yoffset);
     
+    protected:
+    void draw() const;
+    
     private:
-    Camera(const glm::vec3& worldUp = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = -90.0f, float pitch = 0.0f);
+    Camera(const string& name, const glm::vec3& worldUp = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = -90.0f, float pitch = 0.0f);
     void updateRotation();
     
     friend class Scene;

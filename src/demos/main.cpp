@@ -1,4 +1,5 @@
 #include "../Camera.h"
+#include "../Entity.h"
 #include "../Event.h"
 #include "../RenderApp.h"
 #include "../Scene.h"
@@ -23,9 +24,17 @@ int main(int argc, char** argv) {
     
     Scene* scene = app.createScene();
     
-    Camera* camera = scene->createCamera();
+    Camera* camera = scene->createCamera("myCam");
     SceneNode* cameraNode = scene->getRootNode()->createChildNode();
     cameraNode->attachObject(camera);
+    cameraNode->setPosition(glm::vec3(0.0f, 1.8f, 8.0f));
+    
+    scene->generateCube("cube1");
+    scene->generateSphere("sphere1", 1.0f, 128, 64);
+    
+    Entity* sphere1 = scene->createEntity("sphere1");
+    SceneNode* sphere1Node = scene->getRootNode()->createChildNode();
+    sphere1Node->attachObject(sphere1);
     
     app.startRenderThread();
     while (app.getState() != RenderApp::Exiting) {    // Tick loop.

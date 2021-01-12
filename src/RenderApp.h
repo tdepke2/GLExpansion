@@ -115,7 +115,7 @@ class RenderApp {
     void drawGUI();
     void endFrame();
     void renderScene(const Camera& camera, const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx, bool shadowRender);
-    void renderScene2(const Camera& camera, const World& world, const glm::mat4& viewMtx, const glm::mat4& projectionMtx);
+    void renderScene2(const glm::mat4& viewMtx, const glm::mat4& projectionMtx);
     void processInput(float deltaTime);
     float randomFloat(float min = 0.0f, float max = 1.0f);    // Generates a random float between min (inclusive) and max (exclusive).
     int randomInt(int min, int max);    // Generates a random integer between min and max inclusive.
